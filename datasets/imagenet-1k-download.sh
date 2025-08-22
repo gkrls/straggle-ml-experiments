@@ -13,7 +13,7 @@ DEVKIT_URL="https://image-net.org/data/ILSVRC/2012/ILSVRC2012_devkit_t12.tar.gz"
 TARGET_DIR="${1:-.}"
 mkdir -p "$TARGET_DIR"
 
-N_PARTS="${N_PARTS:-16}"
+N_PARTS="${N_PARTS:-12}"
 SPLIT_SIZE_MIN="${SPLIT_SIZE_MIN:-1M}"
 
 have() { command -v "$1" >/dev/null 2>&1; }
