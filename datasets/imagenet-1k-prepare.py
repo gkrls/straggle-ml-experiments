@@ -49,13 +49,28 @@ def extract_val(val_tar, devkit_tar, output_dir):
     """Extract validation data and organize by class"""
     print("Extracting validation data...")
     
-    # First extract devkit to get validation labels
-    print("Extracting devkit for validation labels...")
+    # Extract devkit to devkit directory
+    devkit_dir = output_dir / "devkit"
+    devkit_dir.mkdir(exist_ok=True)
+    
+    print("Extracting devkit...")
     with tarfile.open(devkit_tar) as tar:
-        tar.extractall(output_dir)
+        tar.extractall(devkit_dir)
+    
+    # Find validation ground truth file (search for it)
+    val_labels_file = None
+    for root, dirs, files in os.walk(devkit_dir):
+        if "ILSVRC2012_validation_ground_truth.txt" in files:
+            val_labels_file = Path(root) / "ILSVRC2012_validation_ground_truth.txt"
+            break
+    
+    if not val_labels_file:
+        print("Could not find ILSVRC2012_validation_ground_truth.txt in devkit!")
+        sys.exit(1)
+    
+    print(f"Found validation labels at: {val_labels_file}")
     
     # Read validation ground truth
-    val_labels_file = output_dir / "ILSVRC2012_devkit_t12" / "data" / "ILSVRC2012_validation_ground_truth.txt"
     val_labels = []
     with open(val_labels_file) as f:
         val_labels = [int(line.strip()) for line in f]
@@ -85,30 +100,31 @@ def extract_val(val_tar, devkit_tar, output_dir):
     
     # Clean up
     shutil.rmtree(val_temp)
-    shutil.rmtree(output_dir / "ILSVRC2012_devkit_t12")
 
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: python prepare_imagenet.py <input_dir> [output_dir]")
+        print("Usage: python prepare_imagenet.py <input_dir> <output_dir>")
         sys.exit(1)
     
     input_dir = Path(sys.argv[1])
-    output_dir = Path(sys.argv[2] if len(sys.argv) > 2 else input_dir)
+    output_dir = Path(sys.argv[2])
+    
+    # Check if output directory exists and delete it
+    if output_dir.exists():
+        print(f"Output directory {output_dir} already exists. Deleting it...")
+        shutil.rmtree(output_dir)
     
     train_tar = input_dir / "ILSVRC2012_img_train.tar"
     val_tar = input_dir / "ILSVRC2012_img_val.tar"
     devkit_tar = input_dir / "ILSVRC2012_devkit_t12.tar.gz"
-  
-    print("Preparing Imagenet...")
-
+    
     if not all(f.exists() for f in [train_tar, val_tar, devkit_tar]):
         print("Missing required files!")
         sys.exit(1)
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
-
     extract_train(train_tar, output_dir)
     extract_val(val_tar, devkit_tar, output_dir)
     
