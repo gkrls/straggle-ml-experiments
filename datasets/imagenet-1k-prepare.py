@@ -112,7 +112,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     input_dir = Path(sys.argv[1])
-    output_dir = Path(sys.argv[2]) if len(sys.arv) > 2 else input_dir
+    output_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else input_dir
     
     print("preparing imagenet...")
     # Check if output directory exists and delete specific subdirs
