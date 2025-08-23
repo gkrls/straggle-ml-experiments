@@ -103,8 +103,8 @@ def extract_val(val_tar, devkit_tar, output_dir):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python prepare_imagenet.py <input_dir> <output_dir>")
+    if len(sys.argv) < 2:
+        print("Usage: python prepare_imagenet.py <input_dir> [output_dir]")
         sys.exit(1)
     
     input_dir = Path(sys.argv[1])
