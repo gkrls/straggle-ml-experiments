@@ -3,11 +3,11 @@
 
 set -euo pipefail
 
-# install if missing
-sudo apt install -y nfs-common rsync
-
 # one-liner help
 [[ ${1:-} == "-h" || ${1:-} == "--help" ]] && { echo "Usage: $0 <server> <mountpoint> [path=/]"; exit 0; }
+
+# install if missing
+sudo apt install -y nfs-common rsync
 
 server="${1:?server required}"
 mnt="${2:?mountpoint required}"
