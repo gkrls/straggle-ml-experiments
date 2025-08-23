@@ -24,25 +24,29 @@ def extract_train(train_tar, output_dir):
     train_dir.mkdir(parents=True, exist_ok=True)
     
     with tarfile.open(train_tar) as tar:
-        for member in tar:
-            if member.name.endswith('.tar'):
-                print(f"Extracting {member.name}")
-                
-                # Extract the class tar file
-                tar.extract(member, train_dir)
-                class_tar_path = train_dir / member.name
-                
-                # Create class directory
-                class_name = member.name.replace('.tar', '')
-                class_dir = train_dir / class_name
-                class_dir.mkdir(exist_ok=True)
-                
-                # Extract images from class tar
-                with tarfile.open(class_tar_path) as class_tar:
-                    class_tar.extractall(class_dir)
-                
-                # Remove the class tar file
-                os.remove(class_tar_path)
+        members = [m for m in tar if m.name.endswith('.tar')]
+        total = len(members)
+        
+        for i, member in enumerate(members, 1):
+            print(f"\rExtracting class tars: {i}/{total}", end='', flush=True)
+            
+            # Extract the class tar file
+            tar.extract(member, train_dir)
+            class_tar_path = train_dir / member.name
+            
+            # Create class directory
+            class_name = member.name.replace('.tar', '')
+            class_dir = train_dir / class_name
+            class_dir.mkdir(exist_ok=True)
+            
+            # Extract images from class tar
+            with tarfile.open(class_tar_path) as class_tar:
+                class_tar.extractall(class_dir)
+            
+            # Remove the class tar file
+            os.remove(class_tar_path)
+        
+        print()  # New line after progress
 
 
 def extract_val(val_tar, devkit_tar, output_dir):
@@ -103,12 +107,12 @@ def extract_val(val_tar, devkit_tar, output_dir):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python prepare_imagenet.py <input_dir> [output_dir]")
+    if len(sys.argv) != 3:
+        print("Usage: python prepare_imagenet.py <input_dir> <output_dir>")
         sys.exit(1)
     
     input_dir = Path(sys.argv[1])
-    output_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else input_dir
+    output_dir = Path(sys.argv[2])
     
     # Check if output directory exists and delete specific subdirs
     if output_dir.exists():
