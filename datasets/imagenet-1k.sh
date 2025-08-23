@@ -1,130 +1,105 @@
 #!/usr/bin/env bash
+# Usage: ./get_imagenet.sh /path/to/dir
+# Env knobs:
+#   N_PARTS=16        # parallel connections for aria2 / wget chunking
+#   SPLIT_SIZE_MIN=1M # aria2c chunk size hint
+
 set -euo pipefail
 
-# Where to put the prepared dataset
-ROOT="$HOME/data/imagenet"          # change if needed
-DOWNLOAD="true"                     # set to false if you've already downloaded the tarballs into $ROOT/raw
-
-# URLs you gave me
 TRAIN_URL="https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_train.tar"
 VAL_URL="https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar"
 DEVKIT_URL="https://image-net.org/data/ILSVRC/2012/ILSVRC2012_devkit_t12.tar.gz"
 
-# --- prep dirs ---
-mkdir -p "$ROOT"/{raw,train,val}
-cd "$ROOT"
+TARGET_DIR="${1:-.}"
+mkdir -p "$TARGET_DIR"
 
-# --- 1) download (resume supported) ---
-if [[ "${DOWNLOAD}" == "true" ]]; then
-  echo "[*] Downloading ImageNet archives to $ROOT/raw ..."
-  wget -c -O raw/ILSVRC2012_img_train.tar "$TRAIN_URL"
-  wget -c -O raw/ILSVRC2012_img_val.tar "$VAL_URL"
-  wget -c -O raw/ILSVRC2012_devkit_t12.tar.gz "$DEVKIT_URL"
-else
-  echo "[*] Skipping download (DOWNLOAD=false). Expecting archives in $ROOT/raw"
-fi
+N_PARTS="${N_PARTS:-12}"
+SPLIT_SIZE_MIN="${SPLIT_SIZE_MIN:-1M}"
 
-# Quick sanity check
-for f in raw/ILSVRC2012_img_train.tar raw/ILSVRC2012_img_val.tar raw/ILSVRC2012_devkit_t12.tar.gz; do
-  [[ -f "$f" ]] || { echo "Missing $f"; exit 1; }
-done
+have() { command -v "$1" >/dev/null 2>&1; }
 
-# --- 2) extract devkit (for meta + val ground truth) ---
-echo "[*] Extracting devkit ..."
-tar -xzf raw/ILSVRC2012_devkit_t12.tar.gz -C "$ROOT"
-DEVKIT_DIR="$(find "$ROOT" -maxdepth 1 -type d -name 'ILSVRC2012_devkit_t12' -print -quit)"
-[[ -n "${DEVKIT_DIR:-}" ]] || { echo "Devkit dir not found"; exit 1; }
+download_aria() {
+  local url="$1" out="$2"
+  echo "[aria2c] $out"
+  # -x/-s = connections, -k = min split size, -c = resume, -d/-o set dest
+  aria2c -c -x"$N_PARTS" -s"$N_PARTS" -k"$SPLIT_SIZE_MIN" \
+         -d "$(dirname "$out")" -o "$(basename "$out")" \
+         "$url"
+}
 
-# --- 3) extract TRAIN split ---
-# Step 3a: this creates ~1000 per-class tar files (nXXXX.tar)
-echo "[*] Extracting train meta-archive (this may take a while) ..."
-tar -xf raw/ILSVRC2012_img_train.tar -C train
+# Get headers with wget only; extract Accept-Ranges and Content-Length
+probe_with_wget() {
+  local url="$1"
+  wget --spider --server-response -O - "$url" 2>&1 \
+  | awk 'BEGIN{IGNORECASE=1}
+         tolower($1) ~ /^accept-ranges:/  {ar=$2}
+         tolower($1) ~ /^content-length:/ {cl=$2}
+         END{ if(!ar) ar=""; if(!cl) cl=0; printf "%s %s\n", ar, cl }'
+}
 
-# Step 3b: expand each class tar into its folder, then remove the inner tar
-echo "[*] Expanding per-class train tars ..."
-# Use as many parallel jobs as CPU cores, fall back to 4 if nproc not present.
-JOBS="${JOBS:-$(command -v nproc >/dev/null && nproc || echo 4)}"
-find train -type f -name "*.tar" -print0 \
-  | xargs -0 -I{} -P "${JOBS}" bash -c '
-      set -e
-      t="{}"
-      d="${t%.tar}"
-      mkdir -p "$d"
-      tar -xf "$t" -C "$d"
-      rm -f "$t"
-    '
+download_wget_parallel() {
+  local url="$1" out="$2" nparts="$3"
+  echo "[wget-parallel] Probing range support for $url"
+  read -r accept_ranges content_length < <(probe_with_wget "$url")
 
-# --- 4) extract VAL split (unsorted) ---
-echo "[*] Extracting validation images ..."
-tar -xf raw/ILSVRC2012_img_val.tar -C val
+  if [[ "$accept_ranges" != "bytes" || "$content_length" -le 0 ]]; then
+    echo "[wget] Server does not advertise range support (or size unknown). Using single stream."
+    wget -c --show-progress -O "$out" "$url"
+    return
+  fi
 
-# --- 5) sort VAL images into class folders using devkit mapping ---
-echo "[*] Sorting validation images into class folders ..."
-python3 - << 'PY'
-import os, sys, shutil
-from pathlib import Path
+  echo "[wget-parallel] Accept-Ranges: bytes, size: $content_length bytes, parts: $nparts"
+  local chunk=$(( (content_length + nparts - 1) / nparts ))
+  local -a pids=()
 
-root = Path(os.environ.get("ROOT", "."))
-devkit_dir = next(root.glob("ILSVRC2012_devkit_t12"))
+  for ((i=0; i<nparts; i++)); do
+    local start=$(( i * chunk ))
+    [[ $start -ge $content_length ]] && break
+    local end=$(( start + chunk - 1 ))
+    [[ $end -ge $content_length ]] && end=$(( content_length - 1 ))
+    local part="$(printf "%s.part.%03d" "$out" "$i")"
 
-# Files from the devkit
-gt_file = devkit_dir / "data" / "ILSVRC2012_validation_ground_truth.txt"
-meta_mat = devkit_dir / "data" / "meta.mat"
+    echo "[wget-parallel] Part $i bytes=${start}-${end} -> $part"
+    # -c resumes each part if re-run; --show-progress prints a bar per part (lines will interleave)
+    wget -c --show-progress \
+         --header="Range: bytes=${start}-${end}" \
+         -O "$part" "$url" &
+    pids+=( "$!" )
+  done
 
-# We need scipy to read meta.mat
-try:
-    from scipy.io import loadmat  # type: ignore
-except Exception:
-    # Try to install it on the fly
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "scipy"])
-    from scipy.io import loadmat  # type: ignore
+  # Wait for all parts
+  set +e
+  err=0
+  for pid in "${pids[@]}"; do
+    wait "$pid" || err=1
+  done
+  set -e
+  if [[ $err -ne 0 ]]; then
+    echo "One or more part downloads failed. Re-run the script to resume." >&2
+    exit 1
+  fi
 
-import numpy as np
+  # Stitch parts in order
+  echo "[wget-parallel] Assembling parts -> $out"
+  cat "$out".part.* > "${out}.tmp"
+  mv "${out}.tmp" "$out"
+  rm -f "$out".part.*
+}
 
-# Map: class_index(1..1000) -> wnid (e.g., "n01440764")
-m = loadmat(str(meta_mat), squeeze_me=True, struct_as_record=False)
-synsets = m["synsets"]
-# synsets has 1000+ entries; the 1000 ILSVRC classes have ILSVRC2012_ID in 1..1000
-id_to_wnid = {}
-for s in np.atleast_1d(synsets):
-    ilsvrc_id = int(getattr(s, "ILSVRC2012_ID", 0))
-    if 1 <= ilsvrc_id <= 1000:
-        id_to_wnid[ilsvrc_id] = str(getattr(s, "WNID"))
+download() {
+  local url="$1" out="$2"
+  if have aria2c; then
+    download_aria "$url" "$out"
+  elif have wget; then
+    download_wget_parallel "$url" "$out" "$N_PARTS"
+  else
+    echo "Neither aria2c nor wget is available." >&2
+    exit 1
+  fi
+}
 
-# Read ground-truth labels for val images (one label per line)
-labels = [int(x.strip()) for x in open(gt_file, "r").read().splitlines()]
-assert len(labels) == 50000, f"Expected 50k val labels, got {len(labels)}"
+download "$TRAIN_URL" "$TARGET_DIR/ILSVRC2012_img_train.tar"
+download "$VAL_URL" "$TARGET_DIR/ILSVRC2012_img_val.tar"
+download "$DEVKIT_URL" "$TARGET_DIR/ILSVRC2012_devkit_t12.tar.gz"
 
-val_dir = root / "val"
-# Val image names are 1..50000 in lexical order
-# ILSVRC2012_val_00000001.JPEG, ..., ILSVRC2012_val_00050000.JPEG
-def val_name(i):
-    return f"ILSVRC2012_val_{i:08d}.JPEG"
-
-moved = 0
-for i, class_id in enumerate(labels, start=1):
-    wnid = id_to_wnid.get(class_id)
-    if wnid is None:
-        raise RuntimeError(f"No WNID for class id {class_id}")
-    dst_dir = val_dir / wnid
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    src = val_dir / val_name(i)
-    if not src.exists():
-        raise FileNotFoundError(f"Missing expected val image: {src.name}")
-    shutil.move(str(src), str(dst_dir / src.name))
-    moved += 1
-
-print(f"Moved {moved} validation images into class folders.")
-PY
-
-# --- 6) basic summary ---
-echo "[*] Summary:"
-echo "  Train classes: $(find train -mindepth 1 -maxdepth 1 -type d | wc -l)"
-echo "  Val classes:   $(find val   -mindepth 1 -maxdepth 1 -type d | wc -l)"
-echo "  Train images:  $(find train -type f -name '*.JPEG' | wc -l)"
-echo "  Val images:    $(find val   -type f -name '*.JPEG' | wc -l)"
-
-echo "[✓] ImageNet prepared under: $ROOT"
-echo "    Train path: $ROOT/train"
-echo "    Val path:   $ROOT/val"
+echo "All done."
