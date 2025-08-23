@@ -23,5 +23,7 @@ if ! command -v rsync >/dev/null 2>&1; then
   exit 3
 fi
 
+mkdir -p $DST
+
 # do the copy
 rsync -aH --info=progress2 --partial --inplace --whole-file -- "$SRC" "$DST"
