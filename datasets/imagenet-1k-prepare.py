@@ -106,14 +106,15 @@ def extract_val(val_tar, devkit_tar, output_dir):
     shutil.rmtree(val_temp)
 
 
-def main():
-    if len(sys.argv) != 3:
-        print("Usage: python prepare_imagenet.py <input_dir> <output_dir>")
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python prepare_imagenet.py <input_dir> [output_dir]")
         sys.exit(1)
     
     input_dir = Path(sys.argv[1])
-    output_dir = Path(sys.argv[2])
+    output_dir = Path(sys.argv[2]) if len(sys.arv) > 2 else input_dir
     
+    print("preparing imagenet...")
     # Check if output directory exists and delete specific subdirs
     if output_dir.exists():
         for subdir in ['train', 'val', 'devkit']:
@@ -138,7 +139,3 @@ def main():
     print("Done! Dataset extracted to:")
     print(f"  Training: {output_dir}/train")
     print(f"  Validation: {output_dir}/val")
-
-
-if __name__ == "__main__":
-    main()
