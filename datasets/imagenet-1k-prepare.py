@@ -110,10 +110,13 @@ def main():
     input_dir = Path(sys.argv[1])
     output_dir = Path(sys.argv[2])
     
-    # Check if output directory exists and delete it
+    # Check if output directory exists and delete specific subdirs
     if output_dir.exists():
-        print(f"Output directory {output_dir} already exists. Deleting it...")
-        shutil.rmtree(output_dir)
+        for subdir in ['train', 'val', 'devkit']:
+            subdir_path = output_dir / subdir
+            if subdir_path.exists():
+                print(f"Deleting existing {subdir} directory...")
+                shutil.rmtree(subdir_path)
     
     train_tar = input_dir / "ILSVRC2012_img_train.tar"
     val_tar = input_dir / "ILSVRC2012_img_val.tar"
