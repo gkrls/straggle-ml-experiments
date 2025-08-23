@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ $# -ne 2 ]; then
+# one-line help
+case "${1-}" in -h|--help) echo "Usage: $0 SRC DST"; exit 0;; esac
+
+if [ "$#" -ne 2 ]; then
   echo "Usage: $0 SRC DST" >&2
   exit 1
 fi
@@ -21,4 +24,4 @@ if ! command -v rsync >/dev/null 2>&1; then
 fi
 
 # do the copy
-rsync -aH --info=progress2 --partial --inplace --whole-file "$SRC" "$DST"
+rsync -aH --info=progress2 --partial --inplace --whole-file -- "$SRC" "$DST"
