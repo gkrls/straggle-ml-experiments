@@ -108,7 +108,7 @@ def main():
         sys.exit(1)
     
     input_dir = Path(sys.argv[1])
-    output_dir = Path(sys.argv[2])
+    output_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else input_dir
     
     # Check if output directory exists and delete specific subdirs
     if output_dir.exists():
