@@ -174,7 +174,11 @@ def train(args):
     if args.rank == 0:
         log = {"config": vars(args), "epochs": {}}
 
+    def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
     for epoch in range(args.epochs):
+        print(f"[{now()}][Epoch {epoch:03d}] ...")
+
         epoch_start = time.time()
         train_loader.sampler.set_epoch(epoch)
         
@@ -186,9 +190,9 @@ def train(args):
         if args.rank == 0:
             epoch_time = time.time() - epoch_start
             images_per_sec = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
-            print(f"[Epoch {epoch:03d}] train_loss={train_loss:.4f} val_loss={val_loss:.4f} top1={top1:.2f}% top5={top5:.2f}% "
+        
+            print(f"[{now()}][Epoch {epoch:03d}] train_loss={train_loss:.4f} val_loss={val_loss:.4f} top1={top1:.2f}% top5={top5:.2f}% "
                   f"lr={current_lr:.6f} time={epoch_time:.2f}s thrpt~{images_per_sec:.1f} img/s", flush=True)
-
             log["epochs"][str(epoch)] = {
                 "train_loss": float(train_loss),
                 "val_loss": float(val_loss),
