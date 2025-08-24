@@ -278,6 +278,14 @@ def main():
     parser.add_argument("--json", type=str, default="resnet50.json", help="Path to JSON run log")
     args = parser.parse_args()
 
+    if args.see is not None:
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+        torch.use_deterministic_algorithms(True, warn_only=True)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    else:
+        torch.backends.cudnn.benchmark = True
+
     # Args sanity checks/corrections
     if args.device == 'cuda' and not torch.cuda.is_available():
         args.device = 'cpu'
@@ -290,17 +298,7 @@ def main():
         args.workers = 1 
 
 
-
     sys.stdout.reconfigure(line_buffering=True)
-
-    # Determinism / speed
-    if args.seed is not None:
-        # Offset by rank later after we know it
-        torch.use_deterministic_algorithms(True, warn_only=True)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-    else:
-        torch.backends.cudnn.benchmark = True
 
     setup_ddp(args)
 
