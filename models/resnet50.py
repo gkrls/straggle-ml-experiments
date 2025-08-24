@@ -196,6 +196,8 @@ def train(args):
     optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     scaler = torch.cuda.amp.GradScaler(enabled=args.amp) if device.type == "cuda" else None
+
+    def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     best_top1 = 0.0
     best_top5 = 0.0
@@ -203,9 +205,7 @@ def train(args):
     if args.rank == 0:
         log = {"time": now(), "config": vars(args), "epochs": {}}
         save_log(args.json, log)
-
-    def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
+    
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
 
