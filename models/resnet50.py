@@ -310,6 +310,8 @@ def main():
         random.seed(args.seed)
         np.random.seed(args.seed)
 
+
+    print(json.dumps(vars(args), indent=2))
     try:
         train(args)
     finally:
