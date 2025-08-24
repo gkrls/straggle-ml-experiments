@@ -262,7 +262,7 @@ def main():
     parser.add_argument("--backend", type=str, default="gloo", help="DDP backend (e.g., gloo, nccl)")
     parser.add_argument("--device", type=str, choices="['cuda', 'cpu']", default='cuda')
 
-    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
 
     parser.add_argument('--data', type=str, required=True)
@@ -278,7 +278,9 @@ def main():
     parser.add_argument("--json", type=str, default="resnet50.json", help="Path to JSON run log")
     args = parser.parse_args()
 
-    if args.see is not None:
+
+
+    if args.deterministic is not None:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
@@ -302,8 +304,8 @@ def main():
 
     setup_ddp(args)
 
-    if args.seed:
-        args.seed = args.seed + args.rank
+    if args.deterministic:
+        args.seed = 42 + args.rank
         torch.manual_seed(args.seed)
         random.seed(args.seed)
         np.random.seed(args.seed)
