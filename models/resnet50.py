@@ -98,7 +98,7 @@ def validate(model, loader, device, args):
             for images, targets in loader:
                 images = images.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
-                if args.amp:
+                if args.amp and device.type == 'cuda':
                     with torch.cuda.amp.autocast(device_type='cuda'):
                         outputs = model(images)
                         loss = criterion(outputs, targets)
@@ -124,11 +124,22 @@ def validate(model, loader, device, args):
     return top1.avg, top5.avg, losses.avg
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
+    """Perform 1 full pass over the dataset. Return loss, epoch duration, epoch throughput (imgs/sec)"""
     model.train()
     total_loss = 0.0
+    samples_seen = 0
+
+    if device.type == 'cuda':
+        start = torch.cuda.Event(enable_timing=True)
+        end   = torch.cuda.Event(enable_timing=True)
+        start.record()  # on current stream
+    else:
+        start = time.perf_counter()
+
     for images, targets in dataloader:
         images = images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
+        samples_seen += images.size(0)
 
         optimizer.zero_grad(set_to_none=True)
         if scaler is not None:
@@ -145,7 +156,25 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
             optimizer.step()
 
         total_loss += float(loss.item())
-    return total_loss / max(1, len(dataloader))
+
+    if device.type == 'cuda':
+        end.record() 
+        end.synchronize()
+        duration = start.elapsed_time(end) / 1000.0  # seconds
+    else:
+        duration = time.perf_counter() - start
+
+    throughput = samples_seen / max(1e-6, duration)
+    return total_loss / max(1, len(dataloader)), duration, throughput
+
+def save_log(path, log):
+    """Atomically write log dict to JSON file."""
+    tmp = f"{path}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(log, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
 
 def train(args):
     device = torch.device(args.device)
@@ -173,6 +202,7 @@ def train(args):
 
     if args.rank == 0:
         log = {"config": vars(args), "epochs": {}}
+        save_log(args.json, log)
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -182,26 +212,29 @@ def train(args):
         epoch_start = time.time()
         train_loader.sampler.set_epoch(epoch)
         
-        train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
+        train_loss, train_time, train_tp = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
         top1, top5, val_loss = validate(model, val_loader, device, args)
 
         # Print epoch summary with learning rate
         current_lr = scheduler.get_last_lr()[0]
         if args.rank == 0:
             epoch_time = time.time() - epoch_start
-            images_per_sec = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
+            epoch_tp = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
         
             print(f"[{now()}][Epoch {epoch:03d}] train_loss={train_loss:.4f} val_loss={val_loss:.4f} top1={top1:.2f}% top5={top5:.2f}% "
-                  f"lr={current_lr:.6f} time={epoch_time:.2f}s thrpt~{images_per_sec:.1f} img/s", flush=True)
+                  f"lr={current_lr:.6f} time={epoch_time:.2f}s tp= ~{epoch_tp:.1f} img/s", flush=True)
             log["epochs"][str(epoch)] = {
                 "train_loss": float(train_loss),
                 "val_loss": float(val_loss),
                 "top1": float(top1),
                 "top5": float(top5),
                 "lr": float(current_lr),
+                "train_time_sec": float(train_time),
                 "epoch_time_sec": float(epoch_time),
-                "images_per_sec_per_rank": float(images_per_sec),
+                "train_throughput_ips": float(train_tp),
+                "epoch_throughput_ips": float(epoch_tp)
             }
+            save_log(args.json, log)
 
         # Step the scheduler after evaluation (end of epoch)
         scheduler.step()
@@ -210,10 +243,10 @@ def train(args):
         if args.rank == 0 and top5 > best_top5: best_top5 = top5
 
 
-    if args.rank == 0:
-        with open(args.json, "w") as f:
-            import json
-            json.dump(log, f, indent=2)
+    # if args.rank == 0:
+        # with open(args.json, "w") as f:
+        #     import json
+        #     json.dump(log, f, indent=2)
 
 # ------------------------- Entry / Setup ------------------------
 
@@ -260,7 +293,7 @@ def main():
     parser.add_argument('--master_addr', type=str, default="42.0.0.1")
     parser.add_argument("--master_port", type=int, default=29500)
     parser.add_argument("--backend", type=str, default="gloo", help="DDP backend (e.g., gloo, nccl)")
-    parser.add_argument("--device", type=str, choices="['cuda', 'cpu']", default='cuda')
+    parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
 
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
@@ -280,7 +313,7 @@ def main():
 
 
 
-    if args.deterministic is not None:
+    if args.deterministic:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
