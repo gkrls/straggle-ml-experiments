@@ -4,7 +4,8 @@
 # Set STRICT=1 to return non-zero if counts ≠ expected.
 
 set -euo pipefail
-case "${1-}" in -h|--help) echo "Usage: $0 <IMAGENET_ROOT> [expected_classes=1000]"; exit 0;; esac
+
+[[ ${1:-} == "-h" || ${1:-} == "--help" ]] && { echo "Usage: $0 <imagenet_root> [expected_classes=1000]"; exit 0; }
 
 ROOT="${1:?Usage: $0 <IMAGENET_ROOT> [expected_classes=1000]}"
 EXP="${2:-1000}"
