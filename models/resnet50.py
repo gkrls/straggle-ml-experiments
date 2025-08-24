@@ -10,6 +10,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import Subset
 import sys
 import json
+import datetime
 import time 
 import random
 import numpy as np
@@ -236,7 +237,7 @@ def setup_ddp(args):
     os.environ.setdefault("LOCAL_RANK",  str(args.local_rank))
 
     # Start the process group
-    dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size)
+    dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
     # if torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
     if args.rank == 0:
