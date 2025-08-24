@@ -34,12 +34,14 @@ source $HOME/straggle-ml/venv/bin/activate
 # Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 exec python -u $HOME/straggle-ml-experiments/models/resnet50.py \
   --rank "$RANK" \
-  --data ~/datasets/imagenet \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --backend "$BACKEND" \
+  --data ~/datasets/imagenet \
   --batch_size 128 \
+  --workers 12 \
+  --drop_last \
   --json $HOME/straggle-ml-experiments/models/resnet50.json
   "$@"
