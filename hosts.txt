@@ -1,0 +1,2 @@
+hpdc-gnode1
+hpdc-gnode2

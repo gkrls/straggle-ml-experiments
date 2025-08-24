@@ -201,7 +201,7 @@ def train(args):
     best_top5 = 0.0
 
     if args.rank == 0:
-        log = {"config": vars(args), "epochs": {}}
+        log = {"time": now(), "config": vars(args), "epochs": {}}
         save_log(args.json, log)
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
