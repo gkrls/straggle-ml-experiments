@@ -2,7 +2,7 @@
 """
 ImageNet Dataset Preparation Script
 
-Extracts and organizes ImageNet into train/val folders with matching class names.
+Correctly extracts and organizes ImageNet using the ILSVRC2012 competition ordering.
 
 Usage:
     python prepare_imagenet.py <input_dir> [output_dir]
@@ -24,17 +24,16 @@ def extract_train(train_tar, output_dir):
     
     with tarfile.open(train_tar) as tar:
         class_tars = [m for m in tar if m.name.endswith('.tar')]
-        total = len(class_tars)
         
         for i, member in enumerate(class_tars, 1):
-            if i % 10 == 0:
-                print(f"  Extracting class {i}/{total}...", end='\r')
+            if i % 100 == 0:
+                print(f"  Extracted {i}/{len(class_tars)} classes...")
             
             # Extract class tar
             tar.extract(member, train_dir)
             class_tar_path = train_dir / member.name
             
-            # Create class directory (e.g., n01440764)
+            # Create class directory
             class_name = member.name.replace('.tar', '')
             class_dir = train_dir / class_name
             class_dir.mkdir(exist_ok=True)
@@ -45,81 +44,95 @@ def extract_train(train_tar, output_dir):
             
             os.remove(class_tar_path)
     
-    print(f"  Extracted {total} training classes")
-    return sorted([d.name for d in train_dir.iterdir() if d.is_dir()])
+    print(f"  Extracted {len(class_tars)} training classes")
 
 
-def extract_val(val_tar, devkit_tar, output_dir, train_classes):
-    """Extract validation data and organize using training class names"""
+def extract_val(val_tar, devkit_tar, output_dir):
+    """Extract validation data using ILSVRC2012 competition ordering"""
     print("Extracting validation data...")
     
-    # Extract validation images
+    # Extract validation images to temp folder
     val_temp = output_dir / "val_temp"
     val_temp.mkdir(exist_ok=True)
     
     with tarfile.open(val_tar) as tar:
         tar.extractall(val_temp)
     
-    # Get validation labels from devkit
-    print("  Extracting devkit for labels...")
+    val_images = sorted([f for f in os.listdir(val_temp) if f.endswith('.JPEG')])
+    print(f"  Extracted {len(val_images)} validation images")
+    
+    # Extract devkit to get mappings
+    print("  Extracting devkit for class mappings...")
     devkit_dir = output_dir / "devkit_temp"
     devkit_dir.mkdir(exist_ok=True)
     
     with tarfile.open(devkit_tar) as tar:
-        # Only extract the ground truth file we need
-        for member in tar:
-            if 'val_ground_truth' in member.name or 'validation_ground_truth' in member.name:
-                tar.extract(member, devkit_dir)
+        tar.extractall(devkit_dir)
     
-    # Find the ground truth file
-    val_labels_file = None
-    for path in devkit_dir.rglob('*val*ground_truth.txt'):
-        val_labels_file = path
-        break
-    
-    if not val_labels_file:
-        print("ERROR: Could not find validation ground truth in devkit!")
-        print("  Falling back to using numeric folders (0000, 0001, etc.)")
-        print("  WARNING: This will NOT match training classes!")
-        shutil.rmtree(devkit_dir)
+    # Find meta.mat for synset mapping
+    meta_file = devkit_dir / "ILSVRC2012_devkit_t12" / "data" / "meta.mat"
+    if not meta_file.exists():
+        print("ERROR: meta.mat not found in devkit!")
         shutil.rmtree(val_temp)
-        return []
+        shutil.rmtree(devkit_dir)
+        return False
     
-    # Read labels (1-indexed class indices)
-    with open(val_labels_file) as f:
-        val_labels = [int(line.strip()) - 1 for line in f]  # Convert to 0-indexed
+    # Find ground truth file
+    gt_file = devkit_dir / "ILSVRC2012_devkit_t12" / "data" / "ILSVRC2012_validation_ground_truth.txt"
+    if not gt_file.exists():
+        print("ERROR: validation ground truth not found in devkit!")
+        shutil.rmtree(val_temp)
+        shutil.rmtree(devkit_dir)
+        return False
     
-    # Create validation directory with proper class names
+    # Load synset mapping using scipy
+    try:
+        import scipy.io
+        meta = scipy.io.loadmat(meta_file)
+    except ImportError:
+        print("ERROR: scipy not installed. Please run: pip install scipy")
+        shutil.rmtree(val_temp)
+        shutil.rmtree(devkit_dir)
+        return False
+    
+    # Build ILSVRC index to WordNet ID mapping
+    synsets = meta['synsets']
+    ilsvrc_to_wordnet = {}
+    for i in range(1000):  # ImageNet-1K uses first 1000 classes
+        ilsvrc_id = synsets[i][0][0][0][0]  # ILSVRC ID (1-1000)
+        wordnet_id = synsets[i][0][1][0]    # WordNet ID (e.g., 'n01440764')
+        ilsvrc_to_wordnet[ilsvrc_id] = wordnet_id
+    
+    # Read validation labels
+    with open(gt_file, 'r') as f:
+        val_labels = [int(line.strip()) for line in f]
+    
+    if len(val_labels) != len(val_images):
+        print(f"ERROR: Image count ({len(val_images)}) != label count ({len(val_labels)})")
+        shutil.rmtree(val_temp)
+        shutil.rmtree(devkit_dir)
+        return False
+    
+    # Create validation folders and move images
+    print("  Organizing images into class folders...")
     val_dir = output_dir / "val"
     val_dir.mkdir(exist_ok=True)
     
-    # Move images to class folders matching training structure
-    val_images = sorted([f for f in os.listdir(val_temp) if f.endswith('.JPEG')])
-    
-    if len(val_images) != len(val_labels):
-        print(f"ERROR: Image count ({len(val_images)}) != label count ({len(val_labels)})")
-        return []
-    
-    print(f"  Organizing {len(val_images)} images into {len(set(val_labels))} classes...")
-    
-    for img_file, class_idx in zip(val_images, val_labels):
-        if class_idx < len(train_classes):
-            # Use the training class name for this index
-            class_name = train_classes[class_idx]
-            class_dir = val_dir / class_name
-            class_dir.mkdir(exist_ok=True)
-            
-            src = val_temp / img_file
-            dst = class_dir / img_file
-            shutil.move(str(src), str(dst))
+    for img_file, label in zip(val_images, val_labels):
+        wordnet_id = ilsvrc_to_wordnet[label]
+        class_dir = val_dir / wordnet_id
+        class_dir.mkdir(exist_ok=True)
+        
+        src = val_temp / img_file
+        dst = class_dir / img_file
+        shutil.move(str(src), str(dst))
     
     # Cleanup
     shutil.rmtree(val_temp)
     shutil.rmtree(devkit_dir)
     
-    val_classes = sorted([d.name for d in val_dir.iterdir() if d.is_dir()])
-    print(f"  Created {len(val_classes)} validation classes")
-    return val_classes
+    print(f"  Created {len(os.listdir(val_dir))} validation classes")
+    return True
 
 
 def verify_dataset(dataset_dir):
@@ -138,32 +151,17 @@ def verify_dataset(dataset_dir):
     print(f"  Training: {len(train_classes)} classes")
     print(f"  Validation: {len(val_classes)} classes")
     
-    if train_classes == val_classes:
-        print("  ✓ Class folders match!")
-        print(f"  First 5: {train_classes[:5]}")
-        print(f"  Last 5: {train_classes[-5:]}")
-        
-        # Sample some statistics
-        sample_train = sum(len(list((train_dir / c).glob('*.JPEG'))) for c in train_classes[:5])
-        sample_val = sum(len(list((val_dir / c).glob('*.JPEG'))) for c in val_classes[:5])
-        print(f"  Sample images (first 5 classes): train={sample_train}, val={sample_val}")
+    if set(train_classes) == set(val_classes):
+        print("  ✓ All classes present in both train and val")
         return True
     else:
-        print("  ✗ ERROR: Class folders don't match!")
-        
-        # Check what type of mismatch
-        if val_classes and val_classes[0].isdigit():
-            print("  Validation uses numeric folders (0000, 0001, etc.)")
-            print("  Training uses WordNet IDs (n01440764, etc.)")
-            print("  This is the dataset bug causing low accuracy!")
-        else:
-            only_train = set(train_classes) - set(val_classes)
-            only_val = set(val_classes) - set(train_classes)
-            if only_train:
-                print(f"  Only in train: {list(only_train)[:5]}")
-            if only_val:
-                print(f"  Only in val: {list(only_val)[:5]}")
-        
+        print("  ✗ ERROR: Class mismatch between train and val!")
+        only_train = set(train_classes) - set(val_classes)
+        only_val = set(val_classes) - set(train_classes)
+        if only_train:
+            print(f"    Only in train: {list(only_train)[:5]}")
+        if only_val:
+            print(f"    Only in val: {list(only_val)[:5]}")
         return False
 
 
@@ -184,7 +182,7 @@ def main():
             print("\n✓ Verification PASSED")
             return 0
         else:
-            print("\n✗ Verification FAILED") 
+            print("\n✗ Verification FAILED")
             return 1
     
     # Prepare dataset
@@ -216,12 +214,11 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Extract datasets
-    train_classes = extract_train(required['train'], output_dir)
+    extract_train(required['train'], output_dir)
     
-    if len(train_classes) != 1000:
-        print(f"WARNING: Expected 1000 training classes, got {len(train_classes)}")
-    
-    val_classes = extract_val(required['val'], required['devkit'], output_dir, train_classes)
+    if not extract_val(required['val'], required['devkit'], output_dir):
+        print("\n✗ Validation extraction failed!")
+        return 1
     
     # Verify
     print("\nVerifying dataset consistency...")
@@ -231,8 +228,7 @@ def main():
         print(f"  Val: {output_dir}/val")
         return 0
     else:
-        print("\n✗ Dataset preparation may have issues!")
-        print("  Check the extraction process or try re-extracting")
+        print("\n✗ Dataset verification failed!")
         return 1
 
 
