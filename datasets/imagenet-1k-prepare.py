@@ -207,15 +207,10 @@ def main():
         print(f"\nERROR: Missing required files: {missing}")
         return 1
     
-    # Check for existing directories
-    existing = [d for d in ['train', 'val'] if (output_dir / d).exists()]
-    if existing:
-        print(f"\nWARNING: These directories will be deleted: {existing}")
-        if input("Continue? (yes/no): ").lower() not in ['yes', 'y']:
-            print("Aborted.")
-            return 0
-        
-        for d in existing:
+    # Clean up existing directories
+    for d in ['train', 'val', 'val_temp', 'devkit_temp']:
+        if (output_dir / d).exists():
+            print(f"  Removing existing {d} directory...")
             shutil.rmtree(output_dir / d)
     
     output_dir.mkdir(parents=True, exist_ok=True)
