@@ -93,9 +93,9 @@ def validate(model, loader, device, args):
     criterion = nn.CrossEntropyLoss().to(device)
 
 
-    def run_validation(loader):
+    def run_validation(dataloader):
         with torch.no_grad():
-            for images, targets in loader:
+            for images, targets in dataloader:
                 images = images.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
                 if args.amp and device.type == 'cuda':
@@ -205,6 +205,11 @@ def train(args):
     if args.rank == 0:
         log = {"time": now(), "config": vars(args), "epochs": {}}
         save_log(args.json, log)
+
+
+    # print("len(train classes) =", len(train_dataset.classes))
+    # print("len(val classes)   =", len(val_dataset.classes))
+    # assert train_dataset.classes == val_dataset.classes, "train/val class folder names differ"
     
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
