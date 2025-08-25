@@ -41,7 +41,7 @@ exec python -u $HOME/straggle-ml-experiments/models/resnet50.py \
   --backend "$BACKEND" \
   --data ~/datasets/imagenet \
   --batch_size 128 \
-  --workers 12 \
+  --workers 8 \
   --drop_last \
   --json $HOME/straggle-ml-experiments/models/resnet50.json
   "$@"
