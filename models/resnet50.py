@@ -99,7 +99,8 @@ def validate(model, loader, device, args):
                 images = images.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
                 if args.amp and device.type == 'cuda':
-                    with torch.cuda.amp.autocast(device_type='cuda'):
+                    with torch.amp.autocast(device_type='cuda'):
+                    # with torch.cuda.amp.autocast(device_type='cuda'):
                         outputs = model(images)
                         loss = criterion(outputs, targets)
                 else:
@@ -143,7 +144,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
 
         optimizer.zero_grad(set_to_none=True)
         if scaler is not None:
-            with torch.cuda.amp.autocast():
+            # with torch.cuda.amp.autocast():
+            with torch.amp.autocast(device_type='cuda'):
                 outputs = model(images)
                 loss = criterion(outputs, targets)
             scaler.scale(loss).backward()
