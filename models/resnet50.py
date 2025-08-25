@@ -197,7 +197,7 @@ def train(args):
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
-    scaler = torch.cuda.amp.GradScaler(enabled=args.amp) if device.type == "cuda" else None
+    scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
