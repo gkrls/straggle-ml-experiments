@@ -120,8 +120,6 @@ def validate(model, loader, device, args):
         aux_val_dataset = Subset(loader.dataset, range(len(loader.sampler) * args.world_size, len(loader.dataset)))
         aux_val_loader = torch.utils.data.DataLoader(aux_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
         run_validation(aux_val_loader)
-    if args.rank == 0:
-        print(f"[Validation] Loss {losses.avg:.4f} | Top-1 {top1.avg:.2f}% | Top-5 {top5.avg:.2f}%", flush=True)
     return top1.avg, top5.avg, losses.avg
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):

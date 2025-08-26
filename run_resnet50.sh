@@ -32,6 +32,7 @@ fi
 source $HOME/straggle-ml/venv/bin/activate
 
 # Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
+set -x
 exec python -u $HOME/straggle-ml-experiments/models/resnet50.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
@@ -43,5 +44,5 @@ exec python -u $HOME/straggle-ml-experiments/models/resnet50.py \
   --batch_size 128 \
   --workers 8 \
   --drop_last \
-  --json $HOME/straggle-ml-experiments/models/resnet50.json
+  --json $HOME/straggle-ml-experiments/models/resnet50.json \
   "$@"
