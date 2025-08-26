@@ -201,7 +201,7 @@ def train(args):
     else:
         model = models.resnet152(num_classes=args.num_classes).to(device)
 
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, device_ids=[args.local_rank]) 
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True) 
     # model = models.resnet50(num_classes=args.num_classes)
     # if device.type == "cuda":
     #     model = model.to(device, memory_format=torch.channels_last)
