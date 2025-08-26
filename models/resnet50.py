@@ -62,10 +62,18 @@ class AverageMeter:
         self.count += n
         self.avg = self.sum / max(1.0, self.count)
     def all_reduce(self):
-        if torch.distributed.is_available() and torch.distributed.is_initialized():
-            t = torch.tensor([self.sum, self.count], dtype=torch.float64, device="cpu")
-            torch.distributed.all_reduce(t)
-            self.sum, self.count = t.tolist()
+        # if torch.distributed.is_available() and torch.distributed.is_initialized():
+        #     t = torch.tensor([self.sum, self.count], dtype=torch.float64, device="cpu")
+        #     torch.distributed.all_reduce(t)
+        #     self.sum, self.count = t.tolist()
+        #     self.avg = self.sum / max(1.0, self.count)
+        if dist.is_available() and dist.is_initialized():
+            backend = dist.get_backend()
+            # NCCL => must use GPU tensor; otherwise CPU is fine
+            device = torch.device(f"cuda:{torch.cuda.current_device()}") if backend == dist.Backend.NCCL else torch.device("cpu")
+            t = torch.tensor([self.sum, self.count], dtype=torch.float64, device=device)
+            dist.all_reduce(t, op=dist.ReduceOp.SUM)
+            self.sum, self.count = t.cpu().tolist()
             self.avg = self.sum / max(1.0, self.count)
 
 def accuracy(output, target, topk=(1,)):
