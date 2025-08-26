@@ -329,7 +329,7 @@ def main():
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
 
-    parser.add_argument('--model', type=str, choices=['resnet50', 'resnet101', 'resnet152'], help="Resnet model")
+    parser.add_argument('--model', type=str, choices=['resnet50', 'resnet101', 'resnet152'], help="Resnet model", default="resnet50")
     parser.add_argument('--data', type=str, required=True)
     parser.add_argument('--epochs', type=int, default=90)
     parser.add_argument('--batch_size', type=int, default=32)
