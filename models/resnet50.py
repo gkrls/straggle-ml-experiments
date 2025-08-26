@@ -295,6 +295,11 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
     os.environ.setdefault("LOCAL_RANK",  str(args.local_rank))
 
+    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)               # e.g. ens4f0
+    os.environ.setdefault("NCCL_DEBUG", "INFO")
+    os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
+    os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
+
     # Start the process group
     dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
