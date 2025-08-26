@@ -201,7 +201,7 @@ def train(args):
     else:
         model = models.resnet152(num_classes=args.num_classes).to(device)
 
-    model = DDP(model, device_ids=[args.local_rank]) if device.type == "cuda" else DDP(model)
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, device_ids=[args.local_rank]) 
     # model = models.resnet50(num_classes=args.num_classes)
     # if device.type == "cuda":
     #     model = model.to(device, memory_format=torch.channels_last)
@@ -214,7 +214,7 @@ def train(args):
     print(f"Model '{args.model}' initialized.", flush=True)
 
     criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay, foreach=True)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
