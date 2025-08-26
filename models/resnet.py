@@ -134,8 +134,8 @@ def validate(model, loader, device, args):
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     """Perform 1 full pass over the dataset. Return loss, epoch duration, epoch throughput (imgs/sec)"""
     model.train()
-    total_loss = 0.0
-    samples_seen = 0
+    total_loss, samples_seen = 0.0, 0.0
+    
 
     if device.type == 'cuda':
         start = torch.cuda.Event(enable_timing=True)
@@ -197,7 +197,7 @@ def train(args):
     if args.model == 'resnet50':
         model = models.resnet50(num_classes=args.num_classes).to(device)
     elif args.model == 'resnet101':
-        model = models.resnet50(num_classes=args.num_classes).to(device)
+        model = models.resnet101(num_classes=args.num_classes).to(device)
     else:
         model = models.resnet152(num_classes=args.num_classes).to(device)
 

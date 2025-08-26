@@ -36,7 +36,7 @@ NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 # Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 set -x
-exec python -u $HOME/straggle-ml-experiments/models/resnet50.py \
+exec python -u $HOME/straggle-ml-experiments/models/resnet.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -47,7 +47,7 @@ exec python -u $HOME/straggle-ml-experiments/models/resnet50.py \
   --batch_size 128 \
   --workers 8 \
   --drop_last \
-  --json $HOME/straggle-ml-experiments/models/resnet50.json \
+  --json $HOME/straggle-ml-experiments/models/resnet.json \
   "$@"
 
 

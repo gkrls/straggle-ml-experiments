@@ -12,6 +12,7 @@ Already up to date.
   "device": "cuda",
   "deterministic": true,
   "workers": 8,
+  "model": "resnet50",
   "data": "/home/gks/datasets/imagenet",
   "epochs": 90,
   "batch_size": 128,
@@ -21,7 +22,7 @@ Already up to date.
   "num_classes": 1000,
   "amp": false,
   "drop_last": true,
-  "json": "/home/gks/straggle-ml-experiments/models/resnet50.json",
+  "json": "/home/gks/straggle-ml-experiments/models/resnet.json",
   "local_rank": 0,
   "seed": 42
 }
