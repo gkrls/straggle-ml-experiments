@@ -39,10 +39,13 @@ exec python -u $HOME/straggle-ml-experiments/models/resnet50.py \
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --backend "$BACKEND" \
+  --backend nccl \
   --data ~/datasets/imagenet \
   --batch_size 128 \
   --workers 8 \
   --drop_last \
   --json $HOME/straggle-ml-experiments/models/resnet50.json \
   "$@"
+
+
+  # --backend "$BACKEND" \
