@@ -201,7 +201,7 @@ def train(args):
     else:
         model = models.resnet152(num_classes=args.num_classes).to(device)
 
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True) 
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, static_graph=args.static_graph)
     # model = models.resnet50(num_classes=args.num_classes)
     # if device.type == "cuda":
     #     model = model.to(device, memory_format=torch.channels_last)
@@ -339,6 +339,7 @@ def main():
     parser.add_argument('--num_classes', type=int, default=1000)
     parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
     parser.add_argument("--drop_last", action='store_true', help="Only for validation")
+    parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     
     parser.add_argument("--json", type=str, default="resnet50.json", help="Path to JSON run log")
     args = parser.parse_args()

@@ -1,0 +1,1 @@
+watch -n 0.5 'nvidia-smi --query-gpu=index,name,utilization.gpu,utilization.memory,memory.used,memory.total --format=csv'
