@@ -211,7 +211,7 @@ def train(args):
     #     model = DDP(model)
 
 
-    print("Model initialized.", flush=True)
+    print(f"Model '{args.model}' initialized.", flush=True)
 
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay)
