@@ -193,11 +193,15 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args)
 
     # Model
-    model = models.resnet50(num_classes=args.num_classes).to(device)
-    if device.type == "cuda":
-        model = DDP(model, device_ids=[args.local_rank])
+    model = None
+    if args.model == 'resnet50':
+        model = models.resnet50(num_classes=args.num_classes).to(device)
+    elif args.model == 'resnet101':
+        model = models.resnet50(num_classes=args.num_classes).to(device)
     else:
-        model = DDP(model)
+        model = models.resnet152(num_classes=args.num_classes).to(device)
+
+    model = DDP(model, device_ids=[args.local_rank]) if device.type == "cuda" else DDP(model)
     # model = models.resnet50(num_classes=args.num_classes)
     # if device.type == "cuda":
     #     model = model.to(device, memory_format=torch.channels_last)
@@ -325,6 +329,7 @@ def main():
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
 
+    parser.add_argument('--model', type=str, choices=['resnet50', 'resnet101', 'resnet152'], help="Resnet model")
     parser.add_argument('--data', type=str, required=True)
     parser.add_argument('--epochs', type=int, default=90)
     parser.add_argument('--batch_size', type=int, default=32)
