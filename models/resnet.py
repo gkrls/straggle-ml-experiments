@@ -195,11 +195,11 @@ def train(args):
     # Model
     model = None
     if args.model == 'resnet50':
-        model = models.resnet50(num_classes=args.num_classes, memory_format=torch.channels_last).to(device)
+        model = models.resnet50(num_classes=args.num_classes).to(device, memory_format=torch.channels_last)
     elif args.model == 'resnet101':
-        model = models.resnet101(num_classes=args.num_classes, memory_format=torch.channels_last).to(device)
+        model = models.resnet101(num_classes=args.num_classes).to(device, memory_format=torch.channels_last)
     else:
-        model = models.resnet152(num_classes=args.num_classes, memory_format=torch.channels_last).to(device)
+        model = models.resnet152(num_classes=args.num_classes).to(device, memory_format=torch.channels_last)
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, static_graph=args.static_graph)
     # model = models.resnet50(num_classes=args.num_classes)
@@ -214,7 +214,7 @@ def train(args):
     print(f"Model '{args.model}' initialized.", flush=True)
 
     criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay, foreach=True)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay, foreach=True, fused=True)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
@@ -303,7 +303,8 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_DEBUG", "INFO")
     os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
     os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
-
+    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "8")  # More NCCL threads
+    os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
     # Start the process group
     dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
