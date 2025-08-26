@@ -42,9 +42,9 @@ def get_dataloaders(args):
         val_dataset, num_replicas=args.world_size, rank=args.rank, shuffle=False, drop_last=args.drop_last)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, sampler=train_sampler, 
-                                               num_workers=args.workers, pin_memory=True, persistent_workers=True, prefetch_factor=2)
+                                               num_workers=args.workers, pin_memory=True, persistent_workers=True, prefetch_factor=args.prefetch_factor)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, sampler=val_sampler, shuffle=False,
-                                             num_workers=args.workers, pin_memory=True, persistent_workers=True, prefetch_factor=2)
+                                             num_workers=args.workers, pin_memory=True, persistent_workers=True, prefetch_factor=args.prefetch_factor)
     return train_loader, val_loader
 
 
@@ -104,7 +104,7 @@ def validate(model, loader, device, args):
     def run_validation(dataloader):
         with torch.no_grad():
             for images, targets in dataloader:
-                images = images.to(device, non_blocking=True)
+                images = images.to(device, non_blocking=True, memory_format=torch.channels_last)
                 # images = images.to(device, non_blocking=True, memory_format=torch.channels_last) if device.type == 'cuda' else images.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
                 if args.amp and device.type == 'cuda':
@@ -145,7 +145,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
         start = time.perf_counter()
 
     for images, targets in dataloader:
-        images = images.to(device, non_blocking=True)
+        images = images.to(device, non_blocking=True, memory_format=torch.channels_last)
         # images = images.to(device, non_blocking=True, memory_format=torch.channels_last) if device.type == 'cuda' else images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
         samples_seen += images.size(0)
@@ -195,11 +195,11 @@ def train(args):
     # Model
     model = None
     if args.model == 'resnet50':
-        model = models.resnet50(num_classes=args.num_classes).to(device)
+        model = models.resnet50(num_classes=args.num_classes, memory_format=torch.channels_last).to(device)
     elif args.model == 'resnet101':
-        model = models.resnet101(num_classes=args.num_classes).to(device)
+        model = models.resnet101(num_classes=args.num_classes, memory_format=torch.channels_last).to(device)
     else:
-        model = models.resnet152(num_classes=args.num_classes).to(device)
+        model = models.resnet152(num_classes=args.num_classes, memory_format=torch.channels_last).to(device)
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, static_graph=args.static_graph)
     # model = models.resnet50(num_classes=args.num_classes)
@@ -340,6 +340,7 @@ def main():
     parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
     parser.add_argument("--drop_last", action='store_true', help="Only for validation")
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
+    parser.add_argument("--prefetch_factor", type=int, default=2)
     
     parser.add_argument("--json", type=str, default="resnet50.json", help="Path to JSON run log")
     args = parser.parse_args()
