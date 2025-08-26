@@ -193,18 +193,18 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args)
 
     # Model
-    # model = models.resnet50(num_classes=args.num_classes).to(device)
-    # if device.type == "cuda":
-    #     model = DDP(model, device_ids=[args.local_rank])
-    # else:
-    #     model = DDP(model)
-    model = models.resnet50(num_classes=args.num_classes)
+    model = models.resnet50(num_classes=args.num_classes).to(device)
     if device.type == "cuda":
-        model = model.to(device, memory_format=torch.channels_last)
         model = DDP(model, device_ids=[args.local_rank])
     else:
-        model = model.to(device)  # keep default NCHW on CPU
         model = DDP(model)
+    # model = models.resnet50(num_classes=args.num_classes)
+    # if device.type == "cuda":
+    #     model = model.to(device, memory_format=torch.channels_last)
+    #     model = DDP(model, device_ids=[args.local_rank])
+    # else:
+    #     model = model.to(device)  # keep default NCHW on CPU
+    #     model = DDP(model)
 
 
     print("Model initialized.", flush=True)
