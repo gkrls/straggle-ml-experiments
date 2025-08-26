@@ -104,8 +104,8 @@ def validate(model, loader, device, args):
     def run_validation(dataloader):
         with torch.no_grad():
             for images, targets in dataloader:
-                # images = images.to(device, non_blocking=True)
-                images = images.to(device, non_blocking=True, memory_format=torch.channels_last) if device.type == 'cuda' else images.to(device, non_blocking=True)
+                images = images.to(device, non_blocking=True)
+                # images = images.to(device, non_blocking=True, memory_format=torch.channels_last) if device.type == 'cuda' else images.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
                 if args.amp and device.type == 'cuda':
                     with torch.amp.autocast(device_type='cuda'):
@@ -145,8 +145,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
         start = time.perf_counter()
 
     for images, targets in dataloader:
-        # images = images.to(device, non_blocking=True)
-        images = images.to(device, non_blocking=True, memory_format=torch.channels_last) if device.type == 'cuda' else images.to(device, non_blocking=True)
+        images = images.to(device, non_blocking=True)
+        # images = images.to(device, non_blocking=True, memory_format=torch.channels_last) if device.type == 'cuda' else images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
         samples_seen += images.size(0)
 
