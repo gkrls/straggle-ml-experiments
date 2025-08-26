@@ -96,7 +96,8 @@ def validate(model, loader, device, args):
     def run_validation(dataloader):
         with torch.no_grad():
             for images, targets in dataloader:
-                images = images.to(device, non_blocking=True)
+                # images = images.to(device, non_blocking=True)
+                images = images.to(device, non_blocking=True, memory_format=torch.channels_last) if device.type == 'cuda' else images.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
                 if args.amp and device.type == 'cuda':
                     with torch.amp.autocast(device_type='cuda'):
@@ -136,7 +137,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
         start = time.perf_counter()
 
     for images, targets in dataloader:
-        images = images.to(device, non_blocking=True)
+        # images = images.to(device, non_blocking=True)
+        images = images.to(device, non_blocking=True, memory_format=torch.channels_last) if device.type == 'cuda' else images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
         samples_seen += images.size(0)
 
@@ -183,10 +185,17 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args)
 
     # Model
-    model = models.resnet50(num_classes=args.num_classes).to(device)
+    # model = models.resnet50(num_classes=args.num_classes).to(device)
+    # if device.type == "cuda":
+    #     model = DDP(model, device_ids=[args.local_rank])
+    # else:
+    #     model = DDP(model)
+    model = models.resnet50(num_classes=args.num_classes)
     if device.type == "cuda":
+        model = model.to(device, memory_format=torch.channels_last)
         model = DDP(model, device_ids=[args.local_rank])
     else:
+        model = model.to(device)  # keep default NCHW on CPU
         model = DDP(model)
 
 
