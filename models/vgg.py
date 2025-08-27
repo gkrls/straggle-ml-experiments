@@ -37,9 +37,9 @@ def get_dataloaders(args):
     val_dataset   = ImageFolder(root=os.path.join(args.data, "val"),   transform=val_transform)
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(
-        train_dataset, num_replicas=args.world_size, rank=args.rank, shuffle=True, drop_last=False)
+        train_dataset, num_replicas=args.world_size, rank=args.rank, shuffle=True, drop_last=args.drop_last_train)
     val_sampler = torch.utils.data.distributed.DistributedSampler(
-        val_dataset, num_replicas=args.world_size, rank=args.rank, shuffle=False, drop_last=args.drop_last)
+        val_dataset, num_replicas=args.world_size, rank=args.rank, shuffle=False, drop_last=args.drop_last_val)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, sampler=train_sampler, 
                                                num_workers=args.workers, pin_memory=True, persistent_workers=True, prefetch_factor=args.prefetch_factor)
@@ -309,7 +309,8 @@ def main():
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--num_classes', type=int, default=1000)
     parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
-    parser.add_argument("--drop_last", action='store_true', help="Only for validation")
+    parser.add_argument("--drop_last_train", action='store_true', help="Drop last from train dataset")
+    parser.add_argument("--drop_last_val", action='store_true', help="Drop last from val dataset")
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
     
