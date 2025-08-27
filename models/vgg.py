@@ -98,7 +98,7 @@ def validate(model, loader, device, args):
     def run_validation(dataloader):
         with torch.no_grad():
             for images, targets in dataloader:
-                images = images.to(device, non_blocking=True, memory_format=torch.channels_last)
+                images = images.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
                 if args.amp and device.type == 'cuda':
                     with torch.amp.autocast(device_type='cuda'):
@@ -136,7 +136,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
         start = time.perf_counter()
 
     for images, targets in dataloader:
-        images = images.to(device, non_blocking=True, memory_format=torch.channels_last)
+        images = images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
         samples_seen += images.size(0)
 
@@ -183,19 +183,17 @@ def train(args):
 
     # Model
     model = None
-    if args.model == 'vgg11':
-        model = models.vgg11(num_classes=args.num_classes).to(device, memory_format=torch.channels_last)
-    elif args.model == 'vgg19':
-        model = models.vgg19(num_classes=args.num_classes).to(device, memory_format=torch.channels_last)
-    else:
-        raise ValueError(f"Unsupported model: {args.model}")
+    if args.model == 'vgg11': model = models.vgg11(num_classes=args.num_classes).to(device, memory_format=torch.channels_last)
+    elif args.model == 'vgg19': model = models.vgg19(num_classes=args.num_classes).to(device, memory_format=torch.channels_last)
+    else: raise ValueError(f"Unsupported model: {args.model}")
 
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, static_graph=args.static_graph)
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, \
+                find_unused_parameters=False, static_graph=args.static_graph)
 
     print(f"Model '{args.model}' initialized.", flush=True)
 
     criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay, fused=True)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay, foreach=True) # fused=True 
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
@@ -265,15 +263,22 @@ def setup_ddp(args):
     os.environ.setdefault("WORLD_SIZE",  str(args.world_size))
     os.environ.setdefault("MASTER_ADDR", args.master_addr)
     os.environ.setdefault("MASTER_PORT", str(args.master_port))
-    os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
-    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
     os.environ.setdefault("LOCAL_RANK",  str(args.local_rank))
 
+    os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
+    os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
+    os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
+    os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
+
     os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)               # e.g. ens4f0
-    os.environ.setdefault("NCCL_DEBUG", "INFO")
+    os.environ.setdefault("NCCL_DEBUG", "WARN")
     os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
     os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
-    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "8")  # More NCCL threads
+    os.environ.setdefault("NCCL_P2P_DISABLE", "1")         # P100 P2P is limited
+    os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")      # Force ring for stability
+    os.environ.setdefault("NCCL_IB_DISABLE", "0")          # Enable IB if available on 100G
+    os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
+    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
     os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
 
     # Start the process group

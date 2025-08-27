@@ -62,11 +62,6 @@ class AverageMeter:
         self.count += n
         self.avg = self.sum / max(1.0, self.count)
     def all_reduce(self):
-        # if torch.distributed.is_available() and torch.distributed.is_initialized():
-        #     t = torch.tensor([self.sum, self.count], dtype=torch.float64, device="cpu")
-        #     torch.distributed.all_reduce(t)
-        #     self.sum, self.count = t.tolist()
-        #     self.avg = self.sum / max(1.0, self.count)
         if dist.is_available() and dist.is_initialized():
             backend = dist.get_backend()
             # NCCL => must use GPU tensor; otherwise CPU is fine
@@ -194,12 +189,10 @@ def train(args):
 
     # Model
     model = None
-    if args.model == 'resnet50':
-        model = models.resnet50(num_classes=args.num_classes).to(device)
-    elif args.model == 'resnet101':
-        model = models.resnet101(num_classes=args.num_classes).to(device)
-    else:
-        model = models.resnet152(num_classes=args.num_classes).to(device)
+    if args.model == 'resnet50': model = models.resnet50(num_classes=args.num_classes).to(device)
+    elif args.model == 'resnet101': model = models.resnet101(num_classes=args.num_classes).to(device)
+    elif args.model == 'resnet152': model = models.resnet152(num_classes=args.num_classes).to(device)
+    else: raise ValueError(f"Unsupported model: {args.model}")
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, \
                 find_unused_parameters=False, static_graph=args.static_graph)
@@ -296,7 +289,6 @@ def setup_ddp(args):
     os.environ.setdefault("WORLD_SIZE",  str(args.world_size))
     os.environ.setdefault("MASTER_ADDR", args.master_addr)
     os.environ.setdefault("MASTER_PORT", str(args.master_port))
-    # os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
     os.environ.setdefault("LOCAL_RANK",  str(args.local_rank))
 
     os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
@@ -313,9 +305,10 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_P2P_DISABLE", "1")         # P100 P2P is limited
     os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")      # Force ring for stability
     os.environ.setdefault("NCCL_IB_DISABLE", "0")          # Enable IB if available on 100G
-    os.environ.setdefault("NCCL_BUFFSIZE", "4194304")      # 4MB buffers
+    os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
     os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
     os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
+
     # Start the process group
     dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
