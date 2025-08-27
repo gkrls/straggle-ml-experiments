@@ -46,7 +46,6 @@ exec python -u $HOME/straggle-ml-experiments/models/resnet.py \
   --data ~/datasets/imagenet \
   --batch_size 128 \
   --workers 8 \
-  --drop_last \
   --json $HOME/straggle-ml-experiments/models/resnet.json \
   "$@"
 
