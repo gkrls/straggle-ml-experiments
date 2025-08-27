@@ -195,7 +195,7 @@ def train(args):
     else: raise ValueError(f"Unsupported model: {args.model}")
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, \
-                find_unused_parameters=False, static_graph=args.static_graph)
+                find_unused_parameters=not args.static_graph, static_graph=args.static_graph)
     # model = models.resnet50(num_classes=args.num_classes)
     # if device.type == "cuda":
     #     model = model.to(device, memory_format=torch.channels_last)

@@ -188,7 +188,7 @@ def train(args):
     else: raise ValueError(f"Unsupported model: {args.model}")
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, \
-                find_unused_parameters=False, static_graph=args.static_graph)
+                find_unused_parameters=not args.static_graph, static_graph=args.static_graph)
 
     print(f"Model '{args.model}' initialized.", flush=True)
 
