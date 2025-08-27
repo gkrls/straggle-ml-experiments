@@ -188,7 +188,7 @@ def train(args):
     else: raise ValueError(f"Unsupported model: {args.model}")
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, \
-                find_unused_parameters=not args.static_graph, static_graph=args.static_graph)
+                find_unused_parameters=False, static_graph=args.static_graph)
 
     print(f"Model '{args.model}' initialized.", flush=True)
 
@@ -309,7 +309,7 @@ def main():
     parser.add_argument('--data', type=str, required=True)
     parser.add_argument('--epochs', type=int, default=90)
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.1)
+    parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--num_classes', type=int, default=1000)
