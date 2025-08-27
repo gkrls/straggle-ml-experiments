@@ -215,7 +215,7 @@ def train(args):
     print(f"Model '{args.model}' initialized.", flush=True)
 
     criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay, fused=True) # foreach=True, 
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay, foreach=True) # fused=True 
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 

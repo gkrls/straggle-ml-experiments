@@ -42,7 +42,7 @@ exec python -u $HOME/straggle-ml-experiments/models/resnet.py \
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --backend nccl \
+  --backend gloo \
   --data ~/datasets/imagenet \
   --batch_size 128 \
   --workers 8 \
