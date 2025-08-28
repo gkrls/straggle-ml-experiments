@@ -229,6 +229,7 @@ def train(args):
                 "val_loss": float(val_loss),
                 "top1": float(top1),
                 "top5": float(top5),
+                "steps": int(len(train_loader)),
                 "lr": float(current_lr),
                 "train_time_sec": float(train_time),
                 "epoch_time_sec": float(epoch_time),

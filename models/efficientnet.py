@@ -64,7 +64,6 @@ class AverageMeter:
     def all_reduce(self):
         if dist.is_available() and dist.is_initialized():
             backend = dist.get_backend()
-            # NCCL => must use GPU tensor; otherwise CPU is fine
             device = torch.device(f"cuda:{torch.cuda.current_device()}") if backend == dist.Backend.NCCL else torch.device("cpu")
             t = torch.tensor([self.sum, self.count], dtype=torch.float64, device=device)
             dist.all_reduce(t, op=dist.ReduceOp.SUM)
@@ -123,6 +122,7 @@ def validate(model, loader, device, args):
         run_validation(aux_val_loader)
     return top1.avg, top5.avg, losses.avg
 
+
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     """Perform 1 full pass over the dataset. Return loss, epoch duration, epoch throughput (imgs/sec)"""
     model.train()
@@ -166,6 +166,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     throughput = samples_seen / max(1e-6, duration)
     return total_loss / max(1, len(dataloader)), duration, throughput
 
+
 def save_log(path, log):
     """Atomically write log dict to JSON file."""
     tmp = f"{path}.tmp"
@@ -174,6 +175,7 @@ def save_log(path, log):
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
+
 
 def train(args):
     device = torch.device(args.device)
@@ -213,16 +215,18 @@ def train(args):
 
     print(f"Model '{args.model}' initialized.", flush=True)
 
+    # --- STUDENT'S HYPERPARAMS ---
     criterion = nn.CrossEntropyLoss().to(device)
-    
-    # Based on EfficientNet paper: RMSProp optimizer with decay 0.9 and momentum 0.9
-    # alpha in PyTorch RMSprop corresponds to "decay" in the paper
-    optimizer = optim.RMSprop(model.parameters(), lr=args.learning_rate, momentum=args.momentum, 
-                             weight_decay=args.weight_decay, alpha=0.9, eps=0.001, foreach=True)
-    
-    # Exponential decay scheduler - lr decays by 0.97 every 2.4 epochs
-    # For simplicity, we'll use StepLR with step_size=2 and gamma=0.97^(2.4/2)≈0.928
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.928)
+
+    optimizer = optim.SGD(model.parameters(), 
+                          lr=args.learning_rate,
+                          momentum=args.momentum, 
+                          weight_decay=args.weight_decay,
+                          foreach=True)
+
+    # Cosine schedule over full training (no warmup), as in student's code
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
+    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -256,6 +260,7 @@ def train(args):
                 "val_loss": float(val_loss),
                 "top1": float(top1),
                 "top5": float(top5),
+                "steps": int(len(train_loader)),
                 "lr": float(current_lr),
                 "train_time_sec": float(train_time),
                 "epoch_time_sec": float(epoch_time),
@@ -302,23 +307,25 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_DEBUG", "WARN")
     os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
     os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
-    os.environ.setdefault("NCCL_P2P_DISABLE", "1")         # P100 P2P is limited
-    os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")      # Force ring for stability
-    os.environ.setdefault("NCCL_IB_DISABLE", "0")          # Enable IB if available on 100G
+    os.environ.setdefault("NCCL_P2P_DISABLE", "1")         # keep your original NCCL envs
+    os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")
+    os.environ.setdefault("NCCL_IB_DISABLE", "0")
     os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
-    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
+    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")
     os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
 
-    # Start the process group
+    # Start the process group with your chosen backend
     dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
     if args.rank == 0:
         print(f"[DDP] backend={args.backend} world_size={args.world_size} "
               f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
+
 def cleanup():
     if dist.is_available() and dist.is_initialized():
         dist.destroy_process_group()
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -339,14 +346,13 @@ def main():
                                'efficientnet_v2_s', 'efficientnet_v2_m', 'efficientnet_v2_l'], 
                        help="EfficientNet model", default="efficientnet_b0")
     parser.add_argument('--data', type=str, required=True)
-    parser.add_argument('--epochs', type=int, default=350)  # EfficientNet typically needs many epochs
-    parser.add_argument('--batch_size', type=int, default=32)
-    # Learning rate scaling: 0.256 for batch_size=128, so for batch_size=32: 0.256 * 32/128 = 0.064
-    parser.add_argument('--learning_rate', type=float, default=0.064, help="Initial LR scaled for batch size")
-    parser.add_argument('--momentum', type=float, default=0.9, help="RMSprop momentum from EfficientNet paper")
-    parser.add_argument('--weight_decay', type=float, default=1e-5, help="Weight decay from EfficientNet paper")
+    parser.add_argument('--epochs', type=int, default=90)  # student's typical run length
+    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--learning_rate', type=float, default=0.016)  # student's LR
+    parser.add_argument('--momentum', type=float, default=0.9)
+    parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--num_classes', type=int, default=1000)
-    parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
+    parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA (optional)")
     parser.add_argument("--drop_last_train", action='store_true', help="Drop last from train dataset")
     parser.add_argument("--drop_last_val", action='store_true', help="Drop last from val dataset")
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
@@ -363,7 +369,7 @@ def main():
     else:
         torch.backends.cudnn.benchmark = True
 
-    # Args sanity checks/corrections
+    # Args sanity
     if args.device == 'cuda' and not torch.cuda.is_available():
         args.device = 'cpu'
         if args.rank == 0: print("[Info] Using device=cpu because CUDA is not available", flush=True)
