@@ -1,7 +1,7 @@
 ### Torch vision models
 
 [https://docs.pytorch.org/vision/main/models.html](https://docs.pytorch.org/vision/main/models.html)
-
+[https://catalog.ngc.nvidia.com/orgs/nvidia/resources/efficientnet_for_pytorch](https://catalog.ngc.nvidia.com/orgs/nvidia/resources/efficientnet_for_pytorch)
 
 
 ### Model statistics
