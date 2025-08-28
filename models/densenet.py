@@ -206,8 +206,9 @@ def train(args):
                          weight_decay=args.weight_decay, nesterov=True, foreach=True)
     
     # Learning rate schedule: reduce by 0.1 at 50% and 75% of total epochs (common DenseNet practice)
-    milestones = [int(args.epochs * 0.5), int(args.epochs * 0.75)]
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.1)
+    # milestones = [int(args.epochs * 0.5), int(args.epochs * 0.75)]
+    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.1)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer,milestones=[30, 60, 80],gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
