@@ -20,3 +20,4 @@
 - Resnet154, deterministic, nccl, batch_size=128 -- 2160sec
 - VGG11, deterministic, gloo, batch_size=128 -- 1600sec ~133 images/sec
 - Densenet121, deterministic, gloo, batch_size=128 -- 1021sec ~208 images/sec
+- EfficientNet_b0, deterministic, gloo, batch_size=128 -- 1550sec ~137.2 img/s

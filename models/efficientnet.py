@@ -14,6 +14,7 @@ import datetime
 import time 
 import random
 import numpy as np
+import math
 
 # ------------------------- Dataset ------------------------------
 
@@ -25,12 +26,14 @@ def get_dataloaders(args):
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize,
+        transforms.RandomErasing(p=0.2, inplace=True),  # optional, cheap
     ])
     val_transform = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         normalize,
+        transforms.RandomErasing(p=0.2, inplace=True),  # optional, cheap
     ])
 
     train_dataset = ImageFolder(root=os.path.join(args.data, "train"), transform=train_transform)
@@ -216,15 +219,24 @@ def train(args):
     print(f"Model '{args.model}' initialized.", flush=True)
 
     # --- STUDENT'S HYPERPARAMS ---
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 
-    optimizer = optim.SGD(model.parameters(), 
-                          lr=args.learning_rate,
-                          momentum=args.momentum, 
-                          weight_decay=args.weight_decay,
-                          foreach=True)
+    # optimizer = optim.SGD(model.parameters(), 
+    #                       lr=args.learning_rate,
+    #                       momentum=args.momentum, 
+    #                       weight_decay=args.weight_decay,
+    #                       foreach=True)
 
-    # Cosine schedule over full training (no warmup), as in student's code
+    optimizer = optim.RMSprop(model.parameters(), lr=args.learning_rate, momentum=args.momentum,
+                              alpha=0.9, eps=0.001, weight_decay=args.weight_decay, nesterov=True)
+
+    # warmup_epochs = 5
+    # def lr_lambda(e):
+    #     if e < warmup_epochs:
+    #         return (e + 1) / warmup_epochs
+    #     t = (e - warmup_epochs) / max(1, args.epochs - warmup_epochs)
+    #     return 0.5 * (1 + math.cos(math.pi * t))
+
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
@@ -348,9 +360,9 @@ def main():
     parser.add_argument('--data', type=str, required=True)
     parser.add_argument('--epochs', type=int, default=90)  # student's typical run length
     parser.add_argument('--batch_size', type=int, default=128)
-    parser.add_argument('--learning_rate', type=float, default=0.016)  # student's LR
+    parser.add_argument('--learning_rate', type=float, default=0.08)  # student's LR
     parser.add_argument('--momentum', type=float, default=0.9)
-    parser.add_argument('--weight_decay', type=float, default=1e-5)
+    parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--num_classes', type=int, default=1000)
     parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA (optional)")
     parser.add_argument("--drop_last_train", action='store_true', help="Drop last from train dataset")
