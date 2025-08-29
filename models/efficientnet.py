@@ -218,17 +218,26 @@ def train(args):
 
     print(f"Model '{args.model}' initialized.", flush=True)
 
-    # --- STUDENT'S HYPERPARAMS ---
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 
     if args.optimizer == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, 
-                              weight_decay=args.weight_decay, foreach=True, nesterov=True)
+                              weight_decay=1e-4, foreach=True, nesterov=True)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
     else:
         optimizer = optim.RMSprop(model.parameters(), lr=args.learning_rate, momentum=args.momentum,
-                                alpha=0.9, eps=0.001, weight_decay=args.weight_decay)
-
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
+                                alpha=0.9, eps=0.001, weight_decay=1e-5)
+        warmup_epochs = 5
+        warmup = torch.optim.lr_scheduler.LinearLR(
+            optimizer, start_factor=1/25, total_iters=warmup_epochs
+        )
+        cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=args.epochs - warmup_epochs, eta_min=1e-6
+        )
+        scheduler = torch.optim.lr_scheduler.SequentialLR(
+            optimizer, schedulers=[warmup, cosine], milestones=[warmup_epochs]
+        )
+    
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
@@ -349,9 +358,9 @@ def main():
                                'efficientnet_v2_s', 'efficientnet_v2_m', 'efficientnet_v2_l'], 
                        help="EfficientNet model", default="efficientnet_b0")
     parser.add_argument('--data', type=str, required=True)
-    parser.add_argument('--epochs', type=int, default=90)  # student's typical run length
+    parser.add_argument('--epochs', type=int, default=90)
     parser.add_argument('--batch_size', type=int, default=128)
-    parser.add_argument('--learning_rate', type=float, default=0.08)  # student's LR
+    parser.add_argument('--learning_rate', type=float, default=0.08, help="base for batch=128: sgd=0.08, rmsprop=0.048")
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--num_classes', type=int, default=1000)
