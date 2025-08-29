@@ -221,21 +221,12 @@ def train(args):
     # --- STUDENT'S HYPERPARAMS ---
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 
-    # optimizer = optim.SGD(model.parameters(), 
-    #                       lr=args.learning_rate,
-    #                       momentum=args.momentum, 
-    #                       weight_decay=args.weight_decay,
-    #                       foreach=True)
-
-    optimizer = optim.RMSprop(model.parameters(), lr=args.learning_rate, momentum=args.momentum,
-                              alpha=0.9, eps=0.001, weight_decay=args.weight_decay, nesterov=True)
-
-    # warmup_epochs = 5
-    # def lr_lambda(e):
-    #     if e < warmup_epochs:
-    #         return (e + 1) / warmup_epochs
-    #     t = (e - warmup_epochs) / max(1, args.epochs - warmup_epochs)
-    #     return 0.5 * (1 + math.cos(math.pi * t))
+    if args.optimizer == 'sgd':
+        optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, 
+                              weight_decay=args.weight_decay, foreach=True, nesterov=True)
+    else:
+        optimizer = optim.RMSprop(model.parameters(), lr=args.learning_rate, momentum=args.momentum,
+                                alpha=0.9, eps=0.001, weight_decay=args.weight_decay)
 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1)
@@ -368,6 +359,7 @@ def main():
     parser.add_argument("--drop_last_train", action='store_true', help="Drop last from train dataset")
     parser.add_argument("--drop_last_val", action='store_true', help="Drop last from val dataset")
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
+    parser.add_argument("--optimizer", type=str, choices=["sgd", "rmsprop"], default="sgd")
     parser.add_argument("--prefetch_factor", type=int, default=2)
     
     parser.add_argument("--json", type=str, default="efficientnet_b0.json", help="Path to JSON run log")
