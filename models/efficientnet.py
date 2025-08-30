@@ -416,7 +416,7 @@ def main():
     parser.add_argument('--epochs', type=int, default=90)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=0.08, help="base for batch=128: sgd=0.08, rmsprop=0.048")
-    # parser.add_argument('--momentum', type=float, default=0.9)
+    parser.add_argument('--momentum', type=float, default=0.9, help="(sgd-only)")
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--num_classes', type=int, default=1000)
     parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA (optional)")
