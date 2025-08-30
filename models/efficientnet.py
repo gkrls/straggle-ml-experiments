@@ -236,6 +236,8 @@ def train(args):
         scheduler = torch.optim.lr_scheduler.SequentialLR(
             optimizer, schedulers=[warmup, cosine], milestones=[warmup_epochs]
         )
+        for pg in optimizer.param_groups:
+            pg['lr'] = args.learning_rate / 25.0
     
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
@@ -256,7 +258,6 @@ def train(args):
         train_loader.sampler.set_epoch(epoch)
 
         # Apply LR for THIS epoch (warmup/cosine)
-        scheduler.step()
         current_lr = optimizer.param_groups[0]['lr']  # log the real, in-use LR
 
         train_loss, train_time, train_tp = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
