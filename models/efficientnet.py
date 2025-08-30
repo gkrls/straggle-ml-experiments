@@ -33,7 +33,6 @@ def get_dataloaders(args):
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         normalize,
-        transforms.RandomErasing(p=0.2, inplace=True),  # optional, cheap
     ])
 
     train_dataset = ImageFolder(root=os.path.join(args.data, "train"), transform=train_transform)
@@ -255,18 +254,22 @@ def train(args):
 
         epoch_start = time.time()
         train_loader.sampler.set_epoch(epoch)
-        
+
+        # Apply LR for THIS epoch (warmup/cosine)
+        scheduler.step()
+        current_lr = optimizer.param_groups[0]['lr']  # log the real, in-use LR
+
         train_loss, train_time, train_tp = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
         top1, top5, val_loss = validate(model, val_loader, device, args)
 
         # Print epoch summary with learning rate
-        current_lr = scheduler.get_last_lr()[0]
         if args.rank == 0:
             epoch_time = time.time() - epoch_start
             epoch_tp = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
-        
-            print(f"[{now()}][Epoch {epoch:03d}] train_loss={train_loss:.4f} val_loss={val_loss:.4f} top1={top1:.2f}% top5={top5:.2f}% "
-                  f"lr={current_lr:.6f} time={epoch_time:.2f}s tp= ~{epoch_tp:.1f} img/s", flush=True)
+
+            print(f"[{now()}][Epoch {epoch:03d}] train_loss={train_loss:.4f} val_loss={val_loss:.4f} "
+                f"top1={top1:.2f}% top5={top5:.2f}% lr={current_lr:.6f} time={epoch_time:.2f}s "
+                f"tp= ~{epoch_tp:.1f} img/s", flush=True)
             log["epochs"][str(epoch)] = {
                 "train_loss": float(train_loss),
                 "val_loss": float(val_loss),
