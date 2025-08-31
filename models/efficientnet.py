@@ -426,7 +426,7 @@ def main():
     parser.add_argument("--optimizer", type=str, choices=["sgd", "rmsprop"], default="sgd")
     parser.add_argument("--prefetch_factor", type=int, default=2)
     
-    parser.add_argument("--json", type=str, default="efficientnet_b0.json", help="Path to JSON run log")
+    parser.add_argument("--json", type=str, default="efficientnet.json", help="Path to JSON run log")
     args = parser.parse_args()
 
     if args.deterministic:

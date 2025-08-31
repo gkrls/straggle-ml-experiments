@@ -121,21 +121,33 @@ def validate(model, loader, device, args):
         aux_val_dataset = Subset(loader.dataset, range(len(loader.sampler) * args.world_size, len(loader.dataset)))
         aux_val_loader = torch.utils.data.DataLoader(aux_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
         run_validation(aux_val_loader)
-    return top1.avg, top5.avg, losses.avg
+
+    return {'val_loss': losses.avg, 'val_top1': top1.avg, 'val_top5': top5.avg }
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     """Perform 1 full pass over the dataset. Return loss, epoch duration, epoch throughput (imgs/sec)"""
     model.train()
-    total_loss, samples_seen = 0.0, 0.0
     
-    if device.type == 'cuda':
-        start = torch.cuda.Event(enable_timing=True)
-        end   = torch.cuda.Event(enable_timing=True)
-        start.record()  # on current stream
-    else:
-        start = time.perf_counter()
+    # meters
+    losses = AverageMeter()
+    top1 = AverageMeter() 
+    top5 = AverageMeter()
+    step_time = AverageMeter()
+    data_time = AverageMeter()
 
+    if device.type == 'cuda':
+        epoch_start = torch.cuda.Event(enable_timing=True)
+        epoch_end   = torch.cuda.Event(enable_timing=True)
+        epoch_start.record()  # on current stream
+    else:
+        epoch_start = time.perf_counter()
+
+    step_start = time.perf_counter()
+
+    samples_seen = 0.0
     for images, targets in dataloader:
+        data_time.update(time.perf_counter() - step_start, n=1)
+
         images = images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
         samples_seen += images.size(0)
@@ -154,17 +166,42 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
             loss.backward()
             optimizer.step()
 
-        total_loss += float(loss.item())
+        # Calculate accuracy
+        acc1, acc5 = accuracy(outputs, targets, topk=(1, 5))
+
+        # Update meters
+        losses.update(loss.item(), images.size(0))
+        top1.update(acc1[0].item(), images.size(0))
+        top5.update(acc5[0].item(), images.size(0))
+        
+        step_time.update(time.perf_counter() - step_start, n=1)
+        step_start = time.perf_counter()
 
     if device.type == 'cuda':
-        end.record() 
-        end.synchronize()
-        duration = start.elapsed_time(end) / 1000.0  # seconds
+        epoch_end.record() 
+        epoch_end.synchronize()
+        duration = epoch_start.elapsed_time(epoch_end) / 1000.0  # seconds
     else:
-        duration = time.perf_counter() - start
+        duration = time.perf_counter() - epoch_start
 
     throughput = samples_seen / max(1e-6, duration)
-    return total_loss / max(1, len(dataloader)), duration, throughput
+
+    local_loss = losses.avg
+    losses.all_reduce()
+    
+    # return total_loss / max(1, len(dataloader)), duration, throughput
+    return {
+        'train_loss_global' : losses.avg,
+        'train_loss': local_loss,
+        'train_top1': top1.avg,
+        'train_top5': top5.avg,
+        'train_step_time': step_time.avg,
+        'train_data_time': data_time.avg,
+        'train_comp_time': step_time.avg - data_time.avg,
+        'epoch_duration': duration,
+        'epoch_throughput': throughput,
+    }
+
 
 def save_log(path, log):
     """Atomically write log dict to JSON file."""
@@ -202,8 +239,7 @@ def train(args):
     criterion = nn.CrossEntropyLoss().to(device)
     
     # DenseNet typically uses SGD with Nesterov momentum based on research findings
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, 
-                         weight_decay=args.weight_decay, nesterov=True, foreach=True)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay, nesterov=True, foreach=True)
     
     # Learning rate schedule: reduce by 0.1 at 50% and 75% of total epochs (common DenseNet practice)
     # milestones = [int(args.epochs * 0.5), int(args.epochs * 0.75)]
@@ -226,36 +262,64 @@ def train(args):
         epoch_start = time.time()
         train_loader.sampler.set_epoch(epoch)
         
-        train_loss, train_time, train_tp = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
-        top1, top5, val_loss = validate(model, val_loader, device, args)
+        # Get current learning rate
+        current_lr = optimizer.param_groups[0]['lr']
+
+        # Train for one epoch and get metrics
+        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
+
+        # Validate and get metrics
+        val_metrics  = validate(model, val_loader, device, args)
+
+        # Calculate total epoch time and overall throughput
+        epoch_time = time.time() - epoch_start
+        epoch_throughput = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
 
         # Print epoch summary with learning rate
         current_lr = scheduler.get_last_lr()[0]
         if args.rank == 0:
-            epoch_time = time.time() - epoch_start
-            epoch_tp = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
-        
-            print(f"[{now()}][Epoch {epoch:03d}] train_loss={train_loss:.4f} val_loss={val_loss:.4f} top1={top1:.2f}% top5={top5:.2f}% "
-                  f"lr={current_lr:.6f} time={epoch_time:.2f}s tp= ~{epoch_tp:.1f} img/s", flush=True)
-            log["epochs"][str(epoch)] = {
-                "train_loss": float(train_loss),
-                "val_loss": float(val_loss),
-                "top1": float(top1),
-                "top5": float(top5),
-                "steps": int(len(train_loader)),
+            print(f"[{now()}][Epoch {epoch:03d}] "
+                  f"train_loss={train_metrics['train_loss']:.4f} (global={train_metrics['train_loss_global']:.4f}) "
+                  f"val_loss={val_metrics['val_loss']:.4f} "
+                  f"top1={val_metrics['val_top1']:.2f}% top5={val_metrics['val_top5']:.2f}% "
+                  f"lr={current_lr:.6f} time={epoch_time:.2f}s tp=~{epoch_throughput:.1f} img/s", flush=True)
+            
+            # Combine all metrics into one dictionary for logging
+            epoch_metrics = {
+                # Training metrics
+                "train_loss": float(train_metrics['train_loss']),           # Local loss for rank 0
+                "train_loss_global": float(train_metrics['train_loss_global']), # Global average loss
+                "train_top1": float(train_metrics['train_top1']),
+                "train_top5": float(train_metrics['train_top5']),
+                "train_step_time": float(train_metrics['train_step_time']),
+                "train_data_time": float(train_metrics['train_data_time']),
+                "train_comp_time": float(train_metrics['train_comp_time']),
+                "train_duration": float(train_metrics['epoch_duration']),
+                "train_throughput": float(train_metrics['epoch_throughput']),
+                
+                # Validation metrics
+                "val_loss": float(val_metrics['val_loss']),
+                "val_top1": float(val_metrics['val_top1']),
+                "val_top5": float(val_metrics['val_top5']),
+                
+                # Epoch-level metrics
                 "lr": float(current_lr),
-                "train_time_sec": float(train_time),
-                "epoch_time_sec": float(epoch_time),
-                "train_throughput_ips": float(train_tp),
-                "epoch_throughput_ips": float(epoch_tp)
+                "epoch_time": float(epoch_time),
+                "epoch_throughput": float(epoch_throughput),
+                "steps": int(len(train_loader))
             }
+            
+            log["epochs"][str(epoch)] = epoch_metrics
             save_log(args.json, log)
+            
+            # Track best validation accuracy
+            if val_metrics['val_top1'] > best_top1: 
+                best_top1 = val_metrics['val_top1']
+            if val_metrics['val_top5'] > best_top5: 
+                best_top5 = val_metrics['val_top5']
 
         # Step the scheduler after evaluation (end of epoch)
         scheduler.step()
-        
-        if args.rank == 0 and top1 > best_top1: best_top1 = top1
-        if args.rank == 0 and top5 > best_top5: best_top5 = top5
 
 # ------------------------- Entry / Setup ------------------------
 
@@ -324,8 +388,8 @@ def main():
                        choices=['densenet121', 'densenet161', 'densenet169', 'densenet201'], 
                        help="DenseNet model", default="densenet121")
     parser.add_argument('--data', type=str, required=True)
-    parser.add_argument('--epochs', type=int, default=300)  # DenseNet original paper used 300 epochs for CIFAR, ImageNet typically uses fewer
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--epochs', type=int, default=100)  # DenseNet original paper used 300 epochs for CIFAR, ImageNet typically uses fewer
+    parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=0.1, help="Initial learning rate (standard for DenseNet)")
     parser.add_argument('--momentum', type=float, default=0.9, help="SGD momentum")
     parser.add_argument('--weight_decay', type=float, default=1e-4, help="Weight decay (L2 regularization)")
@@ -336,7 +400,7 @@ def main():
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
     
-    parser.add_argument("--json", type=str, default="densenet121.json", help="Path to JSON run log")
+    parser.add_argument("--json", type=str, default="densenet.json", help="Path to JSON run log")
     args = parser.parse_args()
 
     if args.deterministic:
