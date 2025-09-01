@@ -29,7 +29,7 @@ else
   git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
 fi
 
-source $HOME/straggle-ml/venv/bin/activate
+source $HOME/straggle-ml-experiments/venv/bin/activate
 
 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
 NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
@@ -43,7 +43,6 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --backend gloo \
-  --data ~/datasets/imagenet \
   --batch_size 128 \
   --workers 8 \
   --json $HOME/straggle-ml-experiments/models/lstm.json \
