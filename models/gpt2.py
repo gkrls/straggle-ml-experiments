@@ -496,7 +496,7 @@ def main():
     p.add_argument('--epochs', type=int, default=10)
     p.add_argument('--steps_per_epoch', type=int, default=1000)
     p.add_argument('--batch_size', type=int, default=2)         # per-GPU microbatch; raise if it fits
-    p.add_argument('--learning_rate', type=float, default=3e-4)
+    p.add_argument('--learning_rate', type=float, default=1e-4)
     p.add_argument('--weight_decay', type=float, default=0.01)
     p.add_argument("--amp", action="store_true")
     p.add_argument("--static_graph", action='store_true')
