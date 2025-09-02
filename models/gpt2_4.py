@@ -270,10 +270,11 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         step_start = time.perf_counter()
         
         # Log progress
-        if batch_idx % 50 == 0 and args.rank == 0:
-            warmup_str = " (warmup)" if current_step < warmup_iters else ""
-            print(f"[Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch}] "
-                  f"Loss: {loss.item():.4f} | LR: {lr:.6f}{warmup_str} | Grad Norm: {grad_norm:.2f}")
+        if args.rank == 0:
+            # During warmup, print every 50 steps
+            if current_step < warmup_iters and batch_idx % 50 == 0:
+                print(f"[Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch}] "
+                      f"Loss: {loss.item():.4f} | LR: {lr:.6f} (warmup) | Grad Norm: {grad_norm:.2f}")
         
         if args.steps_per_epoch and batches >= args.steps_per_epoch:
             break
@@ -482,9 +483,11 @@ def train(args):
     # Training loop
     for epoch in range(args.epochs):
         if args.rank == 0:
-            print(f"[{now()}][Epoch {epoch:03d}] Starting...", flush=True)
             if epoch == 0 and warmup_iters > 0:
-                print(f"[Info] First {warmup_iters} are warmup ...")
+                print(f"[{now()}][Epoch {epoch:03d}] Starting. First {warmup_iters} steps are warmup...", flush=True)
+            else:
+                print(f"[{now()}][Epoch {epoch:03d}] Starting...", flush=True)
+
 
         train_ds.set_epoch(epoch)  # Shuffle training data
         
@@ -515,13 +518,17 @@ def train(args):
             epoch_metrics = {
                 "train_loss": float(train_metrics['train_loss']),
                 "train_loss_global": float(train_metrics['train_loss_global']),
-                "train_ppl": float(train_metrics['train_ppl']),
+                "train_step_time": float(train_metrics['train_step_time']),
+                "train_data_time": float(train_metrics['train_data_time']),
+                "train_comp_time": float(train_metrics['train_comp_time']),
+                "train_duration": float(train_metrics['epoch_duration']),
+                "train_throughput": float(train_metrics['epoch_throughput']),
                 "val_loss": float(val_metrics['val_loss']),
                 "val_ppl": float(val_metrics['val_ppl']),
                 "lr": float(current_lr),
                 "epoch_time": float(epoch_time),
-                "tokens_per_sec": float(train_metrics['epoch_throughput']),
-                "total_steps": total_steps,
+                "epoch_throughput": float(train_metrics['epoch_throughput']),
+                "steps": int(train_metrics['batches']),
             }
             
             with open(args.json, "r") as f:
