@@ -537,8 +537,8 @@ def main():
     parser.add_argument('--dataset', type=str, choices=['sst2', 'imdb', 'ag_news'], default='sst2', help='Dataset to use for training')
 
     # Training parameters
-    parser.add_argument('--epochs', type=int, default=None, help='Number of epochs (dataset-specific default if not set)')
-    parser.add_argument('--batch_size', type=int, default=None, help='Batch size per GPU (dataset-specific default if not set)')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs (dataset-specific default if not set)')
+    parser.add_argument('--batch_size', type=int, default=32, help='Batch size per GPU (dataset-specific default if not set)')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate')
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty)')
     parser.add_argument('--step_size', type=int, default=5, help="StepLR step size")
