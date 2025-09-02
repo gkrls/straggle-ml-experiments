@@ -1,6 +1,15 @@
+# Use CUDA 12.6 wheels for PyTorch bits
 --index-url https://download.pytorch.org/whl/cu126
 torch==2.7.1
 torchvision==0.22.1
+
+# Back to PyPI for everything else
 --index-url https://pypi.org/simple/
-datasets
-pyarrow
+# Core HF stack for GPT-2 training
+transformers>=4.44,<5
+tokenizers>=0.19
+accelerate>=0.34
+datasets>=2.18
+pyarrow>=14
+safetensors>=0.4
+tqdm
