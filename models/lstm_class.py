@@ -106,11 +106,9 @@ def get_dataloaders(args, vocab):
     val_sampler = torch.utils.data.distributed.DistributedSampler(
         val_dataset, num_replicas=args.world_size, rank=args.rank, shuffle=False, drop_last=args.drop_last_val)
     
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, sampler=train_sampler,
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, sampler=train_sampler,
         num_workers=args.workers, pin_memory=True, persistent_workers=True, prefetch_factor=args.prefetch_factor)
-    val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=args.batch_size, sampler=val_sampler, shuffle=False,
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, sampler=val_sampler, shuffle=False,
         num_workers=args.workers, pin_memory=True, persistent_workers=True, prefetch_factor=args.prefetch_factor)
     
     return train_loader, val_loader
@@ -121,21 +119,18 @@ def get_dataset_config(dataset_name):
         'sst2': {
             'num_classes': 2,
             'max_len': 64,
-            'expected_acc': '81-85%',
             'epochs': 15,
             'batch_size': 32
         },
         'imdb': {
             'num_classes': 2,
             'max_len': 256,
-            'expected_acc': '85-88%',
             'epochs': 10,
             'batch_size': 32
         },
         'ag_news': {
             'num_classes': 4,
             'max_len': 128,
-            'expected_acc': '90-92%',
             'epochs': 10,
             'batch_size': 64
         }
@@ -253,7 +248,7 @@ def validate(model, loader, device, args):
             num_workers=args.workers, pin_memory=True)
         run_validation(aux_val_loader)
     
-    return {'val_loss': losses.avg, 'val_acc': acc.avg, 'val_perplexity': np.exp(losses.avg)}
+    return {'val_loss': losses.avg, 'val_acc': acc.avg}
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     """Perform 1 full pass over the dataset"""
@@ -327,7 +322,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
         'train_loss': local_loss,
         'train_acc_global': acc.avg,
         'train_acc': local_acc,
-        'train_perplexity': np.exp(local_loss),
         'train_step_time': step_time.avg,
         'train_data_time': data_time.avg,
         'train_comp_time': step_time.avg - data_time.avg,
@@ -388,18 +382,8 @@ def train(args):
         print(f"  Vocabulary size: {len(vocab):,}")
         print(f"  Number of classes: {args.num_classes}")
         print(f"  Max sequence length: {args.max_len}")
-        print(f"  Expected accuracy: {dataset_config['expected_acc']}")
-        print(f"\nModel: LSTM ({'bidirectional' if args.bidirectional else 'unidirectional'}, "
-              f"{args.num_layers} layers)")
-        print(f"  Embedding dim: {args.embed_dim}")
-        print(f"  Hidden dim: {args.hidden_dim}")
-        print(f"  Dropout: {args.dropout}")
-        print(f"\nTraining:")
-        print(f"  Epochs: {args.epochs}")
-        print(f"  Batch size: {args.batch_size}")
-        print(f"  Learning rate: {args.learning_rate}")
-        print(f"  Optimizer: Adam")
-        print(f"  Scheduler: StepLR (step={args.step_size}, gamma={args.gamma})")
+        print(f"\nModel: LSTM Classifier ({'bidirectional' if args.bidirectional else 'unidirectional'}, {args.num_layers} layers)")
+        print(f"  Total parameters: {sum(p.numel() for p in model.parameters()):,}")
         print("=" * 60, flush=True)
     
     criterion = nn.CrossEntropyLoss().to(device)
@@ -411,7 +395,6 @@ def train(args):
         return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     best_acc = 0.0
-    best_perplexity = float('inf')
     
     if args.rank == 0:
         log = {
@@ -457,7 +440,6 @@ def train(args):
                 "train_loss_global": float(train_metrics['train_loss_global']),
                 "train_acc": float(train_metrics['train_acc']),
                 "train_acc_global": float(train_metrics['train_acc_global']),
-                "train_perplexity": float(train_metrics['train_perplexity']),
                 "train_step_time": float(train_metrics['train_step_time']),
                 "train_data_time": float(train_metrics['train_data_time']),
                 "train_comp_time": float(train_metrics['train_comp_time']),
@@ -465,7 +447,6 @@ def train(args):
                 "train_throughput": float(train_metrics['epoch_throughput']),
                 "val_loss": float(val_metrics['val_loss']),
                 "val_acc": float(val_metrics['val_acc']),
-                "val_perplexity": float(val_metrics['val_perplexity']),
                 "lr": float(current_lr),
                 "epoch_time": float(epoch_time),
                 "epoch_throughput": float(epoch_throughput),
@@ -478,9 +459,6 @@ def train(args):
             # Track best validation accuracy
             if val_metrics['val_acc'] > best_acc:
                 best_acc = val_metrics['val_acc']
-                # print(f"  New best accuracy: {best_acc:.2f}%", flush=True)
-            if val_metrics['val_perplexity'] < best_perplexity:
-                best_perplexity = val_metrics['val_perplexity']
         
         # Step the scheduler
         scheduler.step()
@@ -488,8 +466,6 @@ def train(args):
     if args.rank == 0:
         print(f"\n[{now()}] Training completed!")
         print(f"Best validation accuracy: {best_acc:.2f}%")
-        print(f"Best validation perplexity: {best_perplexity:.2f}")
-        print(f"Expected accuracy for {args.dataset}: {dataset_config['expected_acc']}", flush=True)
 
 # ------------------------- Entry / Setup ------------------------
 
@@ -547,25 +523,33 @@ def cleanup():
 def main():
     parser = argparse.ArgumentParser(description='Distributed LSTM training for text classification')
     
-    # Dataset selection
-    parser.add_argument('--dataset', type=str, choices=['sst2', 'imdb', 'ag_news'], default='sst2',
-                       help='Dataset to use for training')
-    
-    # Distributed training arguments
     parser.add_argument('--rank', type=int, default=0, help='Rank of current process')
     parser.add_argument('--world_size', type=int, default=1, help='Number of processes')
     parser.add_argument('--iface', type=str, default="ens4f0", help='Network interface')
     parser.add_argument('--master_addr', type=str, default="42.0.0.1", help='Master node address')
     parser.add_argument("--master_port", type=int, default=29500, help='Master node port')
-    parser.add_argument("--backend", type=str, default="gloo", choices=['gloo', 'nccl'],
-                       help="DDP backend")
-    parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda',
-                       help='Device to use for training')
-    
-    # System arguments
+    parser.add_argument("--backend", type=str, default="gloo", choices=['gloo', 'nccl'], help="DDP backend")
+    parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda', help='Device to use for training')
     parser.add_argument("--deterministic", action='store_true', help='Use deterministic algorithms')
     parser.add_argument("--workers", type=int, default=4, help='Number of data loading workers')
-    
+    parser.add_argument("--json", type=str, default=None, help="Path to JSON run log")
+
+    # Dataset selection
+    parser.add_argument('--dataset', type=str, choices=['sst2', 'imdb', 'ag_news'], default='sst2', help='Dataset to use for training')
+
+    # Training parameters
+    parser.add_argument('--epochs', type=int, default=None, help='Number of epochs (dataset-specific default if not set)')
+    parser.add_argument('--batch_size', type=int, default=None, help='Batch size per GPU (dataset-specific default if not set)')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate')
+    parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty)')
+    parser.add_argument('--step_size', type=int, default=5, help="StepLR step size")
+    parser.add_argument('--gamma', type=float, default=0.5, help="StepLR gamma")
+    parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
+    parser.add_argument("--drop_last_train", action='store_true', help="Drop last batch from train dataset")
+    parser.add_argument("--drop_last_val", action='store_true', help="Drop last batch from val dataset")
+    parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
+    parser.add_argument("--prefetch_factor", type=int, default=2, help='Prefetch factor for data loader')
+
     # Model parameters
     parser.add_argument('--embed_dim', type=int, default=256, help="Embedding dimension")
     parser.add_argument('--hidden_dim', type=int, default=512, help="LSTM hidden dimension")
@@ -576,29 +560,12 @@ def main():
     parser.add_argument('--bidirectional', action='store_true', help="Use bidirectional LSTM")
     parser.add_argument('--num_classes', type=int, default=None, help="Number of output classes (auto-detected)")
     
-    # Training parameters
-    parser.add_argument('--epochs', type=int, default=None, help='Number of epochs (dataset-specific default if not set)')
-    parser.add_argument('--batch_size', type=int, default=None, help='Batch size per GPU (dataset-specific default if not set)')
-    parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate')
-    parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty)')
-    parser.add_argument('--step_size', type=int, default=5, help="StepLR step size")
-    parser.add_argument('--gamma', type=float, default=0.5, help="StepLR gamma")
-    
-    # Optimization arguments
-    parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
-    parser.add_argument("--drop_last_train", action='store_true', help="Drop last batch from train dataset")
-    parser.add_argument("--drop_last_val", action='store_true', help="Drop last batch from val dataset")
-    parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
-    parser.add_argument("--prefetch_factor", type=int, default=2, help='Prefetch factor for data loader')
-    
-    # Logging
-    parser.add_argument("--json", type=str, default=None, help="Path to JSON run log")
     
     args = parser.parse_args()
     
     # Set default JSON log path based on dataset
     if args.json is None:
-        args.json = f"lstm_{args.dataset}.json"
+        args.json = f"lstm_classify_{args.dataset}.json"
     
     if args.deterministic:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
