@@ -282,7 +282,7 @@ def train(args):
 
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=True)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
