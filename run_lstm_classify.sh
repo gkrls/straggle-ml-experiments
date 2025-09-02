@@ -36,7 +36,7 @@ NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 # Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 set -x
-exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
+exec python -u $HOME/straggle-ml-experiments/models/lstm_classify.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -45,7 +45,7 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --backend gloo \
   --batch_size 128 \
   --workers 8 \
-  --json $HOME/straggle-ml-experiments/models/lstm.json \
+  --json $HOME/straggle-ml-experiments/models/lstm_classify.json \
   "$@"
 
 
