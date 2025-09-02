@@ -199,7 +199,7 @@ def validate(model, loader, device, args):
             loss_sum = ce(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
 
         ntok = targets.numel()
-        losses.update(loss_sum.item(), ntok)
+        losses.update(loss_sum.item() / max(1, ntok), ntok)
 
     losses.all_reduce()
     val_loss = losses.avg  # per-token NLL
@@ -275,7 +275,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, sch
 
         # Step-based LR schedule
         scheduler.step()
-        losses.update(loss_sum.item(), ntok)
+        losses.update(loss_sum.item() / max(1, ntok), ntok)
         tokens_seen += int(ntok)
         batches += 1
 
@@ -517,12 +517,12 @@ def main():
     p.add_argument('--max_vocab', type=int, default=50000)
     p.add_argument('--vocab_bytes', type=int, default=2_000_000_000)
     p.add_argument('--seq_len', type=int, default=256)
-    p.add_argument('--stride', type=int, default=128)
+    p.add_argument('--stride', type=int, default=256)
     p.add_argument('--val_fraction', type=float, default=0.01)
     # Training
     p.add_argument('--epochs', type=int, default=25)
-    p.add_argument('--steps_per_epoch', type=int, default=2000, help='Number of training steps per epoch (set 0 to iterate full dataset)')
-    p.add_argument('--batch_size', type=int, default=32)
+    p.add_argument('--steps_per_epoch', type=int, default=1000, help='Number of training steps per epoch (set 0 to iterate full dataset)')
+    p.add_argument('--batch_size', type=int, default=64)
     p.add_argument('--learning_rate', type=float, default=1e-3)
     p.add_argument('--weight_decay', type=float, default=1e-5)
     p.add_argument('--warmup_ratio', type=float, default=0.05, help='Fraction of total steps for linear warmup before cosine decay')
