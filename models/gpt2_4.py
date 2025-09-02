@@ -539,7 +539,7 @@ def train(args):
             # Track best model
             if val_metrics['val_ppl'] < best_ppl:
                 best_ppl = val_metrics['val_ppl']
-                print(f"[{now()}] New best val_ppl: {best_ppl:.2f}")
+                # print(f"[{now()}] New best val_ppl: {best_ppl:.2f}")
     
     if args.rank == 0:
         print(f"\n[{now()}] Training completed!")
