@@ -47,7 +47,8 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm_predict.py \
   --backend gloo \
   --workers 8 \
   --json $HOME/straggle-ml-experiments/models/lstm_predict.json \
-  --data ~/datasets/openwebtext
+  --data ~/datasets/openwebtext \
+  --cache_dir ~/datasets/openwebtext/cache
   "$@"
 
 
