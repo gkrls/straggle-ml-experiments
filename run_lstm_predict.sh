@@ -29,7 +29,9 @@ else
   git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
 fi
 
-source $HOME/straggle-ml-experiments/venv/bin/activate
+source $HOME/straggle-ml/venv/bin/activate
+python -m pip install --upgrade pip 
+python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
 
 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
 NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
@@ -45,6 +47,7 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm_predict.py \
   --backend gloo \
   --workers 8 \
   --json $HOME/straggle-ml-experiments/models/lstm_predict.json \
+  --data ~/datasets/openwebtext
   "$@"
 
 

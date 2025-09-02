@@ -30,6 +30,8 @@ else
 fi
 
 source $HOME/straggle-ml/venv/bin/activate
+python -m pip install --upgrade pip 
+python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
 
 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
 NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
