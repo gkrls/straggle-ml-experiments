@@ -75,53 +75,60 @@ def get_dataloaders(args, vocab):
 # ------------------------- Model --------------------------------
 
 class LSTMClassifier(nn.Module):
-    def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes, dropout_prob=0.5, bidirectional=False):
+    def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes, num_layers=2, dropout_prob=0.5, bidirectional=False):
         super().__init__()
         self.bidirectional = bidirectional
+        self.num_layers = num_layers
+        self.hidden_dim = hidden_dim
+        
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
-        self.lstm = nn.LSTM(embed_dim, hidden_dim, batch_first=True, bidirectional=bidirectional)
+        self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=num_layers, 
+                           batch_first=True, bidirectional=bidirectional, 
+                           dropout=dropout_prob if num_layers > 1 else 0)
         self.dropout = nn.Dropout(dropout_prob)
+        
         # Adjust output size based on bidirectional
         lstm_output_size = hidden_dim * 2 if bidirectional else hidden_dim
         self.fc = nn.Linear(lstm_output_size, num_classes)
 
     def forward(self, x, lengths):
         embeds = self.embedding(x)
+        embeds = self.dropout(embeds)  # Apply dropout to embeddings
+        
         packed = nn.utils.rnn.pack_padded_sequence(
             embeds, lengths.cpu(), batch_first=True, enforce_sorted=False
         )
         _, (hidden, _) = self.lstm(packed)
         
         if self.bidirectional:
-            # Concatenate forward and backward final hidden states
-            # hidden shape: (num_directions, batch, hidden_dim)
-            out = torch.cat([hidden[0], hidden[1]], dim=1)  # forward + backward
+            # Concatenate the last hidden states from both directions
+            # hidden shape: (num_layers * num_directions, batch, hidden_dim)
+            # We want the last layer's forward and backward states
+            forward_hidden = hidden[-2]  # Last layer, forward
+            backward_hidden = hidden[-1]  # Last layer, backward
+            out = torch.cat([forward_hidden, backward_hidden], dim=1)
         else:
-            out = hidden[0]  # Just the final hidden state
+            out = hidden[-1]  # Last layer's hidden state
             
         out = self.dropout(out)
         return self.fc(out)
-
-def accuracy(output, target):
-    """Computes the accuracy"""
-    with torch.no_grad():
-        pred = output.argmax(dim=1)
-        correct = pred.eq(target).float().sum(0)
-        return correct.mul_(100.0 / target.size(0))
 
 # ------------------------- Metrics ------------------------------
 
 class AverageMeter:
     def __init__(self):
         self.reset()
+    
     def reset(self):
         self.sum = 0.0
         self.count = 0.0
         self.avg = 0.0
+    
     def update(self, val, n=1):
         self.sum += float(val) * n
         self.count += n
         self.avg = self.sum / max(1.0, self.count)
+    
     def all_reduce(self):
         if dist.is_available() and dist.is_initialized():
             backend = dist.get_backend()
@@ -132,12 +139,21 @@ class AverageMeter:
             self.sum, self.count = t.cpu().tolist()
             self.avg = self.sum / max(1.0, self.count)
 
+def accuracy(output, target):
+    """Computes the accuracy"""
+    with torch.no_grad():
+        batch_size = target.size(0)
+        pred = output.argmax(dim=1)
+        correct = pred.eq(target).float().sum().item()
+        return correct * 100.0 / batch_size
+
 # ------------------------- Train / Eval -------------------------
 
 @torch.no_grad()
 def validate(model, loader, device, args):
     model.eval()
-    acc, losses = AverageMeter(), AverageMeter()
+    acc = AverageMeter()
+    losses = AverageMeter()
     criterion = nn.CrossEntropyLoss().to(device)
 
     def run_validation(dataloader):
@@ -145,6 +161,7 @@ def validate(model, loader, device, args):
             for inputs, targets, lengths in dataloader:
                 inputs = inputs.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
+                
                 if args.amp and device.type == 'cuda':
                     with torch.amp.autocast(device_type='cuda'):
                         outputs = model(inputs, lengths)
@@ -152,23 +169,27 @@ def validate(model, loader, device, args):
                 else:
                     outputs = model(inputs, lengths)
                     loss = criterion(outputs, targets)
-                accuracy_val = accuracy(outputs, targets)
+                
+                batch_acc = accuracy(outputs, targets)
                 losses.update(loss.item(), inputs.size(0))
-                acc.update(accuracy_val.item(), inputs.size(0))
+                acc.update(batch_acc, inputs.size(0))
 
     run_validation(loader)
     acc.all_reduce()
     losses.all_reduce()
 
+    # Handle remaining samples if dataset doesn't divide evenly
     if len(loader.sampler) * args.world_size < len(loader.dataset):
         aux_val_dataset = Subset(loader.dataset, range(len(loader.sampler) * args.world_size, len(loader.dataset)))
-        aux_val_loader = torch.utils.data.DataLoader(aux_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
+        aux_val_loader = torch.utils.data.DataLoader(
+            aux_val_dataset, batch_size=args.batch_size, shuffle=False, 
+            num_workers=args.workers, pin_memory=True)
         run_validation(aux_val_loader)
 
     return {'val_loss': losses.avg, 'val_acc': acc.avg, 'val_perplexity': np.exp(losses.avg)}
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
-    """Perform 1 full pass over the dataset. Return loss, epoch duration, epoch throughput (samples/sec)"""
+    """Perform 1 full pass over the dataset. Return metrics."""
     model.train()
     
     # meters
@@ -179,22 +200,24 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
 
     if device.type == 'cuda':
         epoch_start = torch.cuda.Event(enable_timing=True)
-        epoch_end   = torch.cuda.Event(enable_timing=True)
-        epoch_start.record()  # on current stream
+        epoch_end = torch.cuda.Event(enable_timing=True)
+        epoch_start.record()
     else:
         epoch_start = time.perf_counter()
 
     step_start = time.perf_counter()
+    samples_seen = 0
 
-    samples_seen = 0.0
     for inputs, targets, lengths in dataloader:
         data_time.update(time.perf_counter() - step_start, n=1)
 
         inputs = inputs.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
-        samples_seen += inputs.size(0)
+        batch_size = inputs.size(0)
+        samples_seen += batch_size
 
         optimizer.zero_grad(set_to_none=True)
+        
         if scaler is not None:
             with torch.amp.autocast(device_type='cuda'):
                 outputs = model(inputs, lengths)
@@ -213,18 +236,18 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             optimizer.step()
 
-        # Calculate accuracy
-        accuracy_val = accuracy(outputs, targets)
+        # Calculate accuracy for this batch
+        batch_acc = accuracy(outputs, targets)
 
         # Update meters
-        losses.update(loss.item(), inputs.size(0))
-        acc.update(accuracy_val.item(), inputs.size(0))
+        losses.update(loss.item(), batch_size)
+        acc.update(batch_acc, batch_size)
         
         step_time.update(time.perf_counter() - step_start, n=1)
         step_start = time.perf_counter()
 
     if device.type == 'cuda':
-        epoch_end.record() 
+        epoch_end.record()
         epoch_end.synchronize()
         duration = epoch_start.elapsed_time(epoch_end) / 1000.0  # seconds
     else:
@@ -232,13 +255,19 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
 
     throughput = samples_seen / max(1e-6, duration)
 
+    # Store local loss before all_reduce
     local_loss = losses.avg
+    local_acc = acc.avg
+    
+    # All-reduce metrics across processes
     losses.all_reduce()
+    acc.all_reduce()
     
     return {
-        'train_loss_global' : losses.avg,
+        'train_loss_global': losses.avg,
         'train_loss': local_loss,
-        'train_acc': acc.avg,
+        'train_acc_global': acc.avg,
+        'train_acc': local_acc,
         'train_perplexity': np.exp(local_loss),
         'train_step_time': step_time.avg,
         'train_data_time': data_time.avg,
@@ -269,21 +298,30 @@ def train(args):
         embed_dim=args.embed_dim,
         hidden_dim=args.hidden_dim,
         num_classes=args.num_classes,
+        num_layers=args.num_layers,
         dropout_prob=args.dropout,
         bidirectional=args.bidirectional
     ).to(device)
 
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, \
-                find_unused_parameters=False, static_graph=args.static_graph)
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, 
+                gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
-    print(f"LSTM model ({'bidirectional' if args.bidirectional else 'unidirectional'}) initialized with vocab_size={len(vocab)}.", flush=True)
+    if args.rank == 0:
+        print(f"Model: LSTM ({'bidirectional' if args.bidirectional else 'unidirectional'}, "
+              f"{args.num_layers} layers) initialized with vocab_size={len(vocab)}.", flush=True)
 
     criterion = nn.CrossEntropyLoss().to(device)
+    
+    # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=True)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+    
+    # Scheduler - using StepLR to match student code's approach
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
+    
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
-    def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    def now(): 
+        return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     best_acc = 0.0
     best_perplexity = float('inf')
@@ -293,7 +331,8 @@ def train(args):
         save_log(args.json, log)
     
     for epoch in range(args.epochs):
-        print(f"[{now()}][Epoch {epoch:03d}] ...")
+        if args.rank == 0:
+            print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
 
         epoch_start = time.time()
         train_loader.sampler.set_epoch(epoch)
@@ -306,10 +345,11 @@ def train(args):
 
         # Calculate total epoch time and overall throughput
         epoch_time = time.time() - epoch_start
-        epoch_throughput = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
+        epoch_throughput = len(train_loader.dataset) / max(1e-6, epoch_time)
 
-        # Print epoch summary with learning rate
-        current_lr = optimizer.param_groups[0]['lr']
+        # Get current learning rate
+        current_lr = scheduler.get_last_lr()[0]
+        
         if args.rank == 0:
             print(f"[{now()}][Epoch {epoch:03d}] "
                   f"train_loss={train_metrics['train_loss']:.4f} (global={train_metrics['train_loss_global']:.4f}) "
@@ -321,9 +361,10 @@ def train(args):
             # Combine all metrics into one dictionary for logging
             epoch_metrics = {
                 # Training metrics
-                "train_loss": float(train_metrics['train_loss']),           # Local loss for rank 0
-                "train_loss_global": float(train_metrics['train_loss_global']), # Global average loss
+                "train_loss": float(train_metrics['train_loss']),
+                "train_loss_global": float(train_metrics['train_loss_global']),
                 "train_acc": float(train_metrics['train_acc']),
+                "train_acc_global": float(train_metrics['train_acc_global']),
                 "train_perplexity": float(train_metrics['train_perplexity']),
                 "train_step_time": float(train_metrics['train_step_time']),
                 "train_data_time": float(train_metrics['train_data_time']),
@@ -347,55 +388,65 @@ def train(args):
             save_log(args.json, log)
             
             # Track best validation accuracy and perplexity
-            if val_metrics['val_acc'] > best_acc: 
+            if val_metrics['val_acc'] > best_acc:
                 best_acc = val_metrics['val_acc']
-            if val_metrics['val_perplexity'] < best_perplexity: 
+                print(f"  New best accuracy: {best_acc:.2f}%", flush=True)
+            if val_metrics['val_perplexity'] < best_perplexity:
                 best_perplexity = val_metrics['val_perplexity']
 
-            # Step the scheduler with validation loss (ReduceLROnPlateau needs the metric)
-            scheduler.step(val_metrics['val_loss'])
+        # Step the scheduler after validation (end of epoch)
+        scheduler.step()
+
+    if args.rank == 0:
+        print(f"[{now()}] Training completed. Best accuracy: {best_acc:.2f}%, Best perplexity: {best_perplexity:.2f}", flush=True)
 
 # ------------------------- Entry / Setup ------------------------
 
 def setup_ddp(args):
     # Ensure args contains everything we need. Give priority to ENV vars
-    def env_int(key, default): return default if os.environ.get(key) in (None, "") else int(os.environ.get(key))
-    def env_str(key, default): return default if os.environ.get(key) in (None, "") else os.environ.get(key)
+    def env_int(key, default): 
+        return default if os.environ.get(key) in (None, "") else int(os.environ.get(key))
+    def env_str(key, default): 
+        return default if os.environ.get(key) in (None, "") else os.environ.get(key)
 
-    args.rank        = env_int("RANK", args.rank)
-    args.world_size  = env_int("WORLD_SIZE", args.world_size)
+    args.rank = env_int("RANK", args.rank)
+    args.world_size = env_int("WORLD_SIZE", args.world_size)
     args.master_addr = env_str("MASTER_ADDR", args.master_addr)
     args.master_port = env_int("MASTER_PORT", args.master_port)
-    args.iface       = env_str("IFACE", args.iface)
-    args.local_rank  = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
+    args.iface = env_str("IFACE", args.iface)
+    args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
+    
     if args.device == 'cuda' and torch.cuda.is_available():
         torch.cuda.set_device(args.local_rank)
 
-    # Ensure the variables torch.distributed expects are present.
-    os.environ.setdefault("RANK",        str(args.rank))
-    os.environ.setdefault("WORLD_SIZE",  str(args.world_size))
+    # Ensure the variables torch.distributed expects are present
+    os.environ.setdefault("RANK", str(args.rank))
+    os.environ.setdefault("WORLD_SIZE", str(args.world_size))
     os.environ.setdefault("MASTER_ADDR", args.master_addr)
     os.environ.setdefault("MASTER_PORT", str(args.master_port))
-    os.environ.setdefault("LOCAL_RANK",  str(args.local_rank))
+    os.environ.setdefault("LOCAL_RANK", str(args.local_rank))
 
+    # GLOO settings
     os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
     os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
     os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
     os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
 
-    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)               # e.g. ens4f0
+    # NCCL settings
+    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
     os.environ.setdefault("NCCL_DEBUG", "WARN")
     os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
     os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
-    os.environ.setdefault("NCCL_P2P_DISABLE", "1")         # P100 P2P is limited
-    os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")      # Force ring for stability
-    os.environ.setdefault("NCCL_IB_DISABLE", "0")          # Enable IB if available on 100G
+    os.environ.setdefault("NCCL_P2P_DISABLE", "1")
+    os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")
+    os.environ.setdefault("NCCL_IB_DISABLE", "0")
     os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
-    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
+    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")
     os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
 
     # Start the process group
-    dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
+    dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, 
+                           world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
     if args.rank == 0:
         print(f"[DDP] backend={args.backend} world_size={args.world_size} "
@@ -406,41 +457,50 @@ def cleanup():
         dist.destroy_process_group()
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--rank', type=int, default=0)
-    parser.add_argument('--world_size', type=int, default=1)
-    parser.add_argument('--iface', type=str, default="ens4f0")
-    parser.add_argument('--master_addr', type=str, default="42.0.0.1")
-    parser.add_argument("--master_port", type=int, default=29500)
-    parser.add_argument("--backend", type=str, default="gloo", help="DDP backend (e.g., gloo, nccl)")
-    parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
+    parser = argparse.ArgumentParser(description='Distributed LSTM training on SST-2')
+    
+    # Distributed training arguments
+    parser.add_argument('--rank', type=int, default=0, help='Rank of current process')
+    parser.add_argument('--world_size', type=int, default=1, help='Number of processes')
+    parser.add_argument('--iface', type=str, default="ens4f0", help='Network interface')
+    parser.add_argument('--master_addr', type=str, default="42.0.0.1", help='Master node address')
+    parser.add_argument("--master_port", type=int, default=29500, help='Master node port')
+    parser.add_argument("--backend", type=str, default="gloo", choices=['gloo', 'nccl'], 
+                       help="DDP backend")
+    parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda',
+                       help='Device to use for training')
 
-    parser.add_argument("--deterministic", action='store_true')
-    parser.add_argument("--workers", type=int, default=4)
+    # System arguments
+    parser.add_argument("--deterministic", action='store_true', help='Use deterministic algorithms')
+    parser.add_argument("--workers", type=int, default=4, help='Number of data loading workers')
 
     # Model parameters
     parser.add_argument('--embed_dim', type=int, default=256, help="Embedding dimension")
     parser.add_argument('--hidden_dim', type=int, default=512, help="LSTM hidden dimension")
+    parser.add_argument('--num_layers', type=int, default=2, help="Number of LSTM layers")
     parser.add_argument('--dropout', type=float, default=0.3, help="Dropout probability")
     parser.add_argument('--max_len', type=int, default=64, help="Maximum sequence length")
     parser.add_argument('--bidirectional', action='store_true', help="Use bidirectional LSTM")
+    parser.add_argument('--num_classes', type=int, default=2, help="Number of output classes")
     
     # Training parameters
-    parser.add_argument('--epochs', type=int, default=25)
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.001)
-    parser.add_argument('--weight_decay', type=float, default=1e-5)
+    parser.add_argument('--epochs', type=int, default=25, help='Number of epochs to train')
+    parser.add_argument('--batch_size', type=int, default=32, help='Batch size per GPU')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate')
+    parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty)')
     parser.add_argument('--step_size', type=int, default=5, help="StepLR step size")
     parser.add_argument('--gamma', type=float, default=0.5, help="StepLR gamma")
-    parser.add_argument('--num_classes', type=int, default=2)
     
+    # Optimization arguments
     parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
-    parser.add_argument("--drop_last_train", action='store_true', help="Drop last from train dataset")
-    parser.add_argument("--drop_last_val", action='store_true', help="Drop last from val dataset")
+    parser.add_argument("--drop_last_train", action='store_true', help="Drop last batch from train dataset")
+    parser.add_argument("--drop_last_val", action='store_true', help="Drop last batch from val dataset")
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
-    parser.add_argument("--prefetch_factor", type=int, default=2)
+    parser.add_argument("--prefetch_factor", type=int, default=2, help='Prefetch factor for data loader')
     
-    parser.add_argument("--json", type=str, default="lstm.json", help="Path to JSON run log")
+    # Logging
+    parser.add_argument("--json", type=str, default="lstm_sst2.json", help="Path to JSON run log")
+    
     args = parser.parse_args()
 
     if args.deterministic:
@@ -454,13 +514,16 @@ def main():
     # Args sanity checks/corrections
     if args.device == 'cuda' and not torch.cuda.is_available():
         args.device = 'cpu'
-        if args.rank == 0: print("[Info] Using device=cpu because CUDA is not available", flush=True)
+        if args.rank == 0: 
+            print("[Info] Using device=cpu because CUDA is not available", flush=True)
     if args.amp and args.device == 'cpu':
         args.amp = False
-        if args.rank == 0: print("[Info] Disabling AMP because CUDA is not available", flush=True)
+        if args.rank == 0: 
+            print("[Info] Disabling AMP because CUDA is not available", flush=True)
     if args.workers < 1:
-        if args.rank == 0: print("[Info] Workers requested < 1; using workers=1", flush=True)
-        args.workers = 1 
+        if args.rank == 0: 
+            print("[Info] Workers requested < 1; using workers=1", flush=True)
+        args.workers = 1
 
     sys.stdout.reconfigure(line_buffering=True)
 
@@ -472,7 +535,9 @@ def main():
         random.seed(args.seed)
         np.random.seed(args.seed)
 
-    print(json.dumps(vars(args), indent=2))
+    if args.rank == 0:
+        print(json.dumps(vars(args), indent=2), flush=True)
+    
     try:
         train(args)
     finally:
