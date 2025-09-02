@@ -1,33 +1,19 @@
 #!/usr/bin/env python3
-import argparse, os, sys, json, time, datetime, random, string, math
+import argparse, os, sys, json, time, datetime, random, math
 from pathlib import Path
-from collections import Counter
 import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import IterableDataset, DataLoader
+
 from datasets import load_dataset
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
 
-tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2", use_fast=True)
-if tokenizer.pad_token is None:
-    tokenizer.add_special_tokens({"pad_token": "<|pad|>"})  # distinct from EOS
-PAD_ID = tokenizer.pad_token_id
-EOS_ID = tokenizer.eos_token_id
-
-# ------------------------- Tokenizer ------------------------------
-def simple_tokenizer(text):
-    text = text.lower()
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    return text.split()
-
-PAD_ID = 0
-UNK_ID = 1
-
-# ------------------------- HF dataset helpers ---------------------
+# ------------------------- Parquet layout helpers ---------------------
 def _resolve_parquet_layout(data_root: Path):
     """
     Returns (train_glob, val_glob, split_needed)
@@ -38,16 +24,12 @@ def _resolve_parquet_layout(data_root: Path):
       4) <root>/*.parquet          -> split_needed=True
     """
     r = data_root
-    # case 1
     if (r / "parquet" / "train").is_dir() and (r / "parquet" / "val").is_dir():
         return str(r / "parquet" / "train" / "*.parquet"), str(r / "parquet" / "val" / "*.parquet"), False
-    # case 2
     if (r / "train").is_dir() and (r / "val").is_dir():
         return str(r / "train" / "*.parquet"), str(r / "val" / "*.parquet"), False
-    # case 3
     if list((r / "parquet").glob("*.parquet")):
         return str(r / "parquet" / "*.parquet"), None, True
-    # case 4
     if list(r.glob("*.parquet")):
         return str(r / "*.parquet"), None, True
     raise FileNotFoundError(f"No Parquet files found under {r}. Expected train/val subdirs or *.parquet files.")
@@ -62,49 +44,43 @@ def hf_load_train_val_parquet(data_root: Path, val_fraction=0.01, seed=42, cache
         ds = load_dataset("parquet", data_files={"train": train_glob, "validation": val_glob}, cache_dir=cache_dir)
         return ds["train"], ds["validation"]
 
-def build_vocab_from_hfds(ds_train, max_vocab=50000, bytes_limit=2_000_000_000):
-    counter = Counter()
-    seen = 0
-    for ex in ds_train:
-        txt = ex["text"]
-        counter.update(simple_tokenizer(txt))
-        seen += len(txt)
-        if bytes_limit and seen >= bytes_limit:
-            break
-    vocab = {"<pad>": PAD_ID, "<unk>": UNK_ID}
-    for w, _ in counter.most_common(max_vocab - len(vocab)):
-        vocab[w] = len(vocab)
-    return vocab
-
-# ------------------------- IterableDataset ------------------------
-class HFWindows(IterableDataset):
+# ------------------------- IterableDataset (DDP-aware) ----------------
+class GPT2Windows(IterableDataset):
     """
     Streams (x, y) windows (seq_len+1) from HF Dataset of documents.
     DDP + multi-worker aware via modulo partitioning over document index.
 
-    Added:
-      - set_epoch(epoch): introduces random rotation & step (coprime) to vary doc order
-      - __iter__ now iterates docs in a pseudo-random permutation *without* materializing it
+    - GPT-2 byte-BPE tokenizer (no OOV).
+    - True permutation (gcd(step, n) == 1).
+    - Keep validation deterministic (don't call set_epoch on val).
+    - Same permutation on all ranks; modulo assigns docs to (rank, worker).
     """
-    def __init__(self, hf_split, vocab, seq_len=256, stride=128,
-                 world_size=1, rank=0, seed=42):
+    def __init__(self, hf_split, tokenizer, seq_len=1024, stride=1024,
+                 world_size=1, rank=0, seed=42, append_eos=True):
         super().__init__()
         self.ds = hf_split
-        self.vocab = vocab
+        self.tok = tokenizer
         self.seq_len = seq_len
         self.stride = stride
         self.world_size = world_size
         self.rank = rank
         self.seed = seed
         self.epoch = 0
+        self.append_eos = append_eos
+        self.PAD_ID = self.tok.pad_token_id
+        self.EOS_ID = self.tok.eos_token_id
 
     def set_epoch(self, epoch: int):
         self.epoch = int(epoch)
 
-    def _encode_line(self, line):
-        return [self.vocab.get(t, UNK_ID) for t in simple_tokenizer(line)]
+    def _encode_line(self, line: str):
+        ids = self.tok.encode(line, add_special_tokens=False)
+        if self.append_eos and (not ids or ids[-1] != self.EOS_ID):
+            ids.append(self.EOS_ID)
+        return ids
 
     def _yield_windows(self, toks):
+        # Make (seq_len+1) sliding windows; x=w[:-1], y=w[1:]
         T = self.seq_len + 1
         for i in range(0, max(0, len(toks) - T + 1), self.stride):
             w = toks[i:i+T]
@@ -114,12 +90,15 @@ class HFWindows(IterableDataset):
                 yield x, y
 
     def _index_permutation(self, n, rng: random.Random):
-        # Random rotation
-        start = rng.randrange(0, max(1, n)) if n > 0 else 0
-        # Random step that is coprime-ish with n (use odd step if n even)
-        step = rng.randrange(1, max(2, n)) if n > 0 else 1
-        if n % 2 == 0 and step % 2 == 0:
-            step += 1
+        if n <= 1:
+            for j in range(n):
+                yield j
+            return
+        start = rng.randrange(n)
+        while True:
+            step = rng.randrange(1, n)
+            if math.gcd(step, n) == 1:
+                break
         for j in range(n):
             yield (start + j * step) % n
 
@@ -127,13 +106,12 @@ class HFWindows(IterableDataset):
         info = torch.utils.data.get_worker_info()
         num_workers = info.num_workers if info else 1
         worker_id = info.id if info else 0
+
         consumers = max(1, self.world_size * num_workers)
         consumer_id = self.rank * num_workers + worker_id
 
-        rng = random.Random(1337 + self.seed + self.rank + worker_id + self.epoch)
+        rng = random.Random(1337 + self.seed + worker_id + self.epoch)  # same on all ranks
         n = len(self.ds)
-
-        # Iterate documents in pseudo-random order without constructing a list
         for i in self._index_permutation(n, rng):
             if (i % consumers) != consumer_id:
                 continue
@@ -142,34 +120,7 @@ class HFWindows(IterableDataset):
             toks = self._encode_line(txt)
             yield from self._yield_windows(toks)
 
-# ------------------------- Model ---------------------------------
-class LSTMLanguageModel(nn.Module):
-    def __init__(self, vocab_size, embed_dim, hidden_dim, num_layers=2,
-                 dropout_prob=0.5, tie_weights=True):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
-        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
-        self.dropout = nn.Dropout(dropout_prob)
-        self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=num_layers,
-                            batch_first=True,
-                            dropout=dropout_prob if num_layers > 1 else 0.0)
-        if tie_weights and embed_dim == hidden_dim:
-            self.decoder = nn.Linear(embed_dim, vocab_size, bias=False)
-            self.decoder.weight = self.embedding.weight
-        else:
-            self.decoder = nn.Linear(hidden_dim, vocab_size)
-        nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
-        if getattr(self.decoder, "bias", None) is not None:
-            nn.init.zeros_((self.decoder.bias))
-
-    def forward(self, x, hidden=None):
-        h = self.dropout(self.embedding(x))
-        out, hidden = self.lstm(h, hidden)
-        out = self.dropout(out)
-        return self.decoder(out), hidden
-
-# ------------------------- Metrics helper ------------------------
+# ------------------------- AverageMeter ---------------------------
 class AverageMeter:
     def __init__(self): self.reset()
     def reset(self): self.sum = 0.0; self.count = 0.0; self.avg = 0.0
@@ -186,12 +137,12 @@ class AverageMeter:
             self.sum, self.count = t.cpu().tolist()
             self.avg = self.sum / max(1.0, self.count)
 
-# ------------------------- Train / Eval --------------------------
+# ------------------------- Validate --------------------------------
 @torch.no_grad()
-def validate(model, loader, device, args):
+def validate(model, loader, device, pad_id, args):
     model.eval()
     losses = AverageMeter()
-    ce = nn.CrossEntropyLoss(ignore_index=PAD_ID, reduction='sum').to(device)
+    ce = nn.CrossEntropyLoss(ignore_index=pad_id, reduction='sum').to(device)
 
     for inputs, targets in loader:
         inputs = inputs.to(device, non_blocking=True)
@@ -199,68 +150,26 @@ def validate(model, loader, device, args):
 
         if args.amp and device.type == 'cuda':
             with torch.amp.autocast(device_type='cuda'):
-                logits, _ = model(inputs)
+                logits = model(inputs).logits
                 loss_sum = ce(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
         else:
-            logits, _ = model(inputs)
+            logits = model(inputs).logits
             loss_sum = ce(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
 
-        ntok = targets.numel()
-        losses.update(loss_sum.item() / max(1, ntok), ntok)
+        ntok_eff = int((targets != pad_id).sum())
+        losses.update(loss_sum.item() / max(1, ntok_eff), ntok_eff)
 
     losses.all_reduce()
-    val_loss = losses.avg  # per-token NLL
-    val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
+    val_loss = losses.avg
+    val_ppl  = float(np.exp(np.clip(val_loss, 0, 20)))
     return {'val_loss': val_loss, 'val_ppl': val_ppl}
 
-@torch.no_grad()
-def sanity_validate(model, loader, device, vocab_size, rank, max_batches: int = 50):
-    """Quick sanity: report per-token CE on a small slice; compare to ln(V) baseline.
-    Uses the same meter path to catch averaging mistakes.
-    """
-    model.eval()
-    losses = AverageMeter()
-    ce = nn.CrossEntropyLoss(ignore_index=PAD_ID, reduction='sum').to(device)
-    seen = 0
-    for inputs, targets in loader:
-        inputs = inputs.to(device, non_blocking=True)
-        targets = targets.to(device, non_blocking=True)
-        logits, _ = model(inputs)
-        loss_sum = ce(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
-        ntok_eff = int((targets != PAD_ID).sum())
-        losses.update(loss_sum.item() / max(1, ntok_eff), ntok_eff)
-        seen += 1
-        if seen >= max_batches:
-            break
-    losses.all_reduce()
-    if rank == 0:
-        print(f"[sanity] val CE/token on first {seen} batches: {losses.avg:.4f} ; ln(V)={math.log(vocab_size):.4f}", flush=True)
-
-
-def make_step_scheduler(optimizer, total_steps: int, warmup_ratio: float = 0.05):
-    warmup_steps = max(1, int(warmup_ratio * total_steps))
-
-    def lr_lambda(step):
-        # step starts at 0 in LambdaLR (last_epoch)
-        if step < warmup_steps:
-            return step / float(max(1, warmup_steps))
-        # cosine decay to 0
-        t = (step - warmup_steps) / float(max(1, total_steps - warmup_steps))
-        t = min(max(t, 0.0), 1.0)
-        return 0.5 * (1.0 + math.cos(math.pi * t))
-
-    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-
-
-def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, scheduler, args):
-    """
-    Returns metrics dict.
-
-    Note: data_time below measures the time spent waiting for the next batch from
-    the DataLoader. Because tokenization happens inside HFWindows.__iter__ in the
-    worker processes, **tokenization is included** in data_time.
-    """
+# ------------------------- Train 1 epoch --------------------------
+def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, pad_id, args):
     model.train()
+    # speed: disable cache during training
+    model.config.use_cache = False
+
     losses = AverageMeter()
     step_time = AverageMeter()
     data_time = AverageMeter()
@@ -277,7 +186,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, sch
     batches = 0
 
     for inputs, targets in dataloader:
-        # Include dataload + tokenization time
         data_time.update(time.perf_counter() - step_start, n=1)
 
         inputs = inputs.to(device, non_blocking=True)
@@ -287,46 +195,25 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, sch
 
         if scaler is not None:
             with torch.amp.autocast(device_type='cuda'):
-                logits, _ = model(inputs)
+                out = model(input_ids=inputs, labels=targets)
+                # HF returns mean loss; re-compute sum to match “loss/tok”
+                logits = out.logits
                 loss_sum = criterion(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
                 ntok = targets.numel()
-                if not torch.isfinite(loss_sum):
-                    if dist.get_rank() == 0:
-                        print("[WARN] non-finite loss_sum; skipping step", flush=True)
-                    step_start = time.perf_counter()
-                    continue
                 loss = loss_sum / ntok
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
-            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.clip_norm)
-            if not torch.isfinite(grad_norm):
-                if dist.get_rank() == 0:
-                    print(f"[WARN] non-finite grad_norm={grad_norm}; skipping step", flush=True)
-                optimizer.zero_grad(set_to_none=True)
-                step_start = time.perf_counter()
-                continue
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             scaler.step(optimizer); scaler.update()
         else:
-            logits, _ = model(inputs)
+            out = model(input_ids=inputs, labels=targets)
+            logits = out.logits
             loss_sum = criterion(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
             ntok = targets.numel()
-            if not torch.isfinite(loss_sum):
-                if dist.get_rank() == 0:
-                    print("[WARN] non-finite loss_sum; skipping step", flush=True)
-                step_start = time.perf_counter()
-                continue
             (loss_sum / ntok).backward()
-            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.clip_norm)
-            if not torch.isfinite(grad_norm):
-                if dist.get_rank() == 0:
-                    print(f"[WARN] non-finite grad_norm={grad_norm}; skipping step", flush=True)
-                optimizer.zero_grad(set_to_none=True)
-                step_start = time.perf_counter()
-                continue
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
-        # Step-based LR schedule
-        scheduler.step()
         losses.update(loss_sum.item() / max(1, ntok), ntok)
         tokens_seen += int(ntok)
         batches += 1
@@ -334,7 +221,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, sch
         step_time.update(time.perf_counter() - step_start, n=1)
         step_start = time.perf_counter()
 
-        # Respect per-epoch and global caps
         if args.steps_per_epoch and batches >= args.steps_per_epoch:
             break
 
@@ -352,17 +238,17 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, sch
     train_ppl = float(np.exp(np.clip(train_loss_global, 0, 20)))
 
     return {
-        'train_loss_global': train_loss_global,   # per-token
-        'train_loss': local_loss,                 # per-token
+        'train_loss_global': train_loss_global,
+        'train_loss': local_loss,
         'train_step_time': step_time.avg,
         'train_data_time': data_time.avg,
         'train_comp_time': step_time.avg - data_time.avg,
         'epoch_duration': duration,
-        'epoch_throughput': tok_per_sec,         # tokens/sec
+        'epoch_throughput': tok_per_sec,
         'tokens_seen': tokens_seen,
         'train_ppl': train_ppl,
-        'batches': batches,    }
-
+        'batches': batches,
+    }
 
 def save_log(path, log):
     tmp = f"{path}.tmp"
@@ -370,7 +256,7 @@ def save_log(path, log):
         json.dump(log, f, indent=2); f.flush(); os.fsync(f.fileno())
     os.replace(tmp, path)
 
-
+# ------------------------- Train driver --------------------------
 def train(args):
     device = torch.device(args.device)
 
@@ -379,77 +265,92 @@ def train(args):
         raise FileNotFoundError(f"--data path not found: {data_root}")
 
     # HF cache
-    if args.cache_dir is None:
-        cache_dir = data_root / "cache"
-    else:
-        cache_dir = Path(args.cache_dir)
+    cache_dir = Path(args.cache_dir) if args.cache_dir is not None else (data_root / "cache")
     cache_dir.mkdir(parents=True, exist_ok=True)
     os.environ["HF_DATASETS_CACHE"] = str(cache_dir)
 
-    # Load train/val Parquet
+    # Tokenizer: GPT-2 byte-BPE with a real PAD
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, use_fast=True)
+    if tokenizer.pad_token is None:
+        tokenizer.add_special_tokens({"pad_token": "<|pad|>"})
+    PAD_ID = tokenizer.pad_token_id
+    EOS_ID = tokenizer.eos_token_id
+    vocab_size = tokenizer.vocab_size
+    tokenizer.model_max_length = 10**9  # avoid warnings
+
     if args.rank == 0:
         print(f"Loading Parquet dataset from {data_root} (cache: {cache_dir}) ...", flush=True)
     ds_train, ds_val = hf_load_train_val_parquet(data_root, val_fraction=args.val_fraction, seed=42, cache_dir=str(cache_dir))
 
-    # Build vocab from TRAIN
-    vocab = build_vocab_from_hfds(ds_train, max_vocab=args.max_vocab, bytes_limit=args.vocab_bytes)
+    # Iterable datasets / loaders
+    train_ds = GPT2Windows(ds_train, tokenizer, seq_len=args.seq_len, stride=args.stride,
+                           world_size=args.world_size, rank=args.rank, seed=args.seed)
+    val_ds   = GPT2Windows(ds_val,   tokenizer, seq_len=args.seq_len, stride=args.seq_len,  # non-overlapping
+                           world_size=args.world_size, rank=args.rank, seed=args.seed + 1)
 
-    # Iterable datasets / loaders (DDP-aware) with epoch-based randomization
-    train_ds = HFWindows(ds_train, vocab, seq_len=args.seq_len, stride=args.stride,
-                         world_size=args.world_size, rank=args.rank, seed=args.seed)
-    val_ds   = HFWindows(ds_val,   vocab, seq_len=args.seq_len, stride=args.seq_len,
-                         world_size=args.world_size, rank=args.rank, seed=args.seed + 1)
-
-    # seed DataLoader workers deterministically so Python/NumPy RNG in workers is stable
     def _seed_worker(worker_id):
         import numpy as _np, random as _random
         worker_seed = (args.seed + args.rank * max(1, args.workers) + worker_id) % 2**32
-        _np.random.seed(worker_seed)
-        _random.seed(worker_seed)
+        _np.random.seed(worker_seed); _random.seed(worker_seed)
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, num_workers=args.workers,
-                              pin_memory=True, prefetch_factor=args.prefetch_factor,
+                              pin_memory=True,
+                              prefetch_factor=args.prefetch_factor if args.workers > 0 else None,
                               persistent_workers=(args.workers>0),
                               worker_init_fn=_seed_worker)
     val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, num_workers=args.workers,
-                              pin_memory=True, prefetch_factor=args.prefetch_factor,
+                              pin_memory=True,
+                              prefetch_factor=args.prefetch_factor if args.workers > 0 else None,
                               persistent_workers=(args.workers>0),
                               worker_init_fn=_seed_worker)
 
-    # Model
-    if args.tie_weights and args.embed_dim != args.hidden_dim and args.rank == 0:
-        print("[Info] --tie_weights requested but embed_dim != hidden_dim; decoder will be untied.", flush=True)
-    model = LSTMLanguageModel(
-        vocab_size=len(vocab),
-        embed_dim=args.embed_dim,
-        hidden_dim=args.hidden_dim,
-        num_layers=args.num_layers,
-        dropout_prob=args.dropout,
-        tie_weights=args.tie_weights
-    ).to(device)
+    # Model (fresh GPT-2 small-ish by default; or load "gpt2" via args.pretrained)
+    if args.pretrained:
+        model = GPT2LMHeadModel.from_pretrained(args.pretrained)
+        # ensure pad token exists in the head
+        if tokenizer.pad_token_id not in model.get_input_embeddings().weight.data:
+            model.resize_token_embeddings(len(tokenizer))
+    else:
+        cfg = GPT2Config(
+            vocab_size=vocab_size,
+            n_positions=max(1024, args.seq_len + 1),
+            n_ctx=max(1024, args.seq_len + 1),
+            n_embd=args.n_embd, n_layer=args.n_layer, n_head=args.n_head,
+            resid_pdrop=args.dropout, attn_pdrop=args.dropout, embd_pdrop=args.dropout,
+            bos_token_id=tokenizer.bos_token_id, eos_token_id=EOS_ID
+        )
+        model = GPT2LMHeadModel(cfg)
+        model.resize_token_embeddings(len(tokenizer))
+    model.to(device)
+    model.config.pad_token_id = PAD_ID
+    model.config.use_cache = False  # for training speed
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
-    print(f"Model 'LSTMLanguageModel' initialized.", flush=True)
+    print(f"Model 'GPT2LMHeadModel' initialized.", flush=True)
 
     if args.rank == 0:
-        n_tr = len(ds_train)
-        n_va = len(ds_val)
+        n_tr = len(ds_train); n_va = len(ds_val)
         print(f"\nDATA ROOT: {data_root}")
         print(f"  Train docs: {n_tr:,} | Val docs: {n_va:,}")
-        print(f"  Vocab size: {len(vocab):,}")
+        print(f"  Vocab size: {vocab_size:,}")
         print(f"  Seq len: {args.seq_len} | Stride: {args.stride}")
-        print(f"\nModel: LSTM LM ({args.num_layers} layers, tie={args.tie_weights})")
+        if args.pretrained:
+            print(f"\nModel: GPT-2 (pretrained: {args.pretrained})")
+        else:
+            print(f"\nModel: GPT-2 from scratch "
+                  f"({args.n_layer} layers, {args.n_head} heads, d_model={args.n_embd})")
         print(f"  Total parameters: {sum(p.numel() for p in model.parameters()):,}")
         print("=" * 60, flush=True)
 
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID, reduction='sum').to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=False)
 
-    # Step-based scheduler (warmup+cosine) over total training steps
-    total_steps = max(1, args.steps_per_epoch) * args.epochs
-    scheduler = make_step_scheduler(optimizer, total_steps=total_steps, warmup_ratio=args.warmup_ratio)
+    # Optimizer (fast + stable)
+    try:
+        optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, fused=True)
+    except TypeError:
+        optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
 
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
@@ -457,26 +358,23 @@ def train(args):
     best_ppl = float('inf')
 
     if args.rank == 0:
-        if args.json is None: args.json = "lstm_lm_openwebtext_parquet.json"
+        if args.json is None: args.json = "gpt2_openwebtext_parquet.json"
         log = {"time": now(), "data_root": str(data_root), "cache_dir": str(cache_dir),
-               "config": vars(args), "vocab_size": len(vocab), "epochs": {}}
+               "config": vars(args), "vocab_size": vocab_size, "epochs": {}}
         save_log(args.json, log)
 
     for epoch in range(args.epochs):
         if args.rank == 0: print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
-        if getattr(args, 'debug_val_check', False) and epoch == 0:
-            sanity_validate(model, val_loader, device, vocab_size=len(vocab), rank=args.rank)
         epoch_start = time.time()
 
-        # vary document order each epoch
         train_ds.set_epoch(epoch)
-        val_ds.set_epoch(epoch if getattr(args, 'shuffle_val', False) else 0)
+        # keep validation fixed for stability: DON'T call val_ds.set_epoch(epoch)
 
-        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler, scheduler, args)
-        val_metrics   = validate(model, val_loader, device, args)
+        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler, PAD_ID, args)
+        val_metrics   = validate(model, val_loader, device, PAD_ID, args)
 
         epoch_time = time.time() - epoch_start
-        current_lr = scheduler.get_last_lr()[0]
+        current_lr = args.learning_rate  # constant LR (you said scheduler doesn't matter)
 
         if args.rank == 0:
             print(f"[{now()}][Epoch {epoch:03d}] "
@@ -500,18 +398,20 @@ def train(args):
                 "lr": float(current_lr),
                 "epoch_time": float(epoch_time),
                 "epoch_throughput": float(train_metrics['epoch_throughput']),
-                "steps": int(train_metrics['batches']),            }
+                "steps": int(train_metrics['batches']),
+            }
             with open(args.json, "r") as f: log = json.load(f)
             log["epochs"][str(epoch)] = epoch_metrics
             save_log(args.json, log)
 
             if val_metrics['val_ppl'] < best_ppl:
                 best_ppl = val_metrics['val_ppl']
+
     if args.rank == 0:
         print(f"\n[{now()}] Training completed!")
         print(f"Best validation perplexity: {best_ppl:.2f}")
 
-# ------------------------- DDP setup -----------------------------
+# ------------------------- DDP setup / teardown -------------------
 def setup_ddp(args):
     def env_int(k, d): return d if os.environ.get(k) in (None, "") else int(os.environ.get(k))
     def env_str(k, d): return d if os.environ.get(k) in (None, "") else os.environ.get(k)
@@ -532,18 +432,13 @@ def setup_ddp(args):
     os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
     os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
     os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
-    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
+    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)  # harmless with gloo backend
     os.environ.setdefault("NCCL_DEBUG", "WARN")
     os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
     os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
-    os.environ.setdefault("NCCL_P2P_DISABLE", "1")
-    os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")
-    os.environ.setdefault("NCCL_IB_DISABLE", "0")
-    os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
-    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")
-    os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
+    # Gloo is fine; no NCCL required.
     dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank,
-                            world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
+                            world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
     if args.rank == 0:
         print(f"[DDP] backend={args.backend} world_size={args.world_size} "
               f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
@@ -552,9 +447,9 @@ def cleanup():
     if dist.is_available() and dist.is_initialized():
         dist.destroy_process_group()
 
-# ------------------------- Entry --------------------------------
+# ------------------------- Entry ----------------------------------
 def main():
-    p = argparse.ArgumentParser("Distributed LSTM LM on OpenWebText (Parquet)")
+    p = argparse.ArgumentParser("Distributed GPT-2 on OpenWebText (Parquet)")
     # DDP/system
     p.add_argument('--rank', type=int, default=0)
     p.add_argument('--world_size', type=int, default=1)
@@ -567,37 +462,28 @@ def main():
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--json", type=str, default=None)
     p.add_argument('--seed', type=int, default=1337, help='Base random seed for reproducible shuffles')
-    # Data (Parquet)
+    # Data
     p.add_argument('--data', type=str, required=True, help='Dataset root dir (contains parquet/train and parquet/val, or *.parquet)')
     p.add_argument('--cache_dir', type=str, default=None, help='HF datasets cache dir (default: <data>/cache)')
-    p.add_argument('--max_vocab', type=int, default=50000)
-    p.add_argument('--vocab_bytes', type=int, default=2_000_000_000)
-    p.add_argument('--seq_len', type=int, default=256)
-    p.add_argument('--stride', type=int, default=256)
     p.add_argument('--val_fraction', type=float, default=0.01)
+    p.add_argument('--tokenizer', type=str, default="openai-community/gpt2", help='HF tokenizer (byte-BPE).')
     # Training
-    p.add_argument('--epochs', type=int, default=25)
-    p.add_argument('--steps_per_epoch', type=int, default=2000, help='Number of training steps per epoch (set 0 to iterate full dataset)')
-    p.add_argument('--batch_size', type=int, default=64)
-    p.add_argument('--learning_rate', type=float, default=1e-3)
-    p.add_argument('--weight_decay', type=float, default=1e-5)
-    p.add_argument('--warmup_ratio', type=float, default=0.05, help='Fraction of total steps for linear warmup before cosine decay')
+    p.add_argument('--epochs', type=int, default=10)
+    p.add_argument('--steps_per_epoch', type=int, default=1000)
+    p.add_argument('--batch_size', type=int, default=8)
+    p.add_argument('--learning_rate', type=float, default=3e-4)
+    p.add_argument('--weight_decay', type=float, default=0.01)
     p.add_argument("--amp", action="store_true")
     p.add_argument("--static_graph", action='store_true')
     p.add_argument("--prefetch_factor", type=int, default=2)
-    p.add_argument('--clip_norm', type=float, default=1.0, help='Max gradient norm for clipping')
-    p.add_argument('--shuffle_val', action='store_true', help='Enable per-epoch shuffle for validation (default: off)')
-    p.add_argument('--debug_val_check', action='store_true', help='Run quick sanity checks on validation loss averaging at epoch 0')
-    # Model
-    p.add_argument('--embed_dim', type=int, default=512)
-    p.add_argument('--hidden_dim', type=int, default=512)
-    p.add_argument('--num_layers', type=int, default=2)
-    p.add_argument('--dropout', type=float, default=0.5)
-    p.add_argument('--tie_weights', dest='tie_weights', action='store_true',
-                   help='Tie decoder weights to embedding (requires embed_dim==hidden_dim)')
-    p.add_argument('--no_tie_weights', dest='tie_weights', action='store_false',
-                   help='Use separate decoder weights')
-    p.set_defaults(tie_weights=True)
+    # Model size / windows
+    p.add_argument('--seq_len', type=int, default=1024)
+    p.add_argument('--stride', type=int, default=1024)
+    p.add_argument('--n_layer', type=int, default=12)
+    p.add_argument('--n_head', type=int, default=12)
+    p.add_argument('--n_embd', type=int, default=768)
+    p.add_argument('--dropout', type=float, default=0.1)
+    p.add_argument('--pretrained', type=str, default="", help="HF model name to start from (e.g., 'gpt2'). Empty = scratch.")
 
     args = p.parse_args()
 
@@ -606,16 +492,13 @@ def main():
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        # Global seeds for full-run reproducibility (includes dataloader workers via worker_init_fn)
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-        torch.manual_seed(args.seed)
+        random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
 
-    # Enable TF32 for speed on Ampere+ (safe for training LMs)
+    # TF32 for speed on Ampere+ (safe)
     if args.device == 'cuda' and torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
