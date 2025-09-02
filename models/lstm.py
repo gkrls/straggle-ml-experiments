@@ -311,7 +311,7 @@ def train(args):
         epoch_throughput = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
 
         # Print epoch summary with learning rate
-        current_lr = scheduler.get_last_lr()[0]
+        current_lr = optimizer.param_groups[0]['lr']
         if args.rank == 0:
             print(f"[{now()}][Epoch {epoch:03d}] "
                   f"train_loss={train_metrics['train_loss']:.4f} (global={train_metrics['train_loss_global']:.4f}) "
