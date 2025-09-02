@@ -132,8 +132,6 @@ class AverageMeter:
             self.sum, self.count = t.cpu().tolist()
             self.avg = self.sum / max(1.0, self.count)
 
-
-
 # ------------------------- Train / Eval -------------------------
 
 @torch.no_grad()
@@ -348,12 +346,14 @@ def train(args):
             log["epochs"][str(epoch)] = epoch_metrics
             save_log(args.json, log)
             
-            # Track best validation perplexity
+            # Track best validation accuracy and perplexity
+            if val_metrics['val_acc'] > best_acc: 
+                best_acc = val_metrics['val_acc']
             if val_metrics['val_perplexity'] < best_perplexity: 
                 best_perplexity = val_metrics['val_perplexity']
 
-        # Step the scheduler after evaluation (end of epoch)
-        scheduler.step()
+            # Step the scheduler with validation loss (ReduceLROnPlateau needs the metric)
+            scheduler.step(val_metrics['val_loss'])
 
 # ------------------------- Entry / Setup ------------------------
 
