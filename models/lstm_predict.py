@@ -21,14 +21,14 @@ PAD_ID = 0
 UNK_ID = 1
 
 # ------------------------- HF dataset helpers ---------------------
-def hf_load_train_val(hf_path, val_fraction=0.01, seed=42, cache_dir=None):
+def hf_load_train_val(data_path, val_fraction=0.01, seed=42, cache_dir=None):
     """
-    Load your custom OpenWebText dataset via HF:
-      - hf_path points to the directory that contains openwebtext.py
-      - the loader itself finds shards at <repo_root>/openwebtext/*.xz
-      - cache_dir controls where HF stores its Arrow cache
+    Load your local OpenWebText dataset via HF Datasets.
+      - data_path: directory that contains the loader .py (e.g., DATA_ROOT) OR the loader .py file itself
+      - the loader itself finds shards under DATA_ROOT/openwebtext/*.xz
+      - cache_dir controls where HF stores Arrow cache
     """
-    ds = load_dataset(path=hf_path, name="plain_text", split="train",
+    ds = load_dataset(path=str(data_path), name="plain_text", split="train",
                       cache_dir=cache_dir, trust_remote_code=True)
     splits = ds.train_test_split(test_size=val_fraction, seed=seed, shuffle=True)
     return splits["train"], splits["test"]
@@ -53,10 +53,10 @@ class HFWindows(IterableDataset):
     Streams (x, y) windows (seq_len+1) from HF Dataset of documents.
     DDP- and multi-worker-aware via modulo partitioning.
     """
-    def __init__(self, hf_path, split, vocab, seq_len=256, stride=128,
+    def __init__(self, data_path, split, vocab, seq_len=256, stride=128,
                  world_size=1, rank=0, seed=42, val_fraction=0.01, cache_dir=None):
         super().__init__()
-        self.hf_path = hf_path
+        self.data_path = data_path
         self.split = split    # "train" or "val"
         self.vocab = vocab
         self.seq_len = seq_len
@@ -86,7 +86,7 @@ class HFWindows(IterableDataset):
 
     def __iter__(self):
         # Load per worker/process so HF Dataset objects aren’t pickled
-        ds_train, ds_val = hf_load_train_val(self.hf_path, self.val_fraction, self.seed, cache_dir=self.cache_dir)
+        ds_train, ds_val = hf_load_train_val(self.data_path, self.val_fraction, self.seed, cache_dir=self.cache_dir)
         ds = ds_train if self.split == "train" else ds_val
 
         info = torch.utils.data.get_worker_info()
@@ -255,36 +255,47 @@ def save_log(path, log):
         json.dump(log, f, indent=2); f.flush(); os.fsync(f.fileno())
     os.replace(tmp, path)
 
+def _resolve_repo_root_and_cache_dir(data_path, cache_dir_arg):
+    """
+    data_path can be:
+      - a directory (preferred): DATA_ROOT (contains openwebtext.py and openwebtext/*.xz)
+      - a file: path/to/openwebtext.py
+    Default cache dir becomes <DATA_ROOT>/cache
+    """
+    p = Path(data_path).resolve()
+    # dataset_root = directory that holds openwebtext.py
+    dataset_root = p.parent if p.is_file() else p
+
+    shards_dir = dataset_root / "openwebtext"   # where *.xz live
+
+    if cache_dir_arg is None:
+        cache_dir = dataset_root / "cache"      # <-- CHANGED: under root now
+    else:
+        cache_dir = Path(cache_dir_arg)
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return dataset_root, shards_dir, cache_dir
+
 def train(args):
     device = torch.device(args.device)
 
-    # Set/resolve cache dir
-    if args.cache_dir is None:
-        # default: <path-to-xz-dir>/cache
-        # xz dir is <repo_root>/openwebtext, where repo_root is parent of args.hf_path
-        repo_root = Path(args.hf_path).resolve().parent
-        shards_dir = repo_root / "openwebtext"
-        cache_dir = shards_dir / "cache"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        args.cache_dir = str(cache_dir)
-    else:
-        Path(args.cache_dir).mkdir(parents=True, exist_ok=True)
-
-    # also set env so HF tooling uses it consistently
+    # Resolve paths + cache
+    repo_root, shards_dir, cache_dir = _resolve_repo_root_and_cache_dir(args.data, args.cache_dir)
+    args.cache_dir = str(cache_dir)
     os.environ["HF_DATASETS_CACHE"] = args.cache_dir
 
     if args.rank == 0:
-        print(f"Loading HF dataset from {args.hf_path} (cache: {args.cache_dir}) ...", flush=True)
+        print(f"Loading HF dataset from {args.data} (cache: {args.cache_dir}) ...", flush=True)
 
     # Load/train/val + build vocab from TRAIN
-    ds_train, ds_val = hf_load_train_val(args.hf_path, args.val_fraction, seed=42, cache_dir=args.cache_dir)
+    ds_train, ds_val = hf_load_train_val(args.data, args.val_fraction, seed=42, cache_dir=args.cache_dir)
     vocab = build_vocab_from_hfds(ds_train, max_vocab=args.max_vocab, bytes_limit=args.vocab_bytes)
 
     # Iterable datasets / loaders (DDP-aware)
-    train_ds = HFWindows(args.hf_path, "train", vocab, seq_len=args.seq_len, stride=args.stride,
+    train_ds = HFWindows(args.data, "train", vocab, seq_len=args.seq_len, stride=args.stride,
                          world_size=args.world_size, rank=args.rank, seed=42,
                          val_fraction=args.val_fraction, cache_dir=args.cache_dir)
-    val_ds   = HFWindows(args.hf_path, "val",   vocab, seq_len=args.seq_len, stride=args.seq_len,
+    val_ds   = HFWindows(args.data, "val",   vocab, seq_len=args.seq_len, stride=args.seq_len,
                          world_size=args.world_size, rank=args.rank, seed=42,
                          val_fraction=args.val_fraction, cache_dir=args.cache_dir)
 
@@ -307,8 +318,8 @@ def train(args):
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
     if args.rank == 0:
-        print(f"\nHF path: {args.hf_path}")
-        print(f"Shards dir: {Path(args.hf_path).resolve().parent / 'openwebtext'}")
+        print(f"\nDATA (loader path): {args.data}")
+        print(f"Shards dir: {shards_dir}")
         print(f"Cache dir:  {args.cache_dir}")
         print(f"  Vocab size: {len(vocab):,}")
         print(f"  Seq len: {args.seq_len} | Stride: {args.stride}")
@@ -326,7 +337,7 @@ def train(args):
 
     if args.rank == 0:
         if args.json is None: args.json = "lstm_lm_openwebtext_hf.json"
-        log = {"time": now(), "hf_path": args.hf_path, "cache_dir": args.cache_dir,
+        log = {"time": now(), "data": str(args.data), "cache_dir": args.cache_dir,
                "config": vars(args), "vocab_size": len(vocab), "epochs": {}}
         save_log(args.json, log)
 
@@ -433,8 +444,8 @@ def main():
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--json", type=str, default=None)
     # Data (HF)
-    p.add_argument('--hf_path', type=str, required=True, help='Directory containing openwebtext.py')
-    p.add_argument('--cache_dir', type=str, default=None, help='HF datasets cache dir (default: <xz-dir>/cache)')
+    p.add_argument('--data', type=str, required=True, help='Directory (DATA_ROOT) or loader .py path')
+    p.add_argument('--cache_dir', type=str, default=None, help='HF datasets cache dir (default: <dataset_root>/cache)')
     p.add_argument('--max_vocab', type=int, default=50000)
     p.add_argument('--vocab_bytes', type=int, default=2_000_000_000)
     p.add_argument('--seq_len', type=int, default=256)
