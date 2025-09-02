@@ -362,10 +362,15 @@ def train(args):
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
-    print(f"Model 'GPT2LMHeadModel' initialized.", flush=True)
 
+    print(f"Model 'GPT2LMHeadModel' initialized.", flush=True)
+    # --- quick one-batch diagnostics ---
     if args.rank == 0:
+        print("\n[diag] TRAIN LOADER")
         diag_once(model, train_loader, tokenizer, PAD_ID, device, rank=args.rank)
+        print("\n[diag] VAL LOADER")
+        diag_once(model, val_loader, tokenizer, PAD_ID, device, rank=args.rank)
+    # --- end diagnostics ---
 
     if args.rank == 0:
         n_tr = len(ds_train); n_va = len(ds_val)
