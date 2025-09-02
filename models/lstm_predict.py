@@ -312,6 +312,8 @@ def train(args):
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
+    print(f"Model '{args.model}' initialized.", flush=True)
+
     if args.rank == 0:
         n_tr = len(ds_train)
         n_va = len(ds_val)
@@ -449,7 +451,7 @@ def main():
     p.add_argument('--val_fraction', type=float, default=0.01)
     # Training
     p.add_argument('--epochs', type=int, default=10)
-    p.add_argument('--batch_size', type=int, default=128)
+    p.add_argument('--batch_size', type=int, default=32)
     p.add_argument('--learning_rate', type=float, default=1e-3)
     p.add_argument('--weight_decay', type=float, default=1e-5)
     p.add_argument('--step_size', type=int, default=5)
@@ -486,6 +488,7 @@ def main():
 
     sys.stdout.reconfigure(line_buffering=True)
     setup_ddp(args)
+    print(json.dumps(vars(args), indent=2))
     try:
         train(args)
     finally:
