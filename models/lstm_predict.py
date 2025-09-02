@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, os, sys, json, time, datetime, random, string, io, tarfile, hashlib
+import argparse, os, sys, json, time, datetime, random, string
 from pathlib import Path
 from collections import Counter
 import numpy as np
@@ -9,6 +9,7 @@ import torch.optim as optim
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import IterableDataset, DataLoader
+from datasets import load_dataset
 
 # ------------------------- Tokenizer ------------------------------
 def simple_tokenizer(text):
@@ -19,51 +20,49 @@ def simple_tokenizer(text):
 PAD_ID = 0
 UNK_ID = 1
 
-# ------------------------- Shards & Vocab -------------------------
-def discover_shards(data_root: Path):
-    """Return sorted list of .xz tar shards under:
-       1) <root>/openwebtext/*.xz, else 2) <root>/*.xz
+# ------------------------- HF dataset helpers ---------------------
+def _resolve_parquet_layout(data_root: Path):
     """
-    a = sorted((data_root / "openwebtext").glob("*.xz"))
-    if a:
-        return [p.resolve() for p in a]
-    b = sorted(data_root.glob("*.xz"))
-    if b:
-        return [p.resolve() for p in b]
-    raise FileNotFoundError(
-        f"No .xz shards found under {data_root}/openwebtext or {data_root}"
-    )
+    Returns (train_glob, val_glob, split_needed)
+    Priority:
+      1) <root>/parquet/train/*.parquet + <root>/parquet/val/*.parquet
+      2) <root>/train/*.parquet + <root>/val/*.parquet
+      3) <root>/parquet/*.parquet  -> split_needed=True
+      4) <root>/*.parquet          -> split_needed=True
+    """
+    r = data_root
+    # case 1
+    if (r / "parquet" / "train").is_dir() and (r / "parquet" / "val").is_dir():
+        return str(r / "parquet" / "train" / "*.parquet"), str(r / "parquet" / "val" / "*.parquet"), False
+    # case 2
+    if (r / "train").is_dir() and (r / "val").is_dir():
+        return str(r / "train" / "*.parquet"), str(r / "val" / "*.parquet"), False
+    # case 3
+    if list((r / "parquet").glob("*.parquet")):
+        return str(r / "parquet" / "*.parquet"), None, True
+    # case 4
+    if list(r.glob("*.parquet")):
+        return str(r / "*.parquet"), None, True
+    raise FileNotFoundError(f"No Parquet files found under {r}. Expected train/val subdirs or *.parquet files.")
 
-def _is_val_file(path: Path, val_fraction: float, seed: int = 42):
-    """Assign files to train/val deterministically using a hash of (name, seed)."""
-    h = hashlib.md5((path.name + str(seed)).encode()).hexdigest()
-    # map hex -> [0,1)
-    r = int(h[:8], 16) / 0xFFFFFFFF
-    return r < val_fraction
+def hf_load_train_val_parquet(data_root: Path, val_fraction=0.01, seed=42, cache_dir=None):
+    train_glob, val_glob, split_needed = _resolve_parquet_layout(data_root)
+    if split_needed:
+        ds = load_dataset("parquet", data_files={"train": train_glob}, cache_dir=cache_dir)
+        splits = ds["train"].train_test_split(test_size=val_fraction, seed=seed, shuffle=True)
+        return splits["train"], splits["test"]
+    else:
+        ds = load_dataset("parquet", data_files={"train": train_glob, "validation": val_glob}, cache_dir=cache_dir)
+        return ds["train"], ds["validation"]
 
-def build_vocab_from_shards(shards, val_fraction=0.01, max_vocab=50000, bytes_limit=2_000_000_000, seed=42):
-    """Scan TRAIN shards and build a word-level vocab up to max_vocab."""
+def build_vocab_from_hfds(ds_train, max_vocab=50000, bytes_limit=2_000_000_000):
     counter = Counter()
-    seen_bytes = 0
-    for shard in shards:
-        if _is_val_file(shard, val_fraction, seed):
-            continue  # skip val shards for vocab
-        with tarfile.open(shard, mode="r:xz") as tf:
-            for m in tf:
-                if not m.isfile() or not m.name.endswith(".txt"):
-                    continue
-                f = tf.extractfile(m)
-                if f is None:
-                    continue
-                b = f.read()
-                seen_bytes += len(b)
-                if not b:
-                    continue
-                txt = b.decode("utf-8", errors="ignore")
-                counter.update(simple_tokenizer(txt))
-                if bytes_limit and seen_bytes >= bytes_limit:
-                    break
-        if bytes_limit and seen_bytes >= bytes_limit:
+    seen = 0
+    for ex in ds_train:
+        txt = ex["text"]
+        counter.update(simple_tokenizer(txt))
+        seen += len(txt)
+        if bytes_limit and seen >= bytes_limit:
             break
     vocab = {"<pad>": PAD_ID, "<unk>": UNK_ID}
     for w, _ in counter.most_common(max_vocab - len(vocab)):
@@ -71,32 +70,27 @@ def build_vocab_from_shards(shards, val_fraction=0.01, max_vocab=50000, bytes_li
     return vocab
 
 # ------------------------- IterableDataset ------------------------
-class OWTWindows(IterableDataset):
+class HFWindows(IterableDataset):
     """
-    Streams (x, y) windows (seq_len+1) from OpenWebText Zenodo .tar.xz shards.
-    - Shards are split into train/val via deterministic hashing.
-    - DDP + multi-worker sharding at the *document* level (txt file).
+    Streams (x, y) windows (seq_len+1) from HF Dataset of documents.
+    DDP + multi-worker aware via modulo partitioning over document index.
     """
-    def __init__(self, shards, split, vocab, seq_len=256, stride=128,
-                 world_size=1, rank=0, seed=42, val_fraction=0.01):
+    def __init__(self, hf_split, vocab, seq_len=256, stride=128,
+                 world_size=1, rank=0, seed=42):
         super().__init__()
-        assert split in ("train", "val")
-        self.shards = list(shards)
-        self.split = split
+        self.ds = hf_split
         self.vocab = vocab
         self.seq_len = seq_len
         self.stride = stride
         self.world_size = world_size
         self.rank = rank
         self.seed = seed
-        self.val_fraction = val_fraction
 
     def _encode_line(self, line):
         return [self.vocab.get(t, UNK_ID) for t in simple_tokenizer(line)]
 
     def _yield_windows(self, toks):
         T = self.seq_len + 1
-        # non-overlapping val by default (stride=seq_len) if caller sets that
         for i in range(0, max(0, len(toks) - T + 1), self.stride):
             w = toks[i:i+T]
             if len(w) == T:
@@ -104,45 +98,21 @@ class OWTWindows(IterableDataset):
                 y = torch.tensor(w[1:],  dtype=torch.long)
                 yield x, y
 
-    def _iter_doc(self, txt):
-        toks = self._encode_line(txt)
-        yield from self._yield_windows(toks)
-
     def __iter__(self):
-        # DDP + workers split: each consumer gets docs where doc_idx % consumers == consumer_id
         info = torch.utils.data.get_worker_info()
         num_workers = info.num_workers if info else 1
         worker_id = info.id if info else 0
         consumers = max(1, self.world_size * num_workers)
         consumer_id = self.rank * num_workers + worker_id
 
-        doc_idx = 0
-        # iterate shards deterministically
-        for shard in self.shards:
-            use_val = _is_val_file(shard, self.val_fraction, self.seed)
-            if (self.split == "val") != use_val:
+        for i, ex in enumerate(self.ds):
+            if (i % consumers) != consumer_id:
                 continue
-            with tarfile.open(shard, mode="r:xz") as tf:
-                for m in tf:
-                    if not m.isfile() or not m.name.endswith(".txt"):
-                        continue
-                    if (doc_idx % consumers) != consumer_id:
-                        doc_idx += 1
-                        continue
-                    f = tf.extractfile(m)
-                    if f is None:
-                        doc_idx += 1
-                        continue
-                    b = f.read()
-                    if not b:
-                        doc_idx += 1
-                        continue
-                    txt = b.decode("utf-8", errors="ignore")
-                    for pair in self._iter_doc(txt):
-                        yield pair
-                    doc_idx += 1
+            txt = ex["text"]
+            toks = self._encode_line(txt)
+            yield from self._yield_windows(toks)
 
-# ------------------------- Model ----------------------------------
+# ------------------------- Model ---------------------------------
 class LSTMLanguageModel(nn.Module):
     def __init__(self, vocab_size, embed_dim, hidden_dim, num_layers=2,
                  dropout_prob=0.5, tie_weights=True):
@@ -161,7 +131,7 @@ class LSTMLanguageModel(nn.Module):
             self.decoder = nn.Linear(hidden_dim, vocab_size)
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
         if getattr(self.decoder, "bias", None) is not None:
-            nn.init.zeros_(self.decoder.bias)
+            nn.init.zeros_((self.decoder.bias))
 
     def forward(self, x, hidden=None):
         h = self.dropout(self.embedding(x))
@@ -169,7 +139,7 @@ class LSTMLanguageModel(nn.Module):
         out = self.dropout(out)
         return self.decoder(out), hidden
 
-# ------------------------- Metrics helper -------------------------
+# ------------------------- Metrics helper ------------------------
 class AverageMeter:
     def __init__(self): self.reset()
     def reset(self): self.sum = 0.0; self.count = 0.0; self.avg = 0.0
@@ -186,7 +156,7 @@ class AverageMeter:
             self.sum, self.count = t.cpu().tolist()
             self.avg = self.sum / max(1.0, self.count)
 
-# ------------------------- Train / Eval ---------------------------
+# ------------------------- Train / Eval --------------------------
 @torch.no_grad()
 def validate(model, loader, device, args):
     model.eval()
@@ -302,24 +272,27 @@ def train(args):
     if not data_root.exists():
         raise FileNotFoundError(f"--data path not found: {data_root}")
 
-    shards = discover_shards(data_root)
+    # HF cache
+    if args.cache_dir is None:
+        cache_dir = data_root / "cache"
+    else:
+        cache_dir = Path(args.cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["HF_DATASETS_CACHE"] = str(cache_dir)
 
+    # Load train/val Parquet
     if args.rank == 0:
-        print(f"Discovered {len(shards)} shards under {data_root}", flush=True)
+        print(f"Loading Parquet dataset from {data_root} (cache: {cache_dir}) ...", flush=True)
+    ds_train, ds_val = hf_load_train_val_parquet(data_root, val_fraction=args.val_fraction, seed=42, cache_dir=str(cache_dir))
 
-    # Build vocab from TRAIN shards only (budgeted by bytes)
-    vocab = build_vocab_from_shards(
-        shards, val_fraction=args.val_fraction,
-        max_vocab=args.max_vocab, bytes_limit=args.vocab_bytes, seed=42
-    )
+    # Build vocab from TRAIN
+    vocab = build_vocab_from_hfds(ds_train, max_vocab=args.max_vocab, bytes_limit=args.vocab_bytes)
 
     # Iterable datasets / loaders (DDP-aware)
-    train_ds = OWTWindows(shards, "train", vocab, seq_len=args.seq_len, stride=args.stride,
-                          world_size=args.world_size, rank=args.rank, seed=42,
-                          val_fraction=args.val_fraction)
-    val_ds   = OWTWindows(shards, "val",   vocab, seq_len=args.seq_len, stride=args.seq_len,
-                          world_size=args.world_size, rank=args.rank, seed=42,
-                          val_fraction=args.val_fraction)
+    train_ds = HFWindows(ds_train, vocab, seq_len=args.seq_len, stride=args.stride,
+                         world_size=args.world_size, rank=args.rank, seed=42)
+    val_ds   = HFWindows(ds_val,   vocab, seq_len=args.seq_len, stride=args.seq_len,
+                         world_size=args.world_size, rank=args.rank, seed=42)
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, num_workers=args.workers,
                               pin_memory=True, persistent_workers=(args.workers>0))
@@ -340,7 +313,10 @@ def train(args):
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
     if args.rank == 0:
+        n_tr = len(ds_train)
+        n_va = len(ds_val)
         print(f"\nDATA ROOT: {data_root}")
+        print(f"  Train docs: {n_tr:,} | Val docs: {n_va:,}")
         print(f"  Vocab size: {len(vocab):,}")
         print(f"  Seq len: {args.seq_len} | Stride: {args.stride}")
         print(f"\nModel: LSTM LM ({args.num_layers} layers, tie={args.tie_weights})")
@@ -356,8 +332,8 @@ def train(args):
     best_ppl = float('inf')
 
     if args.rank == 0:
-        if args.json is None: args.json = "lstm_lm_openwebtext.json"
-        log = {"time": now(), "data_root": str(data_root),
+        if args.json is None: args.json = "lstm_lm_openwebtext_parquet.json"
+        log = {"time": now(), "data_root": str(data_root), "cache_dir": str(cache_dir),
                "config": vars(args), "vocab_size": len(vocab), "epochs": {}}
         save_log(args.json, log)
 
@@ -451,7 +427,7 @@ def cleanup():
 
 # ------------------------- Entry --------------------------------
 def main():
-    p = argparse.ArgumentParser("Distributed LSTM LM on Zenodo OpenWebText shards (.tar.xz)")
+    p = argparse.ArgumentParser("Distributed LSTM LM on OpenWebText (Parquet)")
     # DDP/system
     p.add_argument('--rank', type=int, default=0)
     p.add_argument('--world_size', type=int, default=1)
@@ -463,8 +439,9 @@ def main():
     p.add_argument("--deterministic", action='store_true')
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--json", type=str, default=None)
-    # Data
-    p.add_argument('--data', type=str, required=True, help='Dataset root dir containing openwebtext/*.xz (or *.xz directly)')
+    # Data (Parquet)
+    p.add_argument('--data', type=str, required=True, help='Dataset root dir (contains parquet/train and parquet/val, or *.parquet)')
+    p.add_argument('--cache_dir', type=str, default=None, help='HF datasets cache dir (default: <data>/cache)')
     p.add_argument('--max_vocab', type=int, default=50000)
     p.add_argument('--vocab_bytes', type=int, default=2_000_000_000)
     p.add_argument('--seq_len', type=int, default=256)
