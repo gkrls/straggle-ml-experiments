@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, os, sys, json, time, datetime, random, string
+import argparse, os, sys, json, time, datetime, random, string, math
 from pathlib import Path
 from collections import Counter
 import numpy as np
@@ -74,6 +74,10 @@ class HFWindows(IterableDataset):
     """
     Streams (x, y) windows (seq_len+1) from HF Dataset of documents.
     DDP + multi-worker aware via modulo partitioning over document index.
+
+    Added:
+      - set_epoch(epoch): introduces random rotation & step (coprime) to vary doc order
+      - __iter__ now iterates docs in a pseudo-random permutation *without* materializing it
     """
     def __init__(self, hf_split, vocab, seq_len=256, stride=128,
                  world_size=1, rank=0, seed=42):
@@ -85,6 +89,10 @@ class HFWindows(IterableDataset):
         self.world_size = world_size
         self.rank = rank
         self.seed = seed
+        self.epoch = 0
+
+    def set_epoch(self, epoch: int):
+        self.epoch = int(epoch)
 
     def _encode_line(self, line):
         return [self.vocab.get(t, UNK_ID) for t in simple_tokenizer(line)]
@@ -98,6 +106,16 @@ class HFWindows(IterableDataset):
                 y = torch.tensor(w[1:],  dtype=torch.long)
                 yield x, y
 
+    def _index_permutation(self, n, rng: random.Random):
+        # Random rotation
+        start = rng.randrange(0, max(1, n)) if n > 0 else 0
+        # Random step that is coprime-ish with n (use odd step if n even)
+        step = rng.randrange(1, max(2, n)) if n > 0 else 1
+        if n % 2 == 0 and step % 2 == 0:
+            step += 1
+        for j in range(n):
+            yield (start + j * step) % n
+
     def __iter__(self):
         info = torch.utils.data.get_worker_info()
         num_workers = info.num_workers if info else 1
@@ -105,9 +123,14 @@ class HFWindows(IterableDataset):
         consumers = max(1, self.world_size * num_workers)
         consumer_id = self.rank * num_workers + worker_id
 
-        for i, ex in enumerate(self.ds):
+        rng = random.Random(1337 + self.seed + self.rank + worker_id + self.epoch)
+        n = len(self.ds)
+
+        # Iterate documents in pseudo-random order without constructing a list
+        for i in self._index_permutation(n, rng):
             if (i % consumers) != consumer_id:
                 continue
+            ex = self.ds[i]
             txt = ex["text"]
             toks = self._encode_line(txt)
             yield from self._yield_windows(toks)
@@ -183,7 +206,30 @@ def validate(model, loader, device, args):
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
     return {'val_loss': val_loss, 'val_ppl': val_ppl}
 
-def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
+
+def make_step_scheduler(optimizer, total_steps: int, warmup_ratio: float = 0.05):
+    warmup_steps = max(1, int(warmup_ratio * total_steps))
+
+    def lr_lambda(step):
+        # step starts at 0 in LambdaLR (last_epoch)
+        if step < warmup_steps:
+            return step / float(max(1, warmup_steps))
+        # cosine decay to 0
+        t = (step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        t = min(max(t, 0.0), 1.0)
+        return 0.5 * (1.0 + math.cos(math.pi * t))
+
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+
+def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, scheduler, args):
+    """
+    Returns metrics dict.
+
+    Note: data_time below measures the time spent waiting for the next batch from
+    the DataLoader. Because tokenization happens inside HFWindows.__iter__ in the
+    worker processes, **tokenization is included** in data_time.
+    """
     model.train()
     losses = AverageMeter()
     step_time = AverageMeter()
@@ -201,6 +247,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     batches = 0
 
     for inputs, targets in dataloader:
+        # Include dataload + tokenization time
         data_time.update(time.perf_counter() - step_start, n=1)
 
         inputs = inputs.to(device, non_blocking=True)
@@ -226,12 +273,18 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             optimizer.step()
 
+        # Step-based LR schedule
+        scheduler.step()
         losses.update(loss_sum.item(), ntok)
         tokens_seen += int(ntok)
         batches += 1
 
         step_time.update(time.perf_counter() - step_start, n=1)
         step_start = time.perf_counter()
+
+        # Respect per-epoch and global caps
+        if args.steps_per_epoch and batches >= args.steps_per_epoch:
+            break
 
     if device.type == 'cuda':
         epoch_end.record(); epoch_end.synchronize()
@@ -256,14 +309,15 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
         'epoch_throughput': tok_per_sec,         # tokens/sec
         'tokens_seen': tokens_seen,
         'train_ppl': train_ppl,
-        'batches': batches,
-    }
+        'batches': batches,    }
+
 
 def save_log(path, log):
     tmp = f"{path}.tmp"
     with open(tmp, "w") as f:
         json.dump(log, f, indent=2); f.flush(); os.fsync(f.fileno())
     os.replace(tmp, path)
+
 
 def train(args):
     device = torch.device(args.device)
@@ -288,16 +342,27 @@ def train(args):
     # Build vocab from TRAIN
     vocab = build_vocab_from_hfds(ds_train, max_vocab=args.max_vocab, bytes_limit=args.vocab_bytes)
 
-    # Iterable datasets / loaders (DDP-aware)
+    # Iterable datasets / loaders (DDP-aware) with epoch-based randomization
     train_ds = HFWindows(ds_train, vocab, seq_len=args.seq_len, stride=args.stride,
-                         world_size=args.world_size, rank=args.rank, seed=42)
+                         world_size=args.world_size, rank=args.rank, seed=args.seed)
     val_ds   = HFWindows(ds_val,   vocab, seq_len=args.seq_len, stride=args.seq_len,
-                         world_size=args.world_size, rank=args.rank, seed=42)
+                         world_size=args.world_size, rank=args.rank, seed=args.seed + 1)
+
+    # seed DataLoader workers deterministically so Python/NumPy RNG in workers is stable
+    def _seed_worker(worker_id):
+        import numpy as _np, random as _random
+        worker_seed = (args.seed + args.rank * max(1, args.workers) + worker_id) % 2**32
+        _np.random.seed(worker_seed)
+        _random.seed(worker_seed)
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, num_workers=args.workers,
-                              pin_memory=True, persistent_workers=(args.workers>0))
+                              pin_memory=True, prefetch_factor=args.prefetch_factor,
+                              persistent_workers=(args.workers>0),
+                              worker_init_fn=_seed_worker)
     val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, num_workers=args.workers,
-                              pin_memory=True, persistent_workers=(args.workers>0))
+                              pin_memory=True, prefetch_factor=args.prefetch_factor,
+                              persistent_workers=(args.workers>0),
+                              worker_init_fn=_seed_worker)
 
     # Model
     model = LSTMLanguageModel(
@@ -327,7 +392,11 @@ def train(args):
 
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID, reduction='sum').to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=True)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
+
+    # Step-based scheduler (warmup+cosine) over total training steps
+    total_steps = max(1, args.steps_per_epoch) * args.epochs
+    scheduler = make_step_scheduler(optimizer, total_steps=total_steps, warmup_ratio=args.warmup_ratio)
+
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -343,7 +412,11 @@ def train(args):
         if args.rank == 0: print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
         epoch_start = time.time()
 
-        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
+        # vary document order each epoch
+        train_ds.set_epoch(epoch)
+        val_ds.set_epoch(epoch)
+
+        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler, scheduler, args)
         val_metrics   = validate(model, val_loader, device, args)
 
         epoch_time = time.time() - epoch_start
@@ -371,17 +444,13 @@ def train(args):
                 "lr": float(current_lr),
                 "epoch_time": float(epoch_time),
                 "epoch_throughput": float(train_metrics['epoch_throughput']),
-                "steps": int(train_metrics['batches'])
-            }
+                "steps": int(train_metrics['batches']),            }
             with open(args.json, "r") as f: log = json.load(f)
             log["epochs"][str(epoch)] = epoch_metrics
             save_log(args.json, log)
 
             if val_metrics['val_ppl'] < best_ppl:
                 best_ppl = val_metrics['val_ppl']
-
-        scheduler.step()
-
     if args.rank == 0:
         print(f"\n[{now()}] Training completed!")
         print(f"Best validation perplexity: {best_ppl:.2f}")
@@ -441,6 +510,7 @@ def main():
     p.add_argument("--deterministic", action='store_true')
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--json", type=str, default=None)
+    p.add_argument('--seed', type=int, default=1337, help='Base random seed for reproducible shuffles')
     # Data (Parquet)
     p.add_argument('--data', type=str, required=True, help='Dataset root dir (contains parquet/train and parquet/val, or *.parquet)')
     p.add_argument('--cache_dir', type=str, default=None, help='HF datasets cache dir (default: <data>/cache)')
@@ -450,12 +520,12 @@ def main():
     p.add_argument('--stride', type=int, default=128)
     p.add_argument('--val_fraction', type=float, default=0.01)
     # Training
-    p.add_argument('--epochs', type=int, default=10)
+    p.add_argument('--epochs', type=int, default=25)
+    p.add_argument('--steps_per_epoch', type=int, default=2000, help='Number of training steps per epoch (set 0 to iterate full dataset)')
     p.add_argument('--batch_size', type=int, default=32)
     p.add_argument('--learning_rate', type=float, default=1e-3)
     p.add_argument('--weight_decay', type=float, default=1e-5)
-    p.add_argument('--step_size', type=int, default=5)
-    p.add_argument('--gamma', type=float, default=0.5)
+    p.add_argument('--warmup_ratio', type=float, default=0.05, help='Fraction of total steps for linear warmup before cosine decay')
     p.add_argument("--amp", action="store_true")
     p.add_argument("--static_graph", action='store_true')
     p.add_argument("--prefetch_factor", type=int, default=2)
@@ -473,8 +543,19 @@ def main():
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+        # Global seeds for full-run reproducibility (includes dataloader workers via worker_init_fn)
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
+
+    # Enable TF32 for speed on Ampere+ (safe for training LMs)
+    if args.device == 'cuda' and torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     if args.device == 'cuda' and not torch.cuda.is_available():
         args.device = 'cpu'
