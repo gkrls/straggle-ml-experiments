@@ -312,7 +312,7 @@ def train(args):
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
-    print(f"Model '{args.model}' initialized.", flush=True)
+    print(f"Model 'LSTMLanguageModel' initialized.", flush=True)
 
     if args.rank == 0:
         n_tr = len(ds_train)
