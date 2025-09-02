@@ -146,10 +146,6 @@ def get_lr(it, warmup_iters, learning_rate, lr_decay_iters, min_lr):
     decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
     assert 0 <= decay_ratio <= 1
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
-    return min_lr + coeff * (learning_rate - min_lr) decay down to min learning rate
-    decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
-    assert 0 <= decay_ratio <= 1
-    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
     return min_lr + coeff * (learning_rate - min_lr)
 
 # ------------------------- Validate --------------------------------
@@ -610,7 +606,7 @@ def main():
     # Model configuration
     p.add_argument('--seq_len', type=int, default=1024, help='Sequence length')
     p.add_argument('--dropout', type=float, default=0.1, help='Dropout rate')
-
+    
     # Parse arguments
     args = p.parse_args()
     
