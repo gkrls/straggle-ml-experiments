@@ -19,4 +19,4 @@ download() {
          "$url"
 }
 
-download "$URL" "$TARGET_DIR/openwebtext.tar"
+download "$URL" "$TARGET_DIR/openwebtext.tar.xz"
