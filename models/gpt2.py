@@ -364,13 +364,13 @@ def train(args):
 
 
     print(f"Model 'GPT2LMHeadModel' initialized.", flush=True)
-    # --- quick one-batch diagnostics ---
-    if args.rank == 0:
-        print("\n[diag] TRAIN LOADER")
-        diag_once(model, train_loader, tokenizer, PAD_ID, device, rank=args.rank)
-        print("\n[diag] VAL LOADER")
-        diag_once(model, val_loader, tokenizer, PAD_ID, device, rank=args.rank)
-    # --- end diagnostics ---
+    # # --- quick one-batch diagnostics ---
+    # if args.rank == 0:
+    #     print("\n[diag] TRAIN LOADER")
+    #     diag_once(model, train_loader, tokenizer, PAD_ID, device, rank=args.rank)
+    #     print("\n[diag] VAL LOADER")
+    #     diag_once(model, val_loader, tokenizer, PAD_ID, device, rank=args.rank)
+    # # --- end diagnostics ---
 
     if args.rank == 0:
         n_tr = len(ds_train); n_va = len(ds_val)
