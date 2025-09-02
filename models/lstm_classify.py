@@ -430,7 +430,6 @@ def train(args):
             print(f"[{now()}][Epoch {epoch:03d}] "
                   f"train_loss={train_metrics['train_loss']:.4f} (global={train_metrics['train_loss_global']:.4f}) "
                   f"val_loss={val_metrics['val_loss']:.4f} "
-                  f"train_ppl={train_metrics['train_perplexity']:.2f} val_ppl={val_metrics['val_perplexity']:.2f} "
                   f"train_acc={train_metrics['train_acc']:.1f}% val_acc={val_metrics['val_acc']:.1f}% "
                   f"lr={current_lr:.6f} time={epoch_time:.2f}s tp=~{epoch_throughput:.1f} samples/s", flush=True)
             
