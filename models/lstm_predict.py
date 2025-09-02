@@ -198,14 +198,14 @@ def validate(model, loader, device, args):
             logits, _ = model(inputs)
             loss_sum = ce(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
 
-        ntok = targets.numel()
-        losses.update(loss_sum.item() / max(1, ntok), ntok)
+        # robust even if you add padding later; for your windows it's equal to targets.numel()
+        ntok_eff = int((targets != PAD_ID).sum())
+        losses.update(loss_sum.item() / max(1, ntok_eff), ntok_eff)
 
     losses.all_reduce()
-    val_loss = losses.avg  # per-token NLL
-    val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
+    val_loss = losses.avg                     # per-token CE
+    val_ppl  = float(np.exp(np.clip(val_loss, 0, 20)))
     return {'val_loss': val_loss, 'val_ppl': val_ppl}
-
 
 def make_step_scheduler(optimizer, total_steps: int, warmup_ratio: float = 0.05):
     warmup_steps = max(1, int(warmup_ratio * total_steps))
