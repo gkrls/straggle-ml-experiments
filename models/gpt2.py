@@ -166,9 +166,7 @@ def validate(model, loader, device, pad_id, args):
 
 # ------------------------- Train 1 epoch --------------------------
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, pad_id, args):
-    model.train()
-    # speed: disable cache during training
-    model.config.use_cache = False
+    model.train()  # do NOT touch model.config here
 
     losses = AverageMeter()
     step_time = AverageMeter()
@@ -186,6 +184,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, pad
     batches = 0
 
     for inputs, targets in dataloader:
+        # include dataloader time
         data_time.update(time.perf_counter() - step_start, n=1)
 
         inputs = inputs.to(device, non_blocking=True)
@@ -196,7 +195,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, pad
         if scaler is not None:
             with torch.amp.autocast(device_type='cuda'):
                 out = model(input_ids=inputs, labels=targets)
-                # HF returns mean loss; re-compute sum to match “loss/tok”
                 logits = out.logits
                 loss_sum = criterion(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
                 ntok = targets.numel()
