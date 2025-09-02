@@ -232,6 +232,72 @@ def save_log(path, log):
         json.dump(log, f, indent=2); f.flush(); os.fsync(f.fileno())
     os.replace(tmp, path)
 
+def diag_once(model, loader, tokenizer, PAD_ID, device, rank=0, max_print_tokens=32):
+    """Run one forward on a single batch and print sanity stats."""
+    is_ddp = isinstance(model, DDP)
+    net = model.module if is_ddp else model
+    net.eval()
+
+    # Pull one batch
+    it = iter(loader)
+    inputs, targets = next(it)  # (B, T) each, already next-token aligned by your dataset
+    B, T = inputs.size(0), inputs.size(1)
+
+    # Shapes & ranges
+    V_tok = len(tokenizer)
+    V_head = net.lm_head.out_features
+    print(f"[diag] batch shapes: inputs={tuple(inputs.shape)} targets={tuple(targets.shape)}")
+    print(f"[diag] vocab: tokenizer_len={V_tok} lm_head_out_features={V_head}")
+    print(f"[diag] token ranges: inputs[min,max]=({int(inputs.min())},{int(inputs.max())}) "
+          f"targets[min,max]=({int(targets.min())},{int(targets.max())})")
+    pad_cnt = int((targets == PAD_ID).sum())
+    print(f"[diag] PAD count in targets: {pad_cnt}")
+
+    # Move to device
+    inputs = inputs.to(device, non_blocking=True)
+    targets = targets.to(device, non_blocking=True)
+
+    # One forward – NO labels (we compute our own CE)
+    with torch.no_grad():
+        logits = net(inputs).logits  # (B,T,V)
+        V = logits.size(-1)
+        # our CE (sum) over all tokens, then per-token
+        ce = nn.CrossEntropyLoss(ignore_index=PAD_ID, reduction='sum').to(device)
+        loss_sum = ce(logits.reshape(-1, V), targets.reshape(-1))
+        ntok = targets.numel()
+        loss_tok = (loss_sum / ntok).item()
+
+        # HF internal loss (for comparison)
+        hf_out = net(inputs, labels=targets)
+        hf_loss_tok = float(hf_out.loss)
+
+        # Baseline uniform loss and ppl
+        import math
+        baseline = math.log(V)
+        ppl_ours = math.exp(loss_tok)
+        ppl_hf   = math.exp(hf_loss_tok)
+
+        # Top-1 acc and mean p(target)
+        probs = torch.softmax(logits.float(), dim=-1)
+        pt = probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+        top1 = (logits.argmax(dim=-1) == targets).float().mean().item()
+        mean_pt = pt.mean().item()
+
+    print(f"[diag] loss/token (ours)={loss_tok:.4f}  hf_loss/token={hf_loss_tok:.4f}  baseline ln(V)={baseline:.4f}")
+    print(f"[diag] ppl (ours)={ppl_ours:.1f}  ppl (hf)={ppl_hf:.1f}  top1_acc={top1*100:.3f}%  mean p(target)={mean_pt:.6f}")
+
+    # Tiny decode to eyeball alignment (first example)
+    try:
+        ids0 = inputs[0, :max_print_tokens].detach().cpu().tolist()
+        tgt0 = targets[0, :max_print_tokens].detach().cpu().tolist()
+        print("[diag] decode inputs[:32]:", tokenizer.decode(ids0))
+        print("[diag] decode targets[:32]:", tokenizer.decode(tgt0))
+    except Exception as e:
+        print(f"[diag] decode failed: {e}")
+
+    net.train()
+
+
 # ------------------------- Train driver --------------------------
 def train(args):
     device = torch.device(args.device)
@@ -297,6 +363,10 @@ def train(args):
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
     print(f"Model 'GPT2LMHeadModel' initialized.", flush=True)
+
+    if args.rank == 0:
+        diag_once(model, train_loader, tokenizer, PAD_ID, device, rank=args.rank)
+
     if args.rank == 0:
         n_tr = len(ds_train); n_va = len(ds_val)
         print(f"\nDATA ROOT: {data_root}")
