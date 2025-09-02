@@ -478,7 +478,7 @@ def train(args):
             # Track best validation accuracy
             if val_metrics['val_acc'] > best_acc:
                 best_acc = val_metrics['val_acc']
-                print(f"  New best accuracy: {best_acc:.2f}%", flush=True)
+                # print(f"  New best accuracy: {best_acc:.2f}%", flush=True)
             if val_metrics['val_perplexity'] < best_perplexity:
                 best_perplexity = val_metrics['val_perplexity']
         

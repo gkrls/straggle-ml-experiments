@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: ./get_imagenet.sh /path/to/dir
+# Usage: ./imagenet-1k-download.sh /path/to/dir
 
 set -euo pipefail
 
