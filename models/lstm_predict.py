@@ -198,14 +198,37 @@ def validate(model, loader, device, args):
             logits, _ = model(inputs)
             loss_sum = ce(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
 
-        # robust even if you add padding later; for your windows it's equal to targets.numel()
-        ntok_eff = int((targets != PAD_ID).sum())
-        losses.update(loss_sum.item() / max(1, ntok_eff), ntok_eff)
+        ntok = targets.numel()
+        losses.update(loss_sum.item() / max(1, ntok), ntok)
 
     losses.all_reduce()
-    val_loss = losses.avg                     # per-token CE
-    val_ppl  = float(np.exp(np.clip(val_loss, 0, 20)))
+    val_loss = losses.avg  # per-token NLL
+    val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
     return {'val_loss': val_loss, 'val_ppl': val_ppl}
+
+@torch.no_grad()
+def sanity_validate(model, loader, device, vocab_size, rank, max_batches: int = 50):
+    """Quick sanity: report per-token CE on a small slice; compare to ln(V) baseline.
+    Uses the same meter path to catch averaging mistakes.
+    """
+    model.eval()
+    losses = AverageMeter()
+    ce = nn.CrossEntropyLoss(ignore_index=PAD_ID, reduction='sum').to(device)
+    seen = 0
+    for inputs, targets in loader:
+        inputs = inputs.to(device, non_blocking=True)
+        targets = targets.to(device, non_blocking=True)
+        logits, _ = model(inputs)
+        loss_sum = ce(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
+        ntok_eff = int((targets != PAD_ID).sum())
+        losses.update(loss_sum.item() / max(1, ntok_eff), ntok_eff)
+        seen += 1
+        if seen >= max_batches:
+            break
+    losses.all_reduce()
+    if rank == 0:
+        print(f"[sanity] val CE/token on first {seen} batches: {losses.avg:.4f} ; ln(V)={math.log(vocab_size):.4f}", flush=True)
+
 
 def make_step_scheduler(optimizer, total_steps: int, warmup_ratio: float = 0.05):
     warmup_steps = max(1, int(warmup_ratio * total_steps))
@@ -260,17 +283,39 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, sch
                 logits, _ = model(inputs)
                 loss_sum = criterion(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
                 ntok = targets.numel()
+                if not torch.isfinite(loss_sum):
+                    if dist.get_rank() == 0:
+                        print("[WARN] non-finite loss_sum; skipping step", flush=True)
+                    step_start = time.perf_counter()
+                    continue
                 loss = loss_sum / ntok
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.clip_norm)
+            if not torch.isfinite(grad_norm):
+                if dist.get_rank() == 0:
+                    print(f"[WARN] non-finite grad_norm={grad_norm}; skipping step", flush=True)
+                optimizer.zero_grad(set_to_none=True)
+                step_start = time.perf_counter()
+                continue
             scaler.step(optimizer); scaler.update()
         else:
             logits, _ = model(inputs)
             loss_sum = criterion(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
             ntok = targets.numel()
+            if not torch.isfinite(loss_sum):
+                if dist.get_rank() == 0:
+                    print("[WARN] non-finite loss_sum; skipping step", flush=True)
+                step_start = time.perf_counter()
+                continue
             (loss_sum / ntok).backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.clip_norm)
+            if not torch.isfinite(grad_norm):
+                if dist.get_rank() == 0:
+                    print(f"[WARN] non-finite grad_norm={grad_norm}; skipping step", flush=True)
+                optimizer.zero_grad(set_to_none=True)
+                step_start = time.perf_counter()
+                continue
             optimizer.step()
 
         # Step-based LR schedule
@@ -365,6 +410,8 @@ def train(args):
                               worker_init_fn=_seed_worker)
 
     # Model
+    if args.tie_weights and args.embed_dim != args.hidden_dim and args.rank == 0:
+        print("[Info] --tie_weights requested but embed_dim != hidden_dim; decoder will be untied.", flush=True)
     model = LSTMLanguageModel(
         vocab_size=len(vocab),
         embed_dim=args.embed_dim,
@@ -391,7 +438,7 @@ def train(args):
         print("=" * 60, flush=True)
 
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID, reduction='sum').to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=True)
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=False)
 
     # Step-based scheduler (warmup+cosine) over total training steps
     total_steps = max(1, args.steps_per_epoch) * args.epochs
@@ -410,11 +457,13 @@ def train(args):
 
     for epoch in range(args.epochs):
         if args.rank == 0: print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
+        if getattr(args, 'debug_val_check', False) and epoch == 0:
+            sanity_validate(model, val_loader, device, vocab_size=len(vocab), rank=args.rank)
         epoch_start = time.time()
 
         # vary document order each epoch
         train_ds.set_epoch(epoch)
-        val_ds.set_epoch(epoch)
+        val_ds.set_epoch(epoch if getattr(args, 'shuffle_val', False) else 0)
 
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler, scheduler, args)
         val_metrics   = validate(model, val_loader, device, args)
@@ -521,7 +570,7 @@ def main():
     p.add_argument('--val_fraction', type=float, default=0.01)
     # Training
     p.add_argument('--epochs', type=int, default=25)
-    p.add_argument('--steps_per_epoch', type=int, default=1000, help='Number of training steps per epoch (set 0 to iterate full dataset)')
+    p.add_argument('--steps_per_epoch', type=int, default=2000, help='Number of training steps per epoch (set 0 to iterate full dataset)')
     p.add_argument('--batch_size', type=int, default=64)
     p.add_argument('--learning_rate', type=float, default=1e-3)
     p.add_argument('--weight_decay', type=float, default=1e-5)
@@ -529,12 +578,19 @@ def main():
     p.add_argument("--amp", action="store_true")
     p.add_argument("--static_graph", action='store_true')
     p.add_argument("--prefetch_factor", type=int, default=2)
+    p.add_argument('--clip_norm', type=float, default=1.0, help='Max gradient norm for clipping')
+    p.add_argument('--shuffle_val', action='store_true', help='Enable per-epoch shuffle for validation (default: off)')
+    p.add_argument('--debug_val_check', action='store_true', help='Run quick sanity checks on validation loss averaging at epoch 0')
     # Model
     p.add_argument('--embed_dim', type=int, default=512)
     p.add_argument('--hidden_dim', type=int, default=512)
     p.add_argument('--num_layers', type=int, default=2)
     p.add_argument('--dropout', type=float, default=0.5)
-    p.add_argument('--tie_weights', action='store_true')
+    p.add_argument('--tie_weights', dest='tie_weights', action='store_true',
+                   help='Tie decoder weights to embedding (requires embed_dim==hidden_dim)')
+    p.add_argument('--no_tie_weights', dest='tie_weights', action='store_false',
+                   help='Use separate decoder weights')
+    p.set_defaults(tie_weights=True)
 
     args = p.parse_args()
 
