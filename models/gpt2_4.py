@@ -78,10 +78,12 @@ class GPT2Windows(IterableDataset):
         return ids
 
     def _yield_windows(self, toks):
-        # Window size is seq_len (not seq_len+1 as in original)
-        for i in range(0, max(0, len(toks) - self.seq_len), self.stride):
-            w = toks[i:i+self.seq_len]
-            if len(w) == self.seq_len:
+        # Window size is seq_len (inputs) + 1 (for targets)
+        window_size = self.seq_len + 1
+        for i in range(0, max(0, len(toks) - window_size + 1), self.stride):
+            w = toks[i:i+window_size]
+            if len(w) == window_size:
+                # Return the full window - we'll split into inputs/targets later
                 x = torch.tensor(w, dtype=torch.long)
                 yield x
 
@@ -136,11 +138,15 @@ def get_lr(it, warmup_iters, learning_rate, lr_decay_iters, min_lr):
     """Cosine learning rate schedule with warmup"""
     # Linear warmup for warmup_iters steps
     if it < warmup_iters:
-        return learning_rate * it / warmup_iters
+        return learning_rate * (it + 1) / warmup_iters  # +1 to avoid 0 lr at step 0
     # After lr_decay_iters, return min learning rate
     if it > lr_decay_iters:
         return min_lr
     # In between, use cosine decay down to min learning rate
+    decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
+    return min_lr + coeff * (learning_rate - min_lr) decay down to min learning rate
     decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
     assert 0 <= decay_ratio <= 1
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
@@ -155,14 +161,16 @@ def validate(model, loader, device, args, max_batches=50):
     for batch_idx, inputs in enumerate(loader):
         if batch_idx >= max_batches:
             break
+        
+        # inputs is seq_len+1, split properly    
+        if inputs.size(1) != args.seq_len + 1:
+            continue
             
-        inputs = inputs.to(device, non_blocking=True)
-        # Targets are inputs shifted by 1
-        targets = inputs[:, 1:].contiguous()
-        inputs = inputs[:, :-1].contiguous()
+        inputs_batch = inputs[:, :-1].contiguous().to(device, non_blocking=True)
+        targets = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-            outputs = model(inputs)
+            outputs = model(inputs_batch)
             logits = outputs.logits
             # Reshape for loss calculation
             B, T, V = logits.shape
@@ -197,6 +205,11 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
     for batch_idx, inputs in enumerate(dataloader):
         data_time.update(time.perf_counter() - step_start, n=1)
         
+        # inputs is now seq_len+1, split into input and target
+        if inputs.size(1) != args.seq_len + 1:
+            print(f"[Warning] Unexpected sequence length: {inputs.size(1)}, expected {args.seq_len + 1}")
+            continue
+            
         # Calculate current step
         current_step = epoch * args.steps_per_epoch + batch_idx if args.steps_per_epoch else total_steps
         
@@ -205,14 +218,13 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         
-        inputs = inputs.to(device, non_blocking=True)
-        # Targets are inputs shifted by 1
-        targets = inputs[:, 1:].contiguous()
-        inputs = inputs[:, :-1].contiguous()
+        # Split into inputs and targets
+        inputs_batch = inputs[:, :-1].contiguous().to(device, non_blocking=True)
+        targets = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         
         # Forward pass
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-            outputs = model(inputs)
+            outputs = model(inputs_batch)
             logits = outputs.logits
             # Reshape for loss calculation
             B, T, V = logits.shape
@@ -250,9 +262,10 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         step_start = time.perf_counter()
         
         # Log progress
-        if batch_idx % 10 == 0 and args.rank == 0:
+        if batch_idx % 50 == 0 and args.rank == 0:
+            warmup_str = " (warmup)" if current_step < warmup_iters else ""
             print(f"[Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch}] "
-                  f"Loss: {loss.item():.4f} | LR: {lr:.6f} | Grad Norm: {grad_norm:.2f}")
+                  f"Loss: {loss.item():.4f} | LR: {lr:.6f}{warmup_str} | Grad Norm: {grad_norm:.2f}")
         
         if args.steps_per_epoch and batches >= args.steps_per_epoch:
             break
@@ -597,7 +610,7 @@ def main():
     # Model configuration
     p.add_argument('--seq_len', type=int, default=1024, help='Sequence length')
     p.add_argument('--dropout', type=float, default=0.1, help='Dropout rate')
-    
+
     # Parse arguments
     args = p.parse_args()
     
