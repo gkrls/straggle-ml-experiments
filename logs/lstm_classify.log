@@ -1,0 +1,102 @@
++ exec python -u /home/gks/straggle-ml-experiments/models/lstm_classify.py --rank 0 --world_size 6 --iface ens4f0 --master_addr 42.0.0.1 --master_port 29500 --backend gloo --batch_size 128 --workers 8 --json /home/gks/straggle-ml-experiments/models/lstm_classify.json --deterministic --prefetch_factor 2 --drop_last_val --batch_size 64 --dataset ag_news --epochs 
+25                                                                                                                                                                                                                                                                                                                                                                         
+[DDP] backend=gloo world_size=6 master=42.0.0.1:29500 iface=ens4f0 local_rank=0                                                                                                                                                                                                                                                                                            
+{                                                                                                                                                                                                                                                                                                                                                                          
+  "rank": 0,                                                                                                                                                                                                                                                                                                                                                               
+  "world_size": 6,                                                                                                                                                                                                                                                                                                                                                         
+  "iface": "ens4f0",                                                                                                                                                                                                                                                                                                                                                       
+  "master_addr": "42.0.0.1",                                                                                                                                                                                                                                                                                                                                               
+  "master_port": 29500,                                                                                                                                                                                                                                                                                                                                                    
+  "backend": "gloo",
+  "device": "cuda",
+  "deterministic": true,
+  "workers": 8,
+  "json": "/home/gks/straggle-ml-experiments/models/lstm_classify.json",
+  "dataset": "ag_news",
+  "epochs": 25,
+  "batch_size": 64,
+  "learning_rate": 0.001,
+  "weight_decay": 1e-05,
+  "step_size": 5,
+  "gamma": 0.5,
+  "amp": false,
+  "drop_last_train": false,
+  "drop_last_val": true,
+  "static_graph": false,
+  "prefetch_factor": 2,
+  "embed_dim": 256,
+  "hidden_dim": 512,
+  "num_layers": 2,
+  "dropout": 0.3,
+  "max_len": null,
+  "max_vocab": 20000,
+  "bidirectional": false,
+  "num_classes": null,
+  "local_rank": 0,
+  "seed": 42
+}
+Building vocabulary for ag_news...
+
+Dataset: AG_NEWS
+  Training samples: 120,000
+  Validation samples: 7,600
+  Vocabulary size: 20,000
+  Number of classes: 4
+  Max sequence length: 128
+
+Model: LSTM Classifier (unidirectional, 2 layers)
+  Total parameters: 8,800,260
+============================================================
+[2025-09-02 11:36:19][Epoch 000] ...
+[2025-09-02 11:36:51][Epoch 000] train_loss=0.6056 (global=0.6131) val_loss=0.3869 train_acc=77.2% val_acc=86.9% lr=0.001000 time=31.83s tp=~3769.9 samples/s
+[2025-09-02 11:36:51][Epoch 001] ...
+[2025-09-02 11:37:22][Epoch 001] train_loss=0.3555 (global=0.3569) val_loss=0.3608 train_acc=88.0% val_acc=88.8% lr=0.001000 time=31.20s tp=~3845.5 samples/s
+[2025-09-02 11:37:22][Epoch 002] ...
+[2025-09-02 11:37:53][Epoch 002] train_loss=0.3042 (global=0.3052) val_loss=0.3182 train_acc=89.9% val_acc=90.1% lr=0.001000 time=30.93s tp=~3880.1 samples/s
+[2025-09-02 11:37:53][Epoch 003] ...
+[2025-09-02 11:38:24][Epoch 003] train_loss=0.2677 (global=0.2690) val_loss=0.3033 train_acc=91.1% val_acc=90.3% lr=0.001000 time=30.93s tp=~3880.2 samples/s
+[2025-09-02 11:38:24][Epoch 004] ...
+[2025-09-02 11:38:55][Epoch 004] train_loss=0.2471 (global=0.2462) val_loss=0.2852 train_acc=91.6% val_acc=90.6% lr=0.001000 time=31.03s tp=~3867.4 samples/s
+[2025-09-02 11:38:55][Epoch 005] ...
+[2025-09-02 11:39:25][Epoch 005] train_loss=0.1993 (global=0.2008) val_loss=0.2787 train_acc=93.4% val_acc=91.2% lr=0.000500 time=30.75s tp=~3903.0 samples/s
+[2025-09-02 11:39:25][Epoch 006] ...
+[2025-09-02 11:39:56][Epoch 006] train_loss=0.1936 (global=0.1869) val_loss=0.2624 train_acc=93.4% val_acc=91.6% lr=0.000500 time=30.93s tp=~3879.5 samples/s
+[2025-09-02 11:39:56][Epoch 007] ...
+[2025-09-02 11:40:27][Epoch 007] train_loss=0.1728 (global=0.1732) val_loss=0.2688 train_acc=93.9% val_acc=91.6% lr=0.000500 time=31.04s tp=~3865.6 samples/s
+[2025-09-02 11:40:27][Epoch 008] ...
+[2025-09-02 11:40:58][Epoch 008] train_loss=0.1518 (global=0.1583) val_loss=0.2682 train_acc=94.7% val_acc=91.5% lr=0.000500 time=30.89s tp=~3884.5 samples/s
+[2025-09-02 11:40:58][Epoch 009] ...
+[2025-09-02 11:41:29][Epoch 009] train_loss=0.1482 (global=0.1464) val_loss=0.2671 train_acc=94.9% val_acc=91.8% lr=0.000500 time=30.91s tp=~3882.8 samples/s
+[2025-09-02 11:41:29][Epoch 010] ...
+[2025-09-02 11:42:00][Epoch 010] train_loss=0.1220 (global=0.1212) val_loss=0.2798 train_acc=95.7% val_acc=91.9% lr=0.000250 time=31.07s tp=~3861.9 samples/s
+[2025-09-02 11:42:00][Epoch 011] ...
+[2025-09-02 11:42:31][Epoch 011] train_loss=0.1121 (global=0.1115) val_loss=0.2799 train_acc=96.0% val_acc=92.1% lr=0.000250 time=30.77s tp=~3900.1 samples/s
+[2025-09-02 11:42:31][Epoch 012] ...
+[2025-09-02 11:43:02][Epoch 012] train_loss=0.0995 (global=0.1041) val_loss=0.3000 train_acc=96.5% val_acc=92.0% lr=0.000250 time=31.07s tp=~3862.7 samples/s
+[2025-09-02 11:43:02][Epoch 013] ...
+[2025-09-02 11:43:33][Epoch 013] train_loss=0.0940 (global=0.0946) val_loss=0.3388 train_acc=96.9% val_acc=91.6% lr=0.000250 time=31.02s tp=~3868.1 samples/s
+[2025-09-02 11:43:33][Epoch 014] ...
+[2025-09-02 11:44:04][Epoch 014] train_loss=0.0870 (global=0.0897) val_loss=0.3103 train_acc=96.9% val_acc=91.9% lr=0.000250 time=30.65s tp=~3914.7 samples/s
+[2025-09-02 11:44:04][Epoch 015] ...
+[2025-09-02 11:44:35][Epoch 015] train_loss=0.0759 (global=0.0755) val_loss=0.3411 train_acc=97.3% val_acc=92.0% lr=0.000125 time=31.07s tp=~3862.0 samples/s
+[2025-09-02 11:44:35][Epoch 016] ...
+[2025-09-02 11:45:06][Epoch 016] train_loss=0.0736 (global=0.0697) val_loss=0.3460 train_acc=97.4% val_acc=92.0% lr=0.000125 time=31.17s tp=~3850.1 samples/s
+[2025-09-02 11:45:06][Epoch 017] ...
+[2025-09-02 11:45:37][Epoch 017] train_loss=0.0665 (global=0.0664) val_loss=0.3606 train_acc=97.6% val_acc=91.7% lr=0.000125 time=30.86s tp=~3888.6 samples/s
+[2025-09-02 11:45:37][Epoch 018] ...
+[2025-09-02 11:46:08][Epoch 018] train_loss=0.0663 (global=0.0640) val_loss=0.3595 train_acc=97.6% val_acc=92.1% lr=0.000125 time=31.05s tp=~3864.2 samples/s
+[2025-09-02 11:46:08][Epoch 019] ...
+[2025-09-02 11:46:39][Epoch 019] train_loss=0.0627 (global=0.0610) val_loss=0.3653 train_acc=97.8% val_acc=91.7% lr=0.000125 time=31.29s tp=~3834.8 samples/s
+[2025-09-02 11:46:39][Epoch 020] ...
+[2025-09-02 11:47:10][Epoch 020] train_loss=0.0509 (global=0.0529) val_loss=0.3786 train_acc=98.1% val_acc=91.9% lr=0.000063 time=30.80s tp=~3896.2 samples/s
+[2025-09-02 11:47:10][Epoch 021] ...
+[2025-09-02 11:47:41][Epoch 021] train_loss=0.0500 (global=0.0497) val_loss=0.3920 train_acc=98.2% val_acc=91.8% lr=0.000063 time=31.07s tp=~3862.4 samples/s
+[2025-09-02 11:47:41][Epoch 022] ...
+[2025-09-02 11:48:12][Epoch 022] train_loss=0.0508 (global=0.0479) val_loss=0.3860 train_acc=98.1% val_acc=92.0% lr=0.000063 time=31.04s tp=~3865.4 samples/s
+[2025-09-02 11:48:12][Epoch 023] ...
+[2025-09-02 11:48:43][Epoch 023] train_loss=0.0468 (global=0.0462) val_loss=0.4034 train_acc=98.3% val_acc=91.9% lr=0.000063 time=30.88s tp=~3885.4 samples/s
+[2025-09-02 11:48:43][Epoch 024] ...
+[2025-09-02 11:49:14][Epoch 024] train_loss=0.0466 (global=0.0467) val_loss=0.4006 train_acc=98.3% val_acc=92.1% lr=0.000063 time=31.08s tp=~3861.1 samples/s
+
+[2025-09-02 11:49:14] Training completed!
+Best validation accuracy: 92.11%

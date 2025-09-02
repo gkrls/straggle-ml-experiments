@@ -18,7 +18,7 @@ RANK=$(( ${IP##*.} - 1 ))
 # Default master = same /24, .1 (override with env MASTER_ADDR if you want)
 MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
-echo "[run_vgg.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
+echo "[run_lstm_classify.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
 
 
 # sync repo: clone if missing, otherwise reset/pull
