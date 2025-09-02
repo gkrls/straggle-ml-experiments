@@ -276,7 +276,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         if args.rank == 0:
             # During warmup, print every 50 steps
             if warmup_iters > 0 and current_step <= warmup_iters and batch_idx % 50 == 0:
-                print(f"[{now()}][Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch}] "
+                print(f"[{now()}][Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch:04d}] "
                       f"Loss: {loss.item():.4f} | LR: {lr:.6f} (warmup) | Grad Norm: {grad_norm:.2f}")
         
         if args.steps_per_epoch and batches >= args.steps_per_epoch:
