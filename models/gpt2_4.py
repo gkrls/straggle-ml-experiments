@@ -14,6 +14,8 @@ import random
 import math
 from pathlib import Path
 import numpy as np
+import warnings
+import logging
 
 import torch
 import torch.nn as nn
@@ -71,8 +73,18 @@ class GPT2Windows(IterableDataset):
         self.epoch = int(epoch)
 
     def _encode_line(self, line: str):
-        # Proper encoding without special tokens
-        ids = self.tok.encode(line, add_special_tokens=False)
+        # Temporarily suppress the tokenizer warning about sequence length
+        # We handle chunking ourselves in _yield_windows
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*Token indices sequence length is longer than.*")
+            # Also suppress the logging warning from transformers
+            logging.getLogger("transformers.tokenization_utils_base").setLevel(logging.ERROR)
+            
+            ids = self.tok.encode(line, add_special_tokens=False)
+            
+            # Reset logging level
+            logging.getLogger("transformers.tokenization_utils_base").setLevel(logging.WARNING)
+        
         if self.append_eos and (not ids or ids[-1] != self.EOS_ID):
             ids.append(self.EOS_ID)
         return ids
@@ -471,7 +483,9 @@ def train(args):
     for epoch in range(args.epochs):
         if args.rank == 0:
             print(f"[{now()}][Epoch {epoch:03d}] Starting...", flush=True)
-        
+            if epoch == 0 and warmup_iters > 0:
+                print(f"[Info] First {warmup_iters} are warmup ...")
+
         train_ds.set_epoch(epoch)  # Shuffle training data
         
         # Train for one epoch
