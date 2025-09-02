@@ -193,6 +193,9 @@ def validate(model, loader, device, args, max_batches=50):
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
     return {'val_loss': val_loss, 'val_ppl': val_ppl}
 
+def now():
+    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
 # ------------------------- Train 1 epoch --------------------------
 def train_one_epoch(model, dataloader, optimizer, device, scaler, args, 
                     epoch, total_steps, warmup_iters, lr_decay_iters):
@@ -273,7 +276,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         if args.rank == 0:
             # During warmup, print every 50 steps
             if current_step < warmup_iters and batch_idx % 50 == 0:
-                print(f"[Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch}] "
+                print(f"[{now()}][Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch}] "
                       f"Loss: {loss.item():.4f} | LR: {lr:.6f} (warmup) | Grad Norm: {grad_norm:.2f}")
         
         if args.steps_per_epoch and batches >= args.steps_per_epoch:
@@ -456,9 +459,6 @@ def train(args):
     
     # Mixed precision scaler
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" and args.amp else None
-    
-    def now():
-        return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     best_ppl = float('inf')
     total_steps = 0
