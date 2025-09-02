@@ -23,6 +23,7 @@ if ! command -v rsync >/dev/null 2>&1; then
   exit 3
 fi
 
+[ -e "$DST" ] && [ ! -d "$DST" ] && { echo "Error: $DST exists and is not a directory" >&2; exit 4; }
 mkdir -p $DST
 
 # do the copy

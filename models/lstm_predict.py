@@ -349,11 +349,6 @@ def train(args):
         print(f"  Layers: {args.num_layers}")
         print(f"  Tie weights: {args.tie_weights}")
         print(f"  Total parameters: {sum(p.numel() for p in model.parameters()):,}")
-        print(f"\nTraining:")
-        print(f"  Sequence length: {args.seq_len}")
-        print(f"  Stride: {args.stride}")
-        print(f"  Batch size: {args.batch_size}")
-        print(f"  Learning rate: {args.learning_rate}")
         print("=" * 60)
     
     best_val_ppl = float('inf')
@@ -416,9 +411,22 @@ def main():
     parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda', help='Device to use for training')
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--json", type=str, default=None, help="Path to JSON run log")
+    parser.add_argument('--data', type=str, required=True, help='Path to dataset directory')
+
+   # Training arguments
+    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--learning_rate', type=float, default=0.001)
+    parser.add_argument('--weight_decay', type=float, default=1e-6)
+    parser.add_argument('--step_size', type=int, default=5)
+    parser.add_argument('--gamma', type=float, default=0.5)
+    parser.add_argument('--amp', action='store_true')
+    parser.add_argument("--drop_last_train", action='store_true', help="Drop last batch from train dataset")
+    parser.add_argument("--drop_last_val", action='store_true', help="Drop last batch from val dataset")
+    parser.add_argument("--prefetch_factor", type=int, default=2, help='Prefetch factor for data loader')
 
     # Data arguments
-    parser.add_argument('--data', type=str, required=True, help='Path to directory with .txt files or single .txt file')
     parser.add_argument('--max_vocab', type=int, default=50000, help='Maximum vocabulary size')
     parser.add_argument('--seq_len', type=int, default=256, help='Sequence length for training')
     parser.add_argument('--stride', type=int, default=128, help='Stride for creating sequences (overlap if < seq_len)')
@@ -430,17 +438,7 @@ def main():
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--tie_weights', action='store_true', help='Tie embedding and output weights')
     
-    # Training arguments
-    parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.001)
-    parser.add_argument('--weight_decay', type=float, default=1e-6)
-    parser.add_argument('--step_size', type=int, default=5)
-    parser.add_argument('--gamma', type=float, default=0.5)
-    parser.add_argument('--amp', action='store_true')
-    parser.add_argument("--drop_last_train", action='store_true', help="Drop last batch from train dataset")
-    parser.add_argument("--drop_last_val", action='store_true', help="Drop last batch from val dataset")
-    parser.add_argument("--prefetch_factor", type=int, default=2, help='Prefetch factor for data loader')
+ 
     
     # System arguments
     # parser.add_argument('--device', type=str, default='cuda')
