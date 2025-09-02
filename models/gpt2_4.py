@@ -402,7 +402,8 @@ def train(args):
         model, 
         device_ids=[args.local_rank] if device.type == "cuda" else None,
         gradient_as_bucket_view=True, 
-        find_unused_parameters=False
+        find_unused_parameters=False,
+        static_graph=args.static_graph
     )
     
     if args.rank == 0:
@@ -523,6 +524,7 @@ def setup_ddp(args):
     args.world_size = env_int("WORLD_SIZE", args.world_size)
     args.master_addr = env_str("MASTER_ADDR", args.master_addr)
     args.master_port = env_int("MASTER_PORT", args.master_port)
+    args.iface = env_str("IFACE", args.iface)
     args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
     
     if args.device == 'cuda' and torch.cuda.is_available():
@@ -533,12 +535,13 @@ def setup_ddp(args):
     os.environ.setdefault("MASTER_ADDR", args.master_addr)
     os.environ.setdefault("MASTER_PORT", str(args.master_port))
     os.environ.setdefault("LOCAL_RANK", str(args.local_rank))
+    os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
+    os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
+    os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
     
-    # Use NCCL for GPU communication
-    backend = 'nccl' if args.device == 'cuda' else 'gloo'
-    
+    # Use backend from args
     dist.init_process_group(
-        backend=backend, 
+        backend=args.backend, 
         init_method="env://", 
         rank=args.rank,
         world_size=args.world_size, 
@@ -546,8 +549,8 @@ def setup_ddp(args):
     )
     
     if args.rank == 0:
-        print(f"[DDP] backend={backend} world_size={args.world_size} "
-              f"master={args.master_addr}:{args.master_port} local_rank={args.local_rank}", flush=True)
+        print(f"[DDP] backend={args.backend} world_size={args.world_size} "
+              f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
 def cleanup():
     if dist.is_available() and dist.is_initialized():
@@ -560,10 +563,13 @@ def main():
     # DDP/system
     p.add_argument('--rank', type=int, default=0)
     p.add_argument('--world_size', type=int, default=6, help='Number of GPUs (6 for your setup)')
+    p.add_argument('--iface', type=str, default="ens4f0", help='Network interface')
     p.add_argument('--master_addr', type=str, default="127.0.0.1")
     p.add_argument("--master_port", type=int, default=29500)
+    p.add_argument("--backend", type=str, default="nccl", choices=['gloo', 'nccl'], help='DDP backend')
     p.add_argument("--device", type=str, choices=['cuda','cpu'], default='cuda')
     p.add_argument("--deterministic", action='store_true')
+    p.add_argument("--static_graph", action='store_true', help='DDP static graph optimization')
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--json", type=str, default=None)
     p.add_argument('--seed', type=int, default=1337)
