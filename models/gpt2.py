@@ -15,14 +15,6 @@ from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
 
 # ------------------------- Parquet layout helpers ---------------------
 def _resolve_parquet_layout(data_root: Path):
-    """
-    Returns (train_glob, val_glob, split_needed)
-    Priority:
-      1) <root>/parquet/train/*.parquet + <root>/parquet/val/*.parquet
-      2) <root>/train/*.parquet + <root>/val/*.parquet
-      3) <root>/parquet/*.parquet  -> split_needed=True
-      4) <root>/*.parquet          -> split_needed=True
-    """
     r = data_root
     if (r / "parquet" / "train").is_dir() and (r / "parquet" / "val").is_dir():
         return str(r / "parquet" / "train" / "*.parquet"), str(r / "parquet" / "val" / "*.parquet"), False
@@ -32,7 +24,7 @@ def _resolve_parquet_layout(data_root: Path):
         return str(r / "parquet" / "*.parquet"), None, True
     if list(r.glob("*.parquet")):
         return str(r / "*.parquet"), None, True
-    raise FileNotFoundError(f"No Parquet files found under {r}. Expected train/val subdirs or *.parquet files.")
+    raise FileNotFoundError(f"No Parquet files found under {r}.")
 
 def hf_load_train_val_parquet(data_root: Path, val_fraction=0.01, seed=42, cache_dir=None):
     train_glob, val_glob, split_needed = _resolve_parquet_layout(data_root)
@@ -46,16 +38,8 @@ def hf_load_train_val_parquet(data_root: Path, val_fraction=0.01, seed=42, cache
 
 # ------------------------- IterableDataset (DDP-aware) ----------------
 class GPT2Windows(IterableDataset):
-    """
-    Streams (x, y) windows (seq_len+1) from HF Dataset of documents.
-    DDP + multi-worker aware via modulo partitioning over document index.
-
-    - GPT-2 byte-BPE tokenizer (no OOV).
-    - True permutation (gcd(step, n) == 1).
-    - Keep validation deterministic (don't call set_epoch on val).
-    - Same permutation on all ranks; modulo assigns docs to (rank, worker).
-    """
-    def __init__(self, hf_split, tokenizer, seq_len=1024, stride=1024,
+    """Streams (x,y) windows (seq_len+1) from docs. No padding, no labels in HF forward."""
+    def __init__(self, hf_split, tokenizer, seq_len=512, stride=512,
                  world_size=1, rank=0, seed=42, append_eos=True):
         super().__init__()
         self.ds = hf_split
@@ -80,7 +64,6 @@ class GPT2Windows(IterableDataset):
         return ids
 
     def _yield_windows(self, toks):
-        # Make (seq_len+1) sliding windows; x=w[:-1], y=w[1:]
         T = self.seq_len + 1
         for i in range(0, max(0, len(toks) - T + 1), self.stride):
             w = toks[i:i+T]
@@ -91,8 +74,7 @@ class GPT2Windows(IterableDataset):
 
     def _index_permutation(self, n, rng: random.Random):
         if n <= 1:
-            for j in range(n):
-                yield j
+            for j in range(n): yield j
             return
         start = rng.randrange(n)
         while True:
@@ -110,14 +92,13 @@ class GPT2Windows(IterableDataset):
         consumers = max(1, self.world_size * num_workers)
         consumer_id = self.rank * num_workers + worker_id
 
-        rng = random.Random(1337 + self.seed + worker_id + self.epoch)  # same on all ranks
+        rng = random.Random(1337 + self.seed + worker_id + self.epoch)  # same order across ranks
         n = len(self.ds)
         for i in self._index_permutation(n, rng):
             if (i % consumers) != consumer_id:
                 continue
             ex = self.ds[i]
-            txt = ex["text"]
-            toks = self._encode_line(txt)
+            toks = self._encode_line(ex["text"])
             yield from self._yield_windows(toks)
 
 # ------------------------- AverageMeter ---------------------------
@@ -184,7 +165,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, pad
     batches = 0
 
     for inputs, targets in dataloader:
-        # include dataloader time
         data_time.update(time.perf_counter() - step_start, n=1)
 
         inputs = inputs.to(device, non_blocking=True)
@@ -194,8 +174,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, pad
 
         if scaler is not None:
             with torch.amp.autocast(device_type='cuda'):
-                out = model(input_ids=inputs, labels=targets)
-                logits = out.logits
+                logits = model(inputs).logits           # one forward; no labels passed
                 loss_sum = criterion(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
                 ntok = targets.numel()
                 loss = loss_sum / ntok
@@ -204,8 +183,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, pad
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             scaler.step(optimizer); scaler.update()
         else:
-            out = model(input_ids=inputs, labels=targets)
-            logits = out.logits
+            logits = model(inputs).logits
             loss_sum = criterion(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
             ntok = targets.numel()
             (loss_sum / ntok).backward()
@@ -262,7 +240,6 @@ def train(args):
     if not data_root.exists():
         raise FileNotFoundError(f"--data path not found: {data_root}")
 
-    # HF cache
     cache_dir = Path(args.cache_dir) if args.cache_dir is not None else (data_root / "cache")
     cache_dir.mkdir(parents=True, exist_ok=True)
     os.environ["HF_DATASETS_CACHE"] = str(cache_dir)
@@ -280,7 +257,6 @@ def train(args):
         print(f"Loading Parquet dataset from {data_root} (cache: {cache_dir}) ...", flush=True)
     ds_train, ds_val = hf_load_train_val_parquet(data_root, val_fraction=args.val_fraction, seed=42, cache_dir=str(cache_dir))
 
-    # Iterable datasets / loaders
     train_ds = GPT2Windows(ds_train, tokenizer, seq_len=args.seq_len, stride=args.stride,
                            world_size=args.world_size, rank=args.rank, seed=args.seed)
     val_ds   = GPT2Windows(ds_val,   tokenizer, seq_len=args.seq_len, stride=args.seq_len,  # non-overlapping
@@ -302,53 +278,38 @@ def train(args):
                               persistent_workers=(args.workers>0),
                               worker_init_fn=_seed_worker)
 
-    # Model (fresh GPT-2 small-ish by default; or load "gpt2" via args.pretrained)
-    if args.pretrained:
-        model = GPT2LMHeadModel.from_pretrained(args.pretrained)
-        # ensure pad token exists in the head
-        if tokenizer.pad_token_id not in model.get_input_embeddings().weight.data:
-            model.resize_token_embeddings(len(tokenizer))
-    else:
-        cfg = GPT2Config(
-            vocab_size=vocab_size,
-            n_positions=max(1024, args.seq_len + 1),
-            n_ctx=max(1024, args.seq_len + 1),
-            n_embd=args.n_embd, n_layer=args.n_layer, n_head=args.n_head,
-            resid_pdrop=args.dropout, attn_pdrop=args.dropout, embd_pdrop=args.dropout,
-            bos_token_id=tokenizer.bos_token_id, eos_token_id=EOS_ID
-        )
-        model = GPT2LMHeadModel(cfg)
-        model.resize_token_embeddings(len(tokenizer))
+    # Model: match laxman (6L, 384d, 6H, 512 ctx)
+    cfg = GPT2Config(
+        vocab_size=vocab_size,
+        n_positions=512, n_ctx=512,
+        n_embd=384, n_layer=6, n_head=6,
+        n_inner=1536,
+        activation_function="gelu",
+        resid_pdrop=args.dropout, attn_pdrop=args.dropout, embd_pdrop=args.dropout,
+        bos_token_id=tokenizer.bos_token_id, eos_token_id=EOS_ID, pad_token_id=PAD_ID
+    )
+    model = GPT2LMHeadModel(cfg)
+    model.resize_token_embeddings(len(tokenizer))
     model.to(device)
-    model.config.pad_token_id = PAD_ID
-    model.config.use_cache = False  # for training speed
+    model.config.use_cache = False  # speed/mem
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
     print(f"Model 'GPT2LMHeadModel' initialized.", flush=True)
-
     if args.rank == 0:
         n_tr = len(ds_train); n_va = len(ds_val)
         print(f"\nDATA ROOT: {data_root}")
         print(f"  Train docs: {n_tr:,} | Val docs: {n_va:,}")
         print(f"  Vocab size: {vocab_size:,}")
         print(f"  Seq len: {args.seq_len} | Stride: {args.stride}")
-        if args.pretrained:
-            print(f"\nModel: GPT-2 (pretrained: {args.pretrained})")
-        else:
-            print(f"\nModel: GPT-2 from scratch "
-                  f"({args.n_layer} layers, {args.n_head} heads, d_model={args.n_embd})")
+        print(f"\nModel: GPT-2 from scratch (6 layers, 6 heads, d_model=384)")
         print(f"  Total parameters: {sum(p.numel() for p in model.parameters()):,}")
         print("=" * 60, flush=True)
 
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID, reduction='sum').to(device)
 
-    # Optimizer (fast + stable)
-    try:
-        optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, fused=True)
-    except TypeError:
-        optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
 
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
@@ -363,16 +324,14 @@ def train(args):
 
     for epoch in range(args.epochs):
         if args.rank == 0: print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
-        epoch_start = time.time()
 
-        train_ds.set_epoch(epoch)
-        # keep validation fixed for stability: DON'T call val_ds.set_epoch(epoch)
+        train_ds.set_epoch(epoch)  # shuffle train; keep val deterministic
 
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler, PAD_ID, args)
         val_metrics   = validate(model, val_loader, device, PAD_ID, args)
 
-        epoch_time = time.time() - epoch_start
-        current_lr = args.learning_rate  # constant LR (you said scheduler doesn't matter)
+        epoch_time = train_metrics['epoch_duration']
+        current_lr = args.learning_rate
 
         if args.rank == 0:
             print(f"[{now()}][Epoch {epoch:03d}] "
@@ -390,7 +349,7 @@ def train(args):
                 "train_data_time": float(train_metrics['train_data_time']),
                 "train_comp_time": float(train_metrics['train_comp_time']),
                 "train_duration": float(train_metrics['epoch_duration']),
-                "train_throughput": float(train_metrics['epoch_throughput']),   # tokens/s
+                "train_throughput": float(train_metrics['epoch_throughput']),
                 "val_loss": float(val_metrics['val_loss']),
                 "val_ppl": float(val_metrics['val_ppl']),
                 "lr": float(current_lr),
@@ -401,9 +360,7 @@ def train(args):
             with open(args.json, "r") as f: log = json.load(f)
             log["epochs"][str(epoch)] = epoch_metrics
             save_log(args.json, log)
-
-            if val_metrics['val_ppl'] < best_ppl:
-                best_ppl = val_metrics['val_ppl']
+            if val_metrics['val_ppl'] < best_ppl: best_ppl = val_metrics['val_ppl']
 
     if args.rank == 0:
         print(f"\n[{now()}] Training completed!")
@@ -430,11 +387,6 @@ def setup_ddp(args):
     os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
     os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
     os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
-    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)  # harmless with gloo backend
-    os.environ.setdefault("NCCL_DEBUG", "WARN")
-    os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
-    os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
-    # Gloo is fine; no NCCL required.
     dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank,
                             world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
     if args.rank == 0:
@@ -447,7 +399,7 @@ def cleanup():
 
 # ------------------------- Entry ----------------------------------
 def main():
-    p = argparse.ArgumentParser("Distributed GPT-2 on OpenWebText (Parquet)")
+    p = argparse.ArgumentParser("GPT-2 on OpenWebText (Parquet)")
     # DDP/system
     p.add_argument('--rank', type=int, default=0)
     p.add_argument('--world_size', type=int, default=1)
@@ -457,32 +409,28 @@ def main():
     p.add_argument("--backend", type=str, default="gloo", choices=['gloo', 'nccl'])
     p.add_argument("--device", type=str, choices=['cuda','cpu'], default='cuda')
     p.add_argument("--deterministic", action='store_true')
-    p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--workers", type=int, default=8)
     p.add_argument("--json", type=str, default=None)
-    p.add_argument('--seed', type=int, default=1337, help='Base random seed for reproducible shuffles')
+    p.add_argument('--seed', type=int, default=1337)
     # Data
-    p.add_argument('--data', type=str, required=True, help='Dataset root dir (contains parquet/train and parquet/val, or *.parquet)')
-    p.add_argument('--cache_dir', type=str, default=None, help='HF datasets cache dir (default: <data>/cache)')
+    p.add_argument('--data', type=str, required=True)
+    p.add_argument('--cache_dir', type=str, default=None)
     p.add_argument('--val_fraction', type=float, default=0.01)
-    p.add_argument('--tokenizer', type=str, default="openai-community/gpt2", help='HF tokenizer (byte-BPE).')
-    # Training
+    p.add_argument('--tokenizer', type=str, default="openai-community/gpt2")
+    # Training (no accumulation)
     p.add_argument('--epochs', type=int, default=10)
     p.add_argument('--steps_per_epoch', type=int, default=1000)
-    p.add_argument('--batch_size', type=int, default=8)
+    p.add_argument('--batch_size', type=int, default=2)         # per-GPU microbatch; raise if it fits
     p.add_argument('--learning_rate', type=float, default=3e-4)
     p.add_argument('--weight_decay', type=float, default=0.01)
     p.add_argument("--amp", action="store_true")
     p.add_argument("--static_graph", action='store_true')
     p.add_argument("--prefetch_factor", type=int, default=2)
-    # Model size / windows
-    p.add_argument('--seq_len', type=int, default=1024)
-    p.add_argument('--stride', type=int, default=1024)
-    p.add_argument('--n_layer', type=int, default=12)
-    p.add_argument('--n_head', type=int, default=12)
-    p.add_argument('--n_embd', type=int, default=768)
+    # Windows / model-size
+    p.add_argument('--seq_len', type=int, default=512)
+    p.add_argument('--stride', type=int, default=512)
     p.add_argument('--dropout', type=float, default=0.1)
-    p.add_argument('--pretrained', type=str, default="", help="HF model name to start from (e.g., 'gpt2'). Empty = scratch.")
-
+    # parsed
     args = p.parse_args()
 
     if args.deterministic:
@@ -491,24 +439,18 @@ def main():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
         random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(args.seed)
+        if torch.cuda.is_available(): torch.cuda.manual_seed_all(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
 
-    # TF32 for speed on Ampere+ (safe)
     if args.device == 'cuda' and torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
-
     if args.device == 'cuda' and not torch.cuda.is_available():
-        args.device = 'cpu'
-        print("[Info] Using device=cpu because CUDA is not available", flush=True)
+        args.device = 'cpu'; print("[Info] Using device=cpu because CUDA is not available", flush=True)
     if args.amp and args.device == 'cpu':
-        args.amp = False
-        print("[Info] Disabling AMP because CUDA is not available", flush=True)
+        args.amp = False; print("[Info] Disabling AMP because CUDA is not available", flush=True)
     if args.workers < 1:
-        print("[Info] Workers requested < 1; using workers=1", flush=True)
         args.workers = 1
 
     sys.stdout.reconfigure(line_buffering=True)
