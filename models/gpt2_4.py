@@ -397,7 +397,7 @@ def train(args):
         n_inner=3072,    # 4x n_embd
         activation_function="gelu",
         resid_pdrop=args.dropout,
-        attn_pdrop=args.dropout,
+        attn_pdrop=0.0, #args.dropout,
         embd_pdrop=args.dropout,
         layer_norm_epsilon=1e-5,
         initializer_range=0.02,  # Important for stability
@@ -621,7 +621,7 @@ def main():
     p.add_argument('--lr_decay_iters', type=int, default=5000, help='LR decay iterations')
     p.add_argument('--weight_decay', type=float, default=0.1, help='Weight decay')
     p.add_argument('--grad_clip', type=float, default=1.0, help='Gradient clipping')
-    p.add_argument("--amp", action="store_true", default=True, help='Use mixed precision')
+    p.add_argument("--amp", action="store_true", help='Use mixed precision')
     p.add_argument("--prefetch_factor", type=int, default=2)
     
     # Model configuration
