@@ -609,10 +609,7 @@ def train(args):
     # Training loop
     for epoch in range(args.epochs):
         if args.rank == 0:
-            if epoch == 0 and warmup_steps > 0:
-                print(f"[{now()}][Epoch {epoch:03d}] Starting... first {warmup_steps} updates are warmup...", flush=True)
-            else:
-                print(f"[{now()}][Epoch {epoch:03d}] Starting...", flush=True)
+            print(f"[{now()}][Epoch {epoch:03d}] Starting...", flush=True)
         
         train_ds.set_epoch(epoch)  # Shuffle order each epoch
         
