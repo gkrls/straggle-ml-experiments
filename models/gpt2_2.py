@@ -174,7 +174,8 @@ def validate(model, loader, device, args, max_batches=200):
         x = inputs[:, :-1].contiguous().to(device, non_blocking=True)
         y = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-            logits = model(x).logits
+            attn = torch.ones_like(x, dtype=torch.long)  # no padding in our windows; all tokens attend
+            logits = model(x, attention_mask=attn).logits
             B, T, V = logits.shape
             loss = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
         losses.update(loss.item(), B*T)
@@ -230,7 +231,8 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 
         with sync_context:
             with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-                logits = model(x).logits
+                attn = torch.ones_like(x, dtype=torch.long)  # no padding in our windows; all tokens attend
+            logits = model(x, attention_mask=attn).logits
                 B, T, V = logits.shape
                 loss = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
                 loss = loss / max(1, args.gradient_accumulation_steps)
@@ -610,7 +612,7 @@ def main():
     # Data
     p.add_argument('--data', type=str, required=True, help='Path to OpenWebText parquet files')
     p.add_argument('--cache_dir', type=str, default=None)
-    p.add_argument('--val_fraction', type=float, default=0.001, help='Fraction for validation')
+    p.add_argument('--val_fraction', type=float, default=0.0005, help='Fraction for validation')
     p.add_argument('--tokenizer', type=str, default="gpt2", help='Tokenizer to use')
 
     # Training hyperparameters
