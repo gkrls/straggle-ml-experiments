@@ -232,7 +232,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         with sync_context:
             with torch.amp.autocast(device_type='cuda', enabled=args.amp):
                 attn = torch.ones_like(x, dtype=torch.long)  # no padding in our windows; all tokens attend
-            logits = model(x, attention_mask=attn).logits
+                logits = model(x, attention_mask=attn).logits
                 B, T, V = logits.shape
                 loss = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
                 loss = loss / max(1, args.gradient_accumulation_steps)
