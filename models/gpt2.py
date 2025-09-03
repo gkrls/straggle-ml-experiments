@@ -14,6 +14,8 @@ import random
 import math
 from pathlib import Path
 import numpy as np
+import warnings
+import logging
 
 import torch
 import torch.nn as nn
@@ -71,17 +73,29 @@ class GPT2Windows(IterableDataset):
         self.epoch = int(epoch)
 
     def _encode_line(self, line: str):
-        # Proper encoding without special tokens
-        ids = self.tok.encode(line, add_special_tokens=False)
+        # Temporarily suppress the tokenizer warning about sequence length
+        # We handle chunking ourselves in _yield_windows
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*Token indices sequence length is longer than.*")
+            # Also suppress the logging warning from transformers
+            logging.getLogger("transformers.tokenization_utils_base").setLevel(logging.ERROR)
+            
+            ids = self.tok.encode(line, add_special_tokens=False)
+            
+            # Reset logging level
+            logging.getLogger("transformers.tokenization_utils_base").setLevel(logging.WARNING)
+        
         if self.append_eos and (not ids or ids[-1] != self.EOS_ID):
             ids.append(self.EOS_ID)
         return ids
 
     def _yield_windows(self, toks):
-        # Window size is seq_len (not seq_len+1 as in original)
-        for i in range(0, max(0, len(toks) - self.seq_len), self.stride):
-            w = toks[i:i+self.seq_len]
-            if len(w) == self.seq_len:
+        # Window size is seq_len (inputs) + 1 (for targets)
+        window_size = self.seq_len + 1
+        for i in range(0, max(0, len(toks) - window_size + 1), self.stride):
+            w = toks[i:i+window_size]
+            if len(w) == window_size:
+                # Return the full window - we'll split into inputs/targets later
                 x = torch.tensor(w, dtype=torch.long)
                 yield x
 
@@ -136,7 +150,7 @@ def get_lr(it, warmup_iters, learning_rate, lr_decay_iters, min_lr):
     """Cosine learning rate schedule with warmup"""
     # Linear warmup for warmup_iters steps
     if it < warmup_iters:
-        return learning_rate * it / warmup_iters
+        return learning_rate * (it + 1) / warmup_iters  # +1 to avoid 0 lr at step 0
     # After lr_decay_iters, return min learning rate
     if it > lr_decay_iters:
         return min_lr
@@ -155,14 +169,16 @@ def validate(model, loader, device, args, max_batches=50):
     for batch_idx, inputs in enumerate(loader):
         if batch_idx >= max_batches:
             break
+        
+        # inputs is seq_len+1, split properly    
+        if inputs.size(1) != args.seq_len + 1:
+            continue
             
-        inputs = inputs.to(device, non_blocking=True)
-        # Targets are inputs shifted by 1
-        targets = inputs[:, 1:].contiguous()
-        inputs = inputs[:, :-1].contiguous()
+        inputs_batch = inputs[:, :-1].contiguous().to(device, non_blocking=True)
+        targets = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-            outputs = model(inputs)
+            outputs = model(inputs_batch)
             logits = outputs.logits
             # Reshape for loss calculation
             B, T, V = logits.shape
@@ -176,6 +192,9 @@ def validate(model, loader, device, args, max_batches=50):
     val_loss = losses.avg
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
     return {'val_loss': val_loss, 'val_ppl': val_ppl}
+
+def now():
+    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 # ------------------------- Train 1 epoch --------------------------
 def train_one_epoch(model, dataloader, optimizer, device, scaler, args, 
@@ -197,6 +216,11 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
     for batch_idx, inputs in enumerate(dataloader):
         data_time.update(time.perf_counter() - step_start, n=1)
         
+        # inputs is now seq_len+1, split into input and target
+        if inputs.size(1) != args.seq_len + 1:
+            print(f"[Warning] Unexpected sequence length: {inputs.size(1)}, expected {args.seq_len + 1}")
+            continue
+            
         # Calculate current step
         current_step = epoch * args.steps_per_epoch + batch_idx if args.steps_per_epoch else total_steps
         
@@ -205,14 +229,13 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         
-        inputs = inputs.to(device, non_blocking=True)
-        # Targets are inputs shifted by 1
-        targets = inputs[:, 1:].contiguous()
-        inputs = inputs[:, :-1].contiguous()
+        # Split into inputs and targets
+        inputs_batch = inputs[:, :-1].contiguous().to(device, non_blocking=True)
+        targets = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         
         # Forward pass
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-            outputs = model(inputs)
+            outputs = model(inputs_batch)
             logits = outputs.logits
             # Reshape for loss calculation
             B, T, V = logits.shape
@@ -250,9 +273,11 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         step_start = time.perf_counter()
         
         # Log progress
-        if batch_idx % 10 == 0 and args.rank == 0:
-            print(f"[Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch}] "
-                  f"Loss: {loss.item():.4f} | LR: {lr:.6f} | Grad Norm: {grad_norm:.2f}")
+        if args.rank == 0:
+            # During warmup, print every 50 steps
+            if warmup_iters > 0 and current_step <= warmup_iters and batch_idx % 50 == 0:
+                print(f"[{now()}][Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch:04d}] "
+                      f"Loss: {loss.item():.4f} | LR: {lr:.6f} (warmup) | Grad Norm: {grad_norm:.2f}")
         
         if args.steps_per_epoch and batches >= args.steps_per_epoch:
             break
@@ -372,7 +397,7 @@ def train(args):
         n_inner=3072,    # 4x n_embd
         activation_function="gelu",
         resid_pdrop=args.dropout,
-        attn_pdrop=args.dropout,
+        attn_pdrop=0.0, #args.dropout,
         embd_pdrop=args.dropout,
         layer_norm_epsilon=1e-5,
         initializer_range=0.02,  # Important for stability
@@ -435,9 +460,6 @@ def train(args):
     # Mixed precision scaler
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" and args.amp else None
     
-    def now():
-        return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
     best_ppl = float('inf')
     total_steps = 0
     
@@ -461,8 +483,12 @@ def train(args):
     # Training loop
     for epoch in range(args.epochs):
         if args.rank == 0:
-            print(f"[{now()}][Epoch {epoch:03d}] Starting...", flush=True)
-        
+            if epoch == 0 and warmup_iters > 0:
+                print(f"[{now()}][Epoch {epoch:03d}] Starting... first {warmup_iters} steps are warmup...", flush=True)
+            else:
+                print(f"[{now()}][Epoch {epoch:03d}] Starting...", flush=True)
+
+
         train_ds.set_epoch(epoch)  # Shuffle training data
         
         # Train for one epoch
@@ -492,13 +518,17 @@ def train(args):
             epoch_metrics = {
                 "train_loss": float(train_metrics['train_loss']),
                 "train_loss_global": float(train_metrics['train_loss_global']),
-                "train_ppl": float(train_metrics['train_ppl']),
+                "train_step_time": float(train_metrics['train_step_time']),
+                "train_data_time": float(train_metrics['train_data_time']),
+                "train_comp_time": float(train_metrics['train_comp_time']),
+                "train_duration": float(train_metrics['epoch_duration']),
+                "train_throughput": float(train_metrics['epoch_throughput']),
                 "val_loss": float(val_metrics['val_loss']),
                 "val_ppl": float(val_metrics['val_ppl']),
                 "lr": float(current_lr),
                 "epoch_time": float(epoch_time),
-                "tokens_per_sec": float(train_metrics['epoch_throughput']),
-                "total_steps": total_steps,
+                "epoch_throughput": float(train_metrics['epoch_throughput']),
+                "steps": int(train_metrics['batches']),
             }
             
             with open(args.json, "r") as f:
@@ -509,7 +539,7 @@ def train(args):
             # Track best model
             if val_metrics['val_ppl'] < best_ppl:
                 best_ppl = val_metrics['val_ppl']
-                print(f"[{now()}] New best val_ppl: {best_ppl:.2f}")
+                # print(f"[{now()}] New best val_ppl: {best_ppl:.2f}")
     
     if args.rank == 0:
         print(f"\n[{now()}] Training completed!")
@@ -591,7 +621,7 @@ def main():
     p.add_argument('--lr_decay_iters', type=int, default=5000, help='LR decay iterations')
     p.add_argument('--weight_decay', type=float, default=0.1, help='Weight decay')
     p.add_argument('--grad_clip', type=float, default=1.0, help='Gradient clipping')
-    p.add_argument("--amp", action="store_true", default=True, help='Use mixed precision')
+    p.add_argument("--amp", action="store_true", help='Use mixed precision')
     p.add_argument("--prefetch_factor", type=int, default=2)
     
     # Model configuration
