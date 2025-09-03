@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Fixed GPT-2 training script for OpenWebText with proper hyperparameters
-and training stability fixes. Optimized for 6 nodes with 1 P100 GPU each.
-"""
 
 import argparse
 import os
@@ -390,7 +386,7 @@ def train(args):
     cfg = GPT2Config(
         vocab_size=vocab_size,
         n_positions=args.seq_len,
-        n_ctx=args.seq_len,
+        n_ctx=args.seq_len, # Normally 1024
         n_embd=768,      # Standard GPT2-small dimensions
         n_layer=12,      # 12 layers for GPT2-small
         n_head=12,       # 12 heads

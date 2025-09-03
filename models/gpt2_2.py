@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""
-GPT-2 small training script for OpenWebText (Parquet) with fixes:
-- Packs across documents with EOS (50256) separators, so short docs are used
-- Proper gradient accumulation with DDP.no_sync
-- AdamW param groups: no weight decay on LayerNorm/bias
-- Cosine LR on **optimizer updates** (not microsteps), warmup in updates
-- Validation uses overlapping windows to reduce boundary penalty
-- Dropout settings match GPT-2 small (attn_pdrop=0.1, resid/embd=0.1)
-Tested for 6 ranks (1 GPU each).
-"""
 
 import argparse
 import os
