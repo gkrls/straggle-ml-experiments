@@ -18,7 +18,7 @@ RANK=$(( ${IP##*.} - 1 ))
 # Default master = same /24, .1 (override with env MASTER_ADDR if you want)
 MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
-echo "[run_gpt2_train.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
+echo "[run_gpt2.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
 
 
 # sync repo: clone if missing, otherwise reset/pull
@@ -38,7 +38,7 @@ NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 # Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 set -x
-exec python -u $HOME/straggle-ml-experiments/models/gpt2_4.py \
+exec python -u $HOME/straggle-ml-experiments/models/gpt2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
