@@ -1,15 +1,6 @@
 #!/usr/bin/env python3
 """
 GPT-2 (124M) DDP trainer on local Parquet OpenWebText.
-
-Simple & consistent:
-- Two counters: micro_steps (micro-batches/epoch), steps (optimizer updates/epoch)
-- Two times: micro_step_time_s (avg per micro-batch), step_time_s (avg per optimizer update)
-- Per-epoch stdout logging + optional periodic update logging
-- Auto schedule:
-  * steps_per_epoch is trimmed down to a multiple of GA (printed & logged)
-  * lr_decay_iters = epochs * (steps_per_epoch / GA)
-  * warmup_steps = 10% of total updates, capped at 1000 (unless you set it)
 """
 
 import os, sys, argparse, time, datetime, json, math, random, warnings, logging
@@ -699,7 +690,6 @@ def main():
     parser.add_argument('--seq_len', type=int, default=1024)
     parser.add_argument('--dropout', type=float, default=0.1)
 
-    # Periodic logging (NEW - single argument)
     parser.add_argument('--log_every_n_steps', type=int, default=200, 
                        help='Log every N optimizer updates during training. 0 = disabled. '
                             'Automatically disabled if epoch has fewer than N steps.')
