@@ -46,12 +46,13 @@ exec python -u $HOME/straggle-ml-experiments/models/gpt2_final.py \
   --master_port "$MASTER_PORT" \
   --backend gloo \
   --workers 8 \
-  --epochs 20 \
+  --epochs 12 \
   --steps_per_epoch 6000 \
   --gradient_accumulation_steps 5 \
   --batch_size 12 \
   --seq_len 1024 \
   --amp \
+  --prefetch_factor 4 \
   --json $HOME/straggle-ml-experiments/models/gpt2_final.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \

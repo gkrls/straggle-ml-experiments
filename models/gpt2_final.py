@@ -176,7 +176,8 @@ def validate(model, loader, device, args, max_batches=200):
         x = inputs[:, :-1].contiguous().to(device, non_blocking=True)
         y = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-            logits = model(x).logits  # GPT-2 applies causal mask internally
+            attn = torch.ones_like(x, dtype=torch.long)            # <— all tokens attend
+            logits = model(x, attention_mask=attn).logits
             B, T, V = logits.shape
             loss = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
         losses.update(loss.item(), B*T)
@@ -249,7 +250,8 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
             _sync()
             t0 = time.perf_counter()
             with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-                logits = model(x).logits
+                attn = torch.ones_like(x, dtype=torch.long)            # <— all tokens attend
+                logits = model(x, attention_mask=attn).logits
                 B, T, V = logits.shape
                 loss_full = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
                 loss = loss_full / max(1, args.gradient_accumulation_steps)
@@ -416,6 +418,7 @@ def train(args):
         pad_token_id=tokenizer.eos_token_id,
     )
     model = GPT2LMHeadModel(cfg).to(device)
+    model.config.use_cache = False
 
     # DDP
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
