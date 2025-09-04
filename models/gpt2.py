@@ -186,10 +186,10 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
     Terms:
       - micro-step: one FWD/BWD on a micro-batch (no optimizer update yet)
       - step: one optimizer update (after GA micro-steps)
-      - window: the run of steps since the last log (size = log_every_n_steps; tail can be shorter)
+      - window: the run of steps since the last log (size = log_every_steps; tail can be shorter)
 
     Behavior:
-      - Prints a window snapshot every args.log_every_n_steps steps.
+      - Prints a window snapshot every args.log_every_steps steps.
       - (Optional) Runs a mini validation every args.mini_val_every_steps steps.
       - Epoch summary returns the *current* (tail-window) train_loss/train_ppl,
         plus epoch-averaged timing/throughput and epoch totals.
@@ -248,7 +248,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 
     GA = max(1, args.gradient_accumulation_steps)
     steps_per_epoch = args.micro_steps_per_epoch // GA
-    log_enabled = (args.log_every_n_steps > 0 and steps_per_epoch >= args.log_every_n_steps)
+    log_enabled = (args.log_every_steps > 0 and steps_per_epoch >= args.log_every_steps)
 
 
     last_snap = None  # tail (current) window snapshot
@@ -323,7 +323,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
             micro_idx = 0
 
             # window print + JSON
-            if log_enabled and steps % args.log_every_n_steps == 0:
+            if log_enabled and steps % args.log_every_steps == 0:
                 snap = snapshot_window()
                 last_snap = snap
                 if args.rank == 0 and snap is not None:
@@ -605,12 +605,12 @@ def train(args):
         print(f"[{now()}] LR schedule: warmup {warmup_steps} steps, cosine decay to {lr_decay_iters} (min_lr={args.min_lr}).")
 
         # Window logging info
-        if args.log_every_n_steps > 0:
-            if steps_per_epoch >= args.log_every_n_steps:
-                n_logs_per_epoch = steps_per_epoch // args.log_every_n_steps
-                print(f"[{now()}] Periodic logging: every {args.log_every_n_steps} steps (~{n_logs_per_epoch} times per epoch)")
+        if args.log_every_steps > 0:
+            if steps_per_epoch >= args.log_every_steps:
+                n_logs_per_epoch = steps_per_epoch // args.log_every_steps
+                print(f"[{now()}] Periodic logging: every {args.log_every_steps} steps (~{n_logs_per_epoch} times per epoch)")
             else:
-                print(f"[{now()}] Periodic logging: disabled (epoch too short: {steps_per_epoch} < {args.log_every_n_steps})")
+                print(f"[{now()}] Periodic logging: disabled (epoch too short: {steps_per_epoch} < {args.log_every_steps})")
         else:
             print(f"[{now()}] Periodic logging: disabled")
 
