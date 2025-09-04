@@ -331,7 +331,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                         f"[{now()}][Epoch {epoch:03d}][Step {steps:04d}/{steps_per_epoch}] "
                         f"loss={snap['train_loss']:.4f} "
                         f"ppl={snap['train_ppl']:.2f} "
-                        f"lr={lr:.2e} "
+                        f"lr={lr:.6f} "
                         f"step_time={snap['step_time_s']:.3f}s "
                         f"micro_time={snap['micro_step_time_s']:.3f}s "
                         f"tok/s={snap['tok_per_s']:.0f} "

@@ -54,7 +54,7 @@ exec python -u $HOME/straggle-ml-experiments/models/gpt2.py \
   --seq_len 1024 \
   --amp \
   --prefetch_factor 4 \
-  --log_every_steps 100 \
+  --log_every_steps 50 \
   --json $HOME/straggle-ml-experiments/models/gpt2.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
