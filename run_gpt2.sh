@@ -38,7 +38,7 @@ NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 # Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 set -x
-exec python -u $HOME/straggle-ml-experiments/models/gpt2_3.py \
+exec python -u $HOME/straggle-ml-experiments/models/gpt2_periodic.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -46,7 +46,14 @@ exec python -u $HOME/straggle-ml-experiments/models/gpt2_3.py \
   --master_port "$MASTER_PORT" \
   --backend gloo \
   --workers 8 \
-  --json $HOME/straggle-ml-experiments/models/gpt2.json \
+  --epochs 12 \
+  --steps_per_epoch 6000 \
+  --gradient_accumulation_steps 5 \
+  --batch_size 12 \
+  --seq_len 1024 \
+  --amp \
+  --prefetch_factor 4 \
+  --json $HOME/straggle-ml-experiments/models/gpt2_periodic.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
   "$@"
