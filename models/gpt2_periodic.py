@@ -700,7 +700,7 @@ def main():
     parser.add_argument('--dropout', type=float, default=0.1)
 
     # Periodic logging (NEW - single argument)
-    parser.add_argument('--log_every_n_steps', type=int, default=0, 
+    parser.add_argument('--log_every_n_steps', type=int, default=200, 
                        help='Log every N optimizer updates during training. 0 = disabled. '
                             'Automatically disabled if epoch has fewer than N steps.')
 
