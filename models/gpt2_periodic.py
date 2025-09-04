@@ -302,8 +302,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 
             # Periodic logging check
             if (log_updates_enabled and 
-                steps_in_epoch % args.log_every_n_steps == 0 and 
-                args.rank == 0):
+                steps_in_epoch % args.log_every_n_steps == 0):
                 
                 # Calculate periodic metrics (since last log)
                 periodic_time = time.perf_counter() - periodic_t0
@@ -311,52 +310,53 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 periodic_micro_time_avg = periodic_micro_time_sum / max(1, periodic_micro_time_n)
                 periodic_step_time_avg = periodic_step_time_sum / max(1, periodic_step_time_n)
                 
-                # All-reduce periodic losses
+                # All-reduce periodic losses (ALL ranks must participate)
                 periodic_losses.all_reduce()
                 periodic_train_loss = periodic_losses.avg
                 periodic_train_ppl = float(np.exp(np.clip(periodic_train_loss, 0, 20)))
                 
-                # Console log
-                print(
-                    f"[{now()}][Epoch {epoch:03d}][Step {steps_in_epoch:04d}/{updates_per_epoch}] "
-                    f"loss={periodic_train_loss:.4f} "
-                    f"ppl={periodic_train_ppl:.2f} "
-                    f"lr={lr:.2e} "
-                    f"step_time={periodic_step_time_avg:.3f}s "
-                    f"micro_time={periodic_micro_time_avg:.3f}s "
-                    f"tok/s={periodic_tok_per_s:.0f} "
-                    f"steps_total={steps_total_so_far}",
-                    flush=True
-                )
-                
-                # JSON log update
-                if args.json:
-                    update_key = f"{epoch}_{steps_total_so_far}"
-                    update_metrics = {
-                        "epoch": int(epoch),
-                        "step_in_epoch": int(steps_in_epoch),
-                        "steps_total": int(steps_total_so_far),
-                        "train_loss": float(periodic_train_loss),
-                        "train_ppl": float(periodic_train_ppl),
-                        "lr": float(lr),
-                        "micro_step_time_s": float(periodic_micro_time_avg),
-                        "step_time_s": float(periodic_step_time_avg),
-                        "tok_per_s": float(periodic_tok_per_s),
-                        "tokens": int(periodic_tokens),
-                        "time_s": float(periodic_time),
-                    }
+                # Console log (only rank 0)
+                if args.rank == 0:
+                    print(
+                        f"[{now()}][Epoch {epoch:03d}][Step {steps_in_epoch:04d}/{updates_per_epoch}] "
+                        f"loss={periodic_train_loss:.4f} "
+                        f"ppl={periodic_train_ppl:.2f} "
+                        f"lr={lr:.2e} "
+                        f"step_time={periodic_step_time_avg:.3f}s "
+                        f"micro_time={periodic_micro_time_avg:.3f}s "
+                        f"tok/s={periodic_tok_per_s:.0f} "
+                        f"steps_total={steps_total_so_far}",
+                        flush=True
+                    )
                     
-                    try:
-                        with open(args.json, "r") as f:
-                            log = json.load(f)
-                        if "updates" not in log:
-                            log["updates"] = {}
-                        log["updates"][update_key] = update_metrics
-                        save_log(args.json, log)
-                    except Exception as e:
-                        print(f"[{now()}][Warning] Failed to update JSON log: {e}", flush=True)
+                    # JSON log update
+                    if args.json:
+                        update_key = f"{epoch}_{steps_total_so_far}"
+                        update_metrics = {
+                            "epoch": int(epoch),
+                            "step_in_epoch": int(steps_in_epoch),
+                            "steps_total": int(steps_total_so_far),
+                            "train_loss": float(periodic_train_loss),
+                            "train_ppl": float(periodic_train_ppl),
+                            "lr": float(lr),
+                            "micro_step_time_s": float(periodic_micro_time_avg),
+                            "step_time_s": float(periodic_step_time_avg),
+                            "tok_per_s": float(periodic_tok_per_s),
+                            "tokens": int(periodic_tokens),
+                            "time_s": float(periodic_time),
+                        }
+                        
+                        try:
+                            with open(args.json, "r") as f:
+                                log = json.load(f)
+                            if "updates" not in log:
+                                log["updates"] = {}
+                            log["updates"][update_key] = update_metrics
+                            save_log(args.json, log)
+                        except Exception as e:
+                            print(f"[{now()}][Warning] Failed to update JSON log: {e}", flush=True)
                 
-                # Reset periodic tracking
+                # Reset periodic tracking (ALL ranks must do this)
                 periodic_losses.reset()
                 periodic_micro_time_sum = 0.0; periodic_micro_time_n = 0
                 periodic_step_time_sum = 0.0; periodic_step_time_n = 0
@@ -642,7 +642,7 @@ def train(args):
 
             if val_metrics['val_ppl'] < best_ppl:
                 best_ppl = val_metrics['val_ppl']
-                # print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
+                print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
 
     if args.rank == 0:
         print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
@@ -690,7 +690,8 @@ def main():
     parser.add_argument('--seq_len', type=int, default=1024)
     parser.add_argument('--dropout', type=float, default=0.1)
 
-    parser.add_argument('--log_every_n_steps', type=int, default=200, 
+    # Periodic logging (NEW - single argument)
+    parser.add_argument('--log_every_n_steps', type=int, default=0, 
                        help='Log every N optimizer updates during training. 0 = disabled. '
                             'Automatically disabled if epoch has fewer than N steps.')
 
