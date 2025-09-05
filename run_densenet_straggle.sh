@@ -54,8 +54,9 @@ exec python -u $HOME/straggle-ml-experiments/models/densenet.py \
   --straggle_points 3 \
   --straggle_prob 2 \
   --straggle_ranks 1 \
-  --straggle_amount 0.8 \
+  --straggle_amount 0.6 \
   --straggle_multiply 0.5 2 \
+  --straggle_verbose \
   --json $HOME/straggle-ml-experiments/models/densenet.json \
   "$@"
 
