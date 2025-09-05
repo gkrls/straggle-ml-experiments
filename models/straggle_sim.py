@@ -74,8 +74,8 @@ class SlowWorkerPattern:
         if amount < 0: raise ValueError("amount must be >= 0.")
         self.amount = float(amount)
 
-        self.enabled = self.points > 0 and self.prob > 0 and self.amount > 0
-        if not self.enabled: print(f"[warning] straggle_sim created but not enabled -- points: {self.points}, prob: {self.prob}, amount: {self.amount}")
+        self.active = self.points > 0 and self.prob > 0 and self.amount > 0
+        if not self.active: print(f"[warning] straggle_sim created but not active -- points: {self.points}, prob: {self.prob}, amount: {self.amount}")
 
         self.ranks = set(ranks) if ranks else None
 
@@ -97,7 +97,7 @@ class SlowWorkerPattern:
         self._step_has_straggled = False  # Track if current step already straggled
 
         self.stats = {
-            "num_straggle_steps": AtomicCounter(),
+            "num_straggle_steps" : AtomicCounter(),
             "num_straggle_events": AtomicCounter(),
             "total_straggle_time": AtomicCounter()
         }
@@ -116,7 +116,7 @@ class SlowWorkerPattern:
         return 0
 
     def attach(self, root: nn.Module) -> int:
-        if not self.enabled: return 0
+        if not self.active: return 0
 
         """Attach hooks to the root model. With DDP, use ddp.module."""
         self.detach()  # idempotent

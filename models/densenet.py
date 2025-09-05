@@ -286,50 +286,51 @@ def train(args):
 
         # Print epoch summary with learning rate
         current_lr = scheduler.get_last_lr()[0]
-        if args.rank == 0:
-            print(f"[{now()}][Epoch {epoch:03d}] "
-                  f"train_loss={train_metrics['train_loss']:.4f} (global={train_metrics['train_loss_global']:.4f}) "
-                  f"val_loss={val_metrics['val_loss']:.4f} "
-                  f"top1={val_metrics['val_top1']:.2f}% top5={val_metrics['val_top5']:.2f}% "
-                  f"lr={current_lr:.6f} time={epoch_time:.2f}s tp=~{epoch_throughput:.1f} img/s", 
-                  f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True)
-            
-            # Combine all metrics into one dictionary for logging
-            epoch_metrics = {
-                # Training metrics
-                "train_loss": float(train_metrics['train_loss']),           # Local loss for rank 0
-                "train_loss_global": float(train_metrics['train_loss_global']), # Global average loss
-                "train_top1": float(train_metrics['train_top1']),
-                "train_top5": float(train_metrics['train_top5']),
-                "train_step_time": float(train_metrics['train_step_time']),
-                "train_data_time": float(train_metrics['train_data_time']),
-                "train_comp_time": float(train_metrics['train_comp_time']),
-                "train_duration": float(train_metrics['epoch_duration']),
-                "train_throughput": float(train_metrics['epoch_throughput']),
-                
-                # Validation metrics
-                "val_loss": float(val_metrics['val_loss']),
-                "val_top1": float(val_metrics['val_top1']),
-                "val_top5": float(val_metrics['val_top5']),
-                
-                # Epoch-level metrics
-                "lr": float(current_lr),
-                "epoch_time": float(epoch_time),
-                "epoch_throughput": float(epoch_throughput),
-                "steps": int(len(train_loader)),
 
-                # straggle-sim
-                "straggle" : straggle_sim.get_stats() if straggle_sim else {}
-            }
+        # if args.rank == 0:
+        print(f"[{now()}][Epoch {epoch:03d}] "
+                f"train_loss={train_metrics['train_loss']:.4f} (global={train_metrics['train_loss_global']:.4f}) "
+                f"val_loss={val_metrics['val_loss']:.4f} "
+                f"top1={val_metrics['val_top1']:.2f}% top5={val_metrics['val_top5']:.2f}% "
+                f"lr={current_lr:.6f} time={epoch_time:.2f}s tp=~{epoch_throughput:.1f} img/s", 
+                f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True)
+        
+        # Combine all metrics into one dictionary for logging
+        epoch_metrics = {
+            # Training metrics
+            "train_loss": float(train_metrics['train_loss']),           # Local loss for rank 0
+            "train_loss_global": float(train_metrics['train_loss_global']), # Global average loss
+            "train_top1": float(train_metrics['train_top1']),
+            "train_top5": float(train_metrics['train_top5']),
+            "train_step_time": float(train_metrics['train_step_time']),
+            "train_data_time": float(train_metrics['train_data_time']),
+            "train_comp_time": float(train_metrics['train_comp_time']),
+            "train_duration": float(train_metrics['epoch_duration']),
+            "train_throughput": float(train_metrics['epoch_throughput']),
             
-            log["epochs"][str(epoch)] = epoch_metrics
-            save_log(args.json, log)
+            # Validation metrics
+            "val_loss": float(val_metrics['val_loss']),
+            "val_top1": float(val_metrics['val_top1']),
+            "val_top5": float(val_metrics['val_top5']),
             
-            # Track best validation accuracy
-            if val_metrics['val_top1'] > best_top1: 
-                best_top1 = val_metrics['val_top1']
-            if val_metrics['val_top5'] > best_top5: 
-                best_top5 = val_metrics['val_top5']
+            # Epoch-level metrics
+            "lr": float(current_lr),
+            "epoch_time": float(epoch_time),
+            "epoch_throughput": float(epoch_throughput),
+            "steps": int(len(train_loader)),
+
+            # straggle-sim
+            "straggle" : straggle_sim.get_stats() if straggle_sim else {}
+        }
+        
+        log["epochs"][str(epoch)] = epoch_metrics
+        save_log(args.json, log)
+        
+        # Track best validation accuracy
+        if val_metrics['val_top1'] > best_top1: 
+            best_top1 = val_metrics['val_top1']
+        if val_metrics['val_top5'] > best_top5: 
+            best_top5 = val_metrics['val_top5']
 
         # Step the scheduler after evaluation (end of epoch)
         scheduler.step()

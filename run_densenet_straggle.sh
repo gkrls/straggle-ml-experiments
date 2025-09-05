@@ -52,8 +52,8 @@ exec python -u $HOME/straggle-ml-experiments/models/densenet.py \
   --drop_last_val \
   --prefetch_factor 4 \
   --straggle_points 3 \
-  --straggle_prob 50 \
-  --straggle_ranks 2 \
+  --straggle_prob 2 \
+  --straggle_ranks 1 \
   --straggle_amount 0.8 \
   --straggle_multiply 0.5 2 \
   --json $HOME/straggle-ml-experiments/models/densenet.json \
