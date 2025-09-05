@@ -202,8 +202,8 @@ class SlowWorkerPattern:
         return {
             "num_straggle_steps": self.stats["num_straggle_steps"].get(),
             "num_straggle_events": self.stats["num_straggle_events"].get(),
-            "total_straggle_time_ms": self.stats["total_straggle_time"].get(),
-            "avg_straggle_time_ms": self.stats["total_straggle_time"].get() / max(1, self.stats["num_straggle_events"].get())
+            "total_straggle_time": self.stats["total_straggle_time"].get(),
+            "avg_straggle_time": self.stats["total_straggle_time"].get() / max(1, self.stats["num_straggle_events"].get())
         }
 
     def print_stats(self):
@@ -212,8 +212,8 @@ class SlowWorkerPattern:
         print(f"[straggle_sim] Stats for rank {self._rank}:")
         print(f"  Straggle steps: {stats['num_straggle_steps']}")
         print(f"  Straggle events: {stats['num_straggle_events']}")
-        print(f"  Total straggle time: {stats['total_straggle_time_ms']:.1f}ms")
-        print(f"  Avg straggle time: {stats['avg_straggle_time_ms']:.1f}ms")
+        print(f"  Total straggle time: {stats['total_straggle_time']:.1f}ms")
+        print(f"  Avg straggle time: {stats['avg_straggle_time']:.1f}ms")
 
     def __repr__(self) -> str:
             """Pretty print configuration in one line."""

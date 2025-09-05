@@ -180,7 +180,8 @@ def validate(model, loader, device, args, max_batches=200):
         y = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
             attn = torch.ones_like(x, dtype=torch.long)            # <— all tokens attend
-            logits = model(x, attention_mask=attn).logits
+            # logits = model(x, attention_mask=attn).logits
+            logits = model(x, attention_mask=attn)[0]
             B, T, V = logits.shape
             loss = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
         losses.update(loss.item(), B*T)
@@ -259,7 +260,8 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         with ctx:
             with torch.amp.autocast(device_type="cuda", enabled=args.amp):
                 attn = torch.ones_like(x, dtype=torch.long)
-                logits = model(x, attention_mask=attn).logits
+                # logits = model(x, attention_mask=attn).logits
+                logits = model(x, attention_mask=attn)[0]
                 B, T, V = logits.shape
                 loss_full = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
                 loss = loss_full / GA
@@ -481,18 +483,14 @@ def train(args):
         bos_token_id=tokenizer.bos_token_id,
         eos_token_id=tokenizer.eos_token_id,
         pad_token_id=tokenizer.eos_token_id,
+        use_return_dict=False # IMPORTANT for straggle sim
     )
     model = GPT2LMHeadModel(cfg).to(device)
     model.config.use_cache = False
 
     # DDP
-    model = DDP(
-        model,
-        device_ids=[args.local_rank] if device.type == "cuda" else None,
-        gradient_as_bucket_view=True,
-        find_unused_parameters=False,
-        static_graph=args.static_graph,
-    )
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
+                gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
     # Straggle sim
     straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
