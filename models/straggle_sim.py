@@ -219,5 +219,5 @@ class SlowWorkerPattern:
             """Pretty print configuration in one line."""
             ranks_str = f"ranks={list(self.ranks)}" if self.ranks else "all"
             return (f"SlowWorkerPattern(points={self.points}, prob={self.prob:.1%}, "
-                    f"amount={self.amount:.2f}s multiplier_range=[{self.multi_range[0]:.1f},{self.multi_range[0]:.1f}]"
+                    f"amount={self.amount:.2f} sec, multiplier_range=[{self.multi_range[0]:.2f},{self.multi_range[1]:.2f}], "
                     f"{ranks_str}, active={self.active})")
