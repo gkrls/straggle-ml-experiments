@@ -262,9 +262,9 @@ def train(args):
     best_top1 = 0.0
     best_top5 = 0.0
 
-    if args.rank == 0:
-        log = {"time": now(), "config": vars(args), "epochs": {}}
-        save_log(args.json, log)
+    # if args.rank == 0:
+    log = {"time": now(), "config": vars(args), "epochs": {}}
+    save_log(args.json, log)
     
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
