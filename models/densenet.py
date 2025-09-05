@@ -12,8 +12,11 @@ import sys
 import json
 import datetime
 import time 
+import re
 import random
 import numpy as np
+
+from .straggle_sim import SlowWorkerPattern
 
 # ------------------------- Dataset ------------------------------
 
@@ -231,10 +234,16 @@ def train(args):
     else: 
         raise ValueError(f"Unsupported model: {args.model}")
 
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, \
-                find_unused_parameters=False, static_graph=args.static_graph)
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
     print(f"Model '{args.model}' initialized.", flush=True)
+
+    # Straggle sim
+    straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
+                                     ranks=args.ranks, multiplier_range=args.straggle_multiplier, seed=42, verbose=1)
+    
+    if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
+    else: straggle_sim = None
 
     criterion = nn.CrossEntropyLoss().to(device)
     
@@ -282,7 +291,8 @@ def train(args):
                   f"train_loss={train_metrics['train_loss']:.4f} (global={train_metrics['train_loss_global']:.4f}) "
                   f"val_loss={val_metrics['val_loss']:.4f} "
                   f"top1={val_metrics['val_top1']:.2f}% top5={val_metrics['val_top5']:.2f}% "
-                  f"lr={current_lr:.6f} time={epoch_time:.2f}s tp=~{epoch_throughput:.1f} img/s", flush=True)
+                  f"lr={current_lr:.6f} time={epoch_time:.2f}s tp=~{epoch_throughput:.1f} img/s", 
+                  f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True)
             
             # Combine all metrics into one dictionary for logging
             epoch_metrics = {
@@ -306,7 +316,10 @@ def train(args):
                 "lr": float(current_lr),
                 "epoch_time": float(epoch_time),
                 "epoch_throughput": float(epoch_throughput),
-                "steps": int(len(train_loader))
+                "steps": int(len(train_loader)),
+
+                # straggle-sim
+                "straggle" : straggle_sim.get_stats() if straggle_sim else {}
             }
             
             log["epochs"][str(epoch)] = epoch_metrics
@@ -399,6 +412,17 @@ def main():
     parser.add_argument("--drop_last_val", action='store_true', help="Drop last from val dataset")
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
+
+
+    def csv_ints(s: str) -> list[int]:
+        if not s: return []
+        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
+        except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
+    parser.add_argument("--straggle_points", action="store_true", help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
+    parser.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
+    parser.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
+    parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=10)
+    parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
     
     parser.add_argument("--json", type=str, default="densenet.json", help="Path to JSON run log")
     args = parser.parse_args()
