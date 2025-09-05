@@ -752,8 +752,7 @@ def main():
     parser.add_argument('--seq_len', type=int, default=1024)
 
     # Periodic logging (NEW - single argument)
-    parser.add_argument('--log_every_steps', type=int, default=0, 
-                       help='Log every N optimizer updates during training. 0 = disabled. '
+    parser.add_argument('--log_every_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
                             'Automatically disabled if epoch has fewer than N steps.')
 
     args = parser.parse_args()

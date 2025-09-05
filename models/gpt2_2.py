@@ -1,31 +1,60 @@
 #!/usr/bin/env python3
+"""
+GPT-2 (124M) DDP trainer on local Parquet OpenWebText.
+"""
 
-import argparse
-import os
-import sys
-import json
-import time
-import datetime
-import random
-import math
-from pathlib import Path
-import numpy as np
-import warnings
-import logging
+import os, sys, argparse, time, datetime, json, math, random, warnings, logging
 from contextlib import nullcontext
+from pathlib import Path
 
+import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import IterableDataset, DataLoader
+from torch.utils.data import DataLoader, IterableDataset
+from torch.optim import AdamW
 
+from transformers import GPT2LMHeadModel, GPT2Config, GPT2Tokenizer
 from datasets import load_dataset
-from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
 
-# ------------------------- Parquet layout helpers ---------------------
+
+# ------------------------- utilities -------------------------
+def now():
+    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+def save_log(path, log):
+    tmp = f"{path}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(log, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+class AverageMeter:
+    def __init__(self): self.reset()
+    def reset(self): 
+        self.sum = 0.0; 
+        self.count = 0.0; 
+        self.avg = 0.0
+        # self.min = 0.0
+        # self.max = 0.0
+    def update(self, val, n=1): 
+        self.sum += float(val)*n
+        self.count += n
+        self.avg = self.sum / max(1.0, self.count)
+        # self.min = min(self.min, val)
+        # self.max = max(self.max, val)
+    def all_reduce(self):
+        if dist.is_available() and dist.is_initialized():
+            backend = dist.get_backend()
+            device = torch.device(f"cuda:{torch.cuda.current_device()}") if backend == dist.Backend.NCCL else torch.device("cpu")
+            t = torch.tensor([self.sum, self.count], dtype=torch.float64, device=device)
+            dist.all_reduce(t, op=dist.ReduceOp.SUM)
+            self.sum, self.count = t.cpu().tolist()
+            self.avg = self.sum / max(1.0, self.count)
+
+
 def _resolve_parquet_layout(data_root: Path):
     r = data_root
     if (r / "parquet" / "train").is_dir() and (r / "parquet" / "val").is_dir():
@@ -48,9 +77,10 @@ def hf_load_train_val_parquet(data_root: Path, val_fraction=0.0005, seed=42, cac
         ds = load_dataset("parquet", data_files={"train": train_glob, "validation": val_glob}, cache_dir=cache_dir)
         return ds["train"], ds["validation"]
 
-# ------------------------- IterableDataset (DDP-aware) ----------------
+
+# ------------------------- DDP-aware dataset -------------------------
 class GPT2Windows(IterableDataset):
-    """Streams (seq_len+1) token windows, packing across docs with EOS separators."""
+    """Streams (seq_len+1) windows packed across docs with EOS separators."""
     def __init__(self, hf_split, tokenizer, seq_len=1024, stride=1024,
                  world_size=1, rank=0, seed=42, append_eos=True):
         super().__init__()
@@ -70,7 +100,6 @@ class GPT2Windows(IterableDataset):
         self.epoch = int(epoch)
 
     def _encode_line(self, line: str):
-        # Suppress tokenizer warnings about long sequences; we chunk manually
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*Token indices sequence length is longer than.*")
             logging.getLogger("transformers.tokenization_utils_base").setLevel(logging.ERROR)
@@ -82,14 +111,12 @@ class GPT2Windows(IterableDataset):
 
     def _index_permutation(self, n, rng: random.Random):
         if n <= 1:
-            for j in range(n):
-                yield j
+            for j in range(n): yield j
             return
         start = rng.randrange(n)
         while True:
             step = rng.randrange(1, n)
-            if math.gcd(step, n) == 1:
-                break
+            if math.gcd(step, n) == 1: break
         for j in range(n):
             yield (start + j * step) % n
 
@@ -97,13 +124,11 @@ class GPT2Windows(IterableDataset):
         info = torch.utils.data.get_worker_info()
         num_workers = info.num_workers if info else 1
         worker_id = info.id if info else 0
-
         consumers = max(1, self.world_size * num_workers)
         consumer_id = self.rank * num_workers + worker_id
-
         rng = random.Random(1337 + self.seed + worker_id + self.epoch)
-        n = len(self.ds)
 
+        n = len(self.ds)
         window_size = self.seq_len + 1
         stride = self.stride
         buf = []
@@ -112,202 +137,286 @@ class GPT2Windows(IterableDataset):
             if (i % consumers) != consumer_id:
                 continue
             ex = self.ds[i]
-            toks = self._encode_line(ex["text"])  # adds EOS if missing
+            toks = self._encode_line(ex["text"])
             buf.extend(toks)
 
-            # Emit as many windows as possible
             j = 0
             while len(buf) - j >= window_size:
-                w = buf[j:j+window_size]
+                w = buf[j:j + window_size]
                 yield torch.tensor(w, dtype=torch.long)
                 j += stride
-
-            # Keep the tail for the next doc
             if j > 0:
                 buf = buf[j:]
 
-# ------------------------- AverageMeter ---------------------------
-class AverageMeter:
-    def __init__(self):
-        self.reset()
-    def reset(self):
-        self.sum = 0.0; self.count = 0.0; self.avg = 0.0
-    def update(self, val, n=1):
-        self.sum += float(val) * n
-        self.count += n
-        self.avg = self.sum / max(1.0, self.count)
-    def all_reduce(self):
-        if dist.is_available() and dist.is_initialized():
-            backend = dist.get_backend()
-            device = torch.device(f"cuda:{torch.cuda.current_device()}") if backend == dist.Backend.NCCL else torch.device("cpu")
-            t = torch.tensor([self.sum, self.count], dtype=torch.float64, device=device)
-            dist.all_reduce(t, op=dist.ReduceOp.SUM)
-            self.sum, self.count = t.cpu().tolist()
-            self.avg = self.sum / max(1.0, self.count)
 
-# ------------------------- Learning Rate Schedule ------------------
-def get_lr(update_idx, warmup_iters, learning_rate, lr_decay_iters, min_lr):
-    """Cosine learning rate schedule with warmup, driven by optimizer updates."""
-    # Linear warmup for warmup_iters updates
-    if update_idx < warmup_iters:
-        return learning_rate * (update_idx + 1) / max(1, warmup_iters)
-    # After lr_decay_iters, return min learning rate
+# ------------------------- schedule -------------------------
+def get_lr(update_idx, warmup_steps, learning_rate, lr_decay_iters, min_lr):
+    # Linear warmup
+    if update_idx < warmup_steps:
+        return learning_rate * (update_idx + 1) / max(1, warmup_steps)
+    # After decay iters, return min LR
     if update_idx > lr_decay_iters:
         return min_lr
-    # In between, cosine decay down to min learning rate
-    decay_ratio = (update_idx - warmup_iters) / max(1, (lr_decay_iters - warmup_iters))
+    # Cosine decay
+    decay_ratio = (update_idx - warmup_steps) / max(1, (lr_decay_iters - warmup_steps))
     decay_ratio = min(max(decay_ratio, 0.0), 1.0)
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
     return min_lr + coeff * (learning_rate - min_lr)
 
-# ------------------------- Validate --------------------------------
+
+# ------------------------- validate -------------------------
 @torch.no_grad()
 def validate(model, loader, device, args, max_batches=200):
     model.eval()
     losses = AverageMeter()
-
+    step_start = time.perf_counter()
     for batch_idx, inputs in enumerate(loader):
-        if batch_idx >= max_batches:
-            break
+        if batch_idx >= max_batches: break
         if inputs.size(1) != args.seq_len + 1:
             continue
         x = inputs[:, :-1].contiguous().to(device, non_blocking=True)
         y = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-            attn = torch.ones_like(x, dtype=torch.long)  # no padding in our windows; all tokens attend
+            attn = torch.ones_like(x, dtype=torch.long)            # <— all tokens attend
             logits = model(x, attention_mask=attn).logits
             B, T, V = logits.shape
             loss = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
         losses.update(loss.item(), B*T)
-
     losses.all_reduce()
     val_loss = losses.avg
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
-    return {'val_loss': val_loss, 'val_ppl': val_ppl}
+    return {'val_loss': val_loss, 'val_ppl': val_ppl, 'val_time': time.perf_counter() - step_start}
 
-# ------------------------- Utilities --------------------------------
-def now():
-    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-# ------------------------- Train 1 epoch --------------------------
+# ------------------------- train (enhanced with periodic logging) -------------------------
 def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
-                    epoch, total_updates, warmup_iters, lr_decay_iters):
+                    epoch, global_step_start, warmup_steps, lr_decay_iters,
+                    val_loader=None):
     model.train()
+    use_cuda = (device.type == "cuda")
+    def _sync():
+        if use_cuda: torch.cuda.synchronize()
 
-    losses = AverageMeter()
-    step_time = AverageMeter()
-    data_time = AverageMeter()
+    GA = max(1, args.gradient_accumulation_steps)
+    steps_per_epoch = max(1, args.micro_steps_per_epoch // GA)
+    log_every = max(0, args.log_every_steps)
 
-    if device.type == 'cuda':
-        torch.cuda.synchronize()
-    epoch_start = time.perf_counter()
+    # ----- epoch counters -----
+    epoch_t0 = time.perf_counter()
+    micro_count = 0
+    step_count  = 0
+    tokens      = 0
 
-    step_start = time.perf_counter()
-    tokens_seen = 0
-    batches = 0
+    # epoch time accumulators (+ min/max)
+    step_time = 0.0
+    micro_time = 0.0
+    step_time_min, step_time_max = float("inf"), 0.0
+    micro_time_min, micro_time_max = float("inf"), 0.0
+
+    # ----- window accumulators (reset each log) -----
+    w_start = time.perf_counter()
+    w_step_time = 0.0
+    w_step_count = 0
+    w_micro_time = 0.0
+    w_tokens = 0
+    w_loss_sum = 0.0      # token-weighted CE
+    w_token_count = 0
+
+    last_train_loss = float("nan")
 
     optimizer.zero_grad(set_to_none=True)
-    micro_step = 0
+    lr = args.learning_rate
+    micros_in_step = 0
+    step_t0 = None
 
-    # updates completed before this epoch
-    num_updates = total_updates
-
-    for batch_idx, inputs in enumerate(dataloader):
-        data_time.update(time.perf_counter() - step_start, n=1)
-
-        if inputs.size(1) != args.seq_len + 1:
+    it = iter(dataloader)
+    while True:
+        try:
+            batch = next(it)
+        except StopIteration:
+            break
+        if batch.size(1) != args.seq_len + 1:
             continue
 
-        # Set LR based on number of completed optimizer updates
-        lr = get_lr(num_updates, warmup_iters, args.learning_rate, lr_decay_iters, args.min_lr)
-        for pg in optimizer.param_groups:
-            pg['lr'] = lr
+        # start a new optimizer step timing on first micro
+        if micros_in_step == 0:
+            _sync()
+            step_t0 = time.perf_counter()
+            global_step = global_step_start + step_count
+            lr = get_lr(global_step, warmup_steps, args.learning_rate, lr_decay_iters, args.min_lr)
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr
 
-        x = inputs[:, :-1].contiguous().to(device, non_blocking=True)
-        y = inputs[:, 1:].contiguous().to(device, non_blocking=True)
+        # ----- micro-step -----
+        x = batch[:, :-1].contiguous().to(device, non_blocking=True)
+        y = batch[:, 1:].contiguous().to(device, non_blocking=True)
+        is_last_micro = (micros_in_step == GA - 1)
+        ctx = nullcontext() if is_last_micro else model.no_sync()
 
-        ddp_sync = (micro_step == args.gradient_accumulation_steps - 1)
-        sync_context = nullcontext() if ddp_sync else model.no_sync()
-
-        with sync_context:
-            with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-                attn = torch.ones_like(x, dtype=torch.long)  # no padding in our windows; all tokens attend
+        _sync(); t0 = time.perf_counter()
+        with ctx:
+            with torch.amp.autocast(device_type="cuda", enabled=args.amp):
+                attn = torch.ones_like(x, dtype=torch.long)
                 logits = model(x, attention_mask=attn).logits
                 B, T, V = logits.shape
                 loss_full = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
-                loss = loss_full / max(1, args.gradient_accumulation_steps)
-                losses.update(loss_full.item(), B*T)
+                loss = loss_full / GA
+            if scaler is not None: scaler.scale(loss).backward()
+            else: loss.backward()
+        _sync()
+        micro_dt = time.perf_counter() - t0
 
-            if scaler is not None:
-                scaler.scale(loss).backward()
-            else:
-                loss.backward()
+        # micro accounting
+        tok = x.numel()
+        tokens += tok
+        w_tokens += tok
+        w_loss_sum += float(loss_full.item()) * (B * T)
+        w_token_count += (B * T)
 
-        micro_step += 1
-        tokens_seen += x.numel()  # B*T tokens (inputs)
-        batches += 1
+        micro_count += 1
+        micros_in_step += 1
 
-        if ddp_sync:
+        micro_time += micro_dt
+        w_micro_time += micro_dt
+        micro_time_min = min(micro_time_min, micro_dt)
+        micro_time_max = max(micro_time_max, micro_dt)
+
+        # ----- finish GA group → optimizer step -----
+        if is_last_micro:
+            _sync()
             if scaler is not None:
                 scaler.unscale_(optimizer)
-                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-                scaler.step(optimizer)
-                scaler.update()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+                scaler.step(optimizer); scaler.update()
             else:
-                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
                 optimizer.step()
             optimizer.zero_grad(set_to_none=True)
+            _sync()
 
-            num_updates += 1
-            micro_step = 0
+            step_dt = time.perf_counter() - step_t0
+            step_count += 1
+            global_step = global_step_start + step_count
 
-            # Optional: warmup prints every ~50 updates (scaled loss back)
-            if args.rank == 0 and warmup_iters > 0 and num_updates <= warmup_iters and (batch_idx // max(1, args.gradient_accumulation_steps)) % 50 == 0:
-                print(f"[{now()}][Epoch {epoch:03d}][Step {batch_idx:04d}/{args.steps_per_epoch:04d}] "
-                      f"Loss: {loss.item()*max(1, args.gradient_accumulation_steps):.4f} | LR: {lr:.6f} (warmup) | Grad Norm: {grad_norm:.2f}")
+            step_time += step_dt
+            w_step_time += step_dt
+            w_step_count += 1
+            step_time_min = min(step_time_min, step_dt)
+            step_time_max = max(step_time_max, step_dt)
 
-        step_time.update(time.perf_counter() - step_start, n=1)
-        step_start = time.perf_counter()
+            micros_in_step = 0
 
-        # Steps-per-epoch counts MICRO-batches (for consistent logging with older runs)
-        if args.steps_per_epoch and batches >= args.steps_per_epoch:
+            # ----- periodic window log -----
+            if log_every > 0 and step_count % log_every == 0:
+                elapsed = max(1e-6, time.perf_counter() - w_start)
+                train_loss = (w_loss_sum / max(1, w_token_count)) if w_token_count > 0 else float("nan")
+                last_train_loss = train_loss
+                train_ppl = float(np.exp(np.clip(train_loss, 0, 20))) if math.isfinite(train_loss) else float("nan")
+
+                # window avgs
+                step_time_win = w_step_time / max(1, w_step_count)
+                micro_time_win = w_micro_time / max(1, w_step_count * GA)  # per-micro avg
+                tok_per_s = w_tokens / elapsed
+
+                if args.rank == 0:
+                    print(
+                        f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] "
+                        f"loss={train_loss:.4f} ppl={train_ppl:.2f} lr={lr:.6f} "
+                        f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
+                        f"micro_time={micro_time_win:.3f}s tok/s={tok_per_s:.0f} global_step={global_step}",
+                        flush=True
+                    )
+                    if args.json:
+                        try:
+                            with open(args.json, "r") as f:
+                                log = json.load(f)
+                            updates = log.setdefault("updates", {})
+                            ep = updates.setdefault(str(epoch), {})
+                            ep[f"{step_count:04d}"] = {
+                                "global_step": int(global_step),
+                                "train_loss": float(train_loss),
+                                "train_ppl":  float(train_ppl),
+                                "lr": float(lr),
+                                "step_time_s":       float(step_time_win),
+                                "micro_step_time_s": float(micro_time_win),
+                                "tok_per_s":         float(tok_per_s),
+                                "tokens":            int(w_tokens),
+                            }
+                            save_log(args.json, log)
+                        except Exception as e:
+                            print(f"[{now()}][Warning] Failed to update JSON log: {e}", flush=True)
+
+                # reset window
+                w_start = time.perf_counter()
+                w_step_time = 0.0; w_step_count = 0
+                w_micro_time = 0.0
+                w_tokens = 0
+                w_loss_sum = 0.0; w_token_count = 0
+
+            # ----- optional mini validation -----
+            if (val_loader is not None and getattr(args, "mini_val_every_steps", 0) > 0
+                    and step_count % args.mini_val_every_steps == 0):
+                mini = validate(model, val_loader, device, args, max_batches=getattr(args, "mini_val_max_batches", 64))
+                model.train()
+                if args.rank == 0:
+                    print(
+                        f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
+                        f"val_loss={mini['val_loss']:.4f} val_ppl={mini['val_ppl']:.2f}",
+                        flush=True
+                    )
+                    if args.json:
+                        try:
+                            with open(args.json, "r") as f:
+                                log = json.load(f)
+                                updates_minival = log.setdefault("minival", {})
+                                epm = updates_minival.setdefault(str(epoch), {})
+                                epm[f"{step_count:04d}"] = {
+                                    "global_step": int(global_step),
+                                    "mini_val_loss": float(mini['val_loss']),
+                                    "mini_val_ppl":  float(mini['val_ppl']),
+                                    "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
+                                }
+                            save_log(args.json, log)
+                        except Exception as e:
+                            print(f"[{now()}][Warning] Failed to update JSON log (mini-val): {e}", flush=True)
+
+        # optional epoch cap by micro-steps
+        if args.micro_steps_per_epoch and micro_count >= args.micro_steps_per_epoch:
             break
 
-    if device.type == 'cuda':
-        torch.cuda.synchronize()
-    duration = time.perf_counter() - epoch_start
+    # ----- epoch summary -----
+    _sync()
+    time_epoch_s = time.perf_counter() - epoch_t0
+    tok_per_s = tokens / max(1e-6, time_epoch_s)
 
-    tok_per_sec = tokens_seen / max(1e-6, duration)  # per-rank throughput; aggregate by multiplying by world_size if desired
+    if not math.isfinite(last_train_loss):
+        last_train_loss = w_loss_sum / w_token_count if w_token_count > 0 else float("nan")
 
-    local_loss = losses.avg  # not updated per microstep; fine for display
-    losses.all_reduce()
-    train_loss_global = losses.avg
-    train_ppl = float(np.exp(np.clip(train_loss_global, 0, 20)))
+    train_ppl = float(np.exp(np.clip(last_train_loss, 0, 20))) if math.isfinite(last_train_loss) else float("nan")
 
     return {
-        'train_loss_global': train_loss_global,
-        'train_loss': local_loss,
-        'train_step_time': step_time.avg,
-        'train_data_time': data_time.avg,
-        'train_comp_time': step_time.avg - data_time.avg,
-        'epoch_duration': duration,
-        'epoch_throughput': tok_per_sec,
-        'tokens_seen': tokens_seen,
-        'train_ppl': train_ppl,
-        'batches': batches,
-        'total_steps': num_updates,  # legacy name, holds UPDATE count
+        "train_loss": float(last_train_loss),
+        "train_ppl":  float(train_ppl),
+        "lr":         float(lr),
+
+        "micro_steps": int(micro_count),
+        "steps":       int(step_count),
+        "tokens":      int(tokens),
+
+        "micro_step_time_s": float(micro_time / max(1, micro_count)),  # epoch avg
+        "micro_step_time_min_s": float(micro_time_min if micro_count > 0 else float("nan")),
+        "micro_step_time_max_s": float(micro_time_max if micro_count > 0 else float("nan")),
+        "step_time_s":       float(step_time / max(1, step_count)),    # epoch avg
+        "step_time_min_s":        float(step_time_min if step_count > 0 else float("nan")),
+        "step_time_max_s":        float(step_time_max if step_count > 0 else float("nan")),
+
+        "time_epoch_s": float(time_epoch_s),
+        "tok_per_s":    float(tok_per_s),
     }
 
-# ------------------------- Logging helper --------------------------
-def save_log(path, log):
-    tmp = f"{path}.tmp"
-    with open(tmp, "w") as f:
-        json.dump(log, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
 
-# ------------------------- Train driver --------------------------
+
+# ------------------------- training driver -------------------------
 def train(args):
     device = torch.device(args.device)
 
@@ -315,52 +424,32 @@ def train(args):
     if not data_root.exists():
         raise FileNotFoundError(f"--data path not found: {data_root}")
 
-    cache_dir = Path(args.cache_dir) if args.cache_dir is not None else (data_root / "cache")
+    cache_dir = Path(args.cache_dir) if args.cache_dir else (data_root / "cache")
     cache_dir.mkdir(parents=True, exist_ok=True)
     os.environ["HF_DATASETS_CACHE"] = str(cache_dir)
 
-    # Tokenizer: GPT-2 BPE
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, use_fast=True)
-    tokenizer.pad_token = tokenizer.eos_token  # GPT2 uses eos_token as pad_token
+    # tokenizer
+    tokenizer = GPT2Tokenizer.from_pretrained(args.tokenizer, use_fast=True)
+    tokenizer.pad_token = tokenizer.eos_token  # GPT-2 uses eos as pad
     vocab_size = len(tokenizer)
 
     if args.rank == 0:
-        print(f"Loading Parquet dataset from {data_root} (cache: {cache_dir}) ...", flush=True)
+        print(f"[{now()}] Loading Parquet dataset from {data_root} (cache: {cache_dir}) ...", flush=True)
 
     ds_train, ds_val = hf_load_train_val_parquet(
-        data_root,
-        val_fraction=args.val_fraction,
-        seed=42,
-        cache_dir=str(cache_dir)
+        data_root, val_fraction=args.val_fraction, seed=42, cache_dir=str(cache_dir)
     )
 
-    # Create datasets; training non-overlap, validation with overlap
-    train_ds = GPT2Windows(
-        ds_train, tokenizer,
-        seq_len=args.seq_len,
-        stride=args.seq_len,
-        world_size=args.world_size,
-        rank=args.rank,
-        seed=args.seed,
-        append_eos=True,
-    )
-    val_stride = max(1, args.seq_len - 256)  # overlap by 256 tokens
-    val_ds = GPT2Windows(
-        ds_val, tokenizer,
-        seq_len=args.seq_len,
-        stride=val_stride,
-        world_size=args.world_size,
-        rank=args.rank,
-        seed=args.seed + 1,
-        append_eos=True,
-    )
+    # datasets/loaders
+    train_ds = GPT2Windows(ds_train, tokenizer, seq_len=args.seq_len, stride=args.seq_len,
+                           world_size=args.world_size, rank=args.rank, seed=args.seed, append_eos=True)
+    val_ds = GPT2Windows(ds_val, tokenizer, seq_len=args.seq_len, stride=max(1, args.seq_len - 256),
+                         world_size=args.world_size, rank=args.rank, seed=args.seed + 1, append_eos=True)
 
     def _seed_worker(worker_id):
         worker_seed = (args.seed + args.rank * max(1, args.workers) + worker_id) % 2**32
-        np.random.seed(worker_seed)
-        random.seed(worker_seed)
+        np.random.seed(worker_seed); random.seed(worker_seed)
 
-    # Data loaders
     train_loader = DataLoader(
         train_ds,
         batch_size=args.batch_size,
@@ -378,43 +467,23 @@ def train(args):
         worker_init_fn=_seed_worker,
     )
 
-    # Model configuration - GPT2-small (124M parameters)
+    # model config (GPT-2 small)
     cfg = GPT2Config(
         vocab_size=vocab_size,
         n_positions=args.seq_len,
         n_ctx=args.seq_len,
-        n_embd=768,
-        n_layer=12,
-        n_head=12,
-        n_inner=3072,
+        n_embd=768, n_layer=12, n_head=12, n_inner=3072,
         activation_function="gelu",
-        resid_pdrop=args.dropout,
-        attn_pdrop=0.1,  # match GPT-2 small
-        embd_pdrop=args.dropout,
-        layer_norm_epsilon=1e-5,
-        initializer_range=0.02,
+        resid_pdrop=0.1, attn_pdrop=0.1, embd_pdrop=0.1,
+        layer_norm_epsilon=1e-5, initializer_range=0.02,
         bos_token_id=tokenizer.bos_token_id,
         eos_token_id=tokenizer.eos_token_id,
         pad_token_id=tokenizer.eos_token_id,
     )
+    model = GPT2LMHeadModel(cfg).to(device)
+    model.config.use_cache = False
 
-    # Initialize model
-    model = GPT2LMHeadModel(cfg)
-
-    # Weight initialization (redundant but explicit)
-    def init_weights(module):
-        if isinstance(module, (nn.Linear, nn.Embedding)):
-            nn.init.normal_(module.weight, mean=0.0, std=0.02)
-            if isinstance(module, nn.Linear) and module.bias is not None:
-                nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.LayerNorm):
-            nn.init.zeros_(module.bias)
-            nn.init.ones_(module.weight)
-
-    model.apply(init_weights)
-    model.to(device)
-
-    # Wrap in DDP
+    # DDP
     model = DDP(
         model,
         device_ids=[args.local_rank] if device.type == "cuda" else None,
@@ -424,138 +493,164 @@ def train(args):
     )
 
     if args.rank == 0:
-        n_tr = len(ds_train)
-        n_va = len(ds_val)
+        n_tr = len(ds_train); n_va = len(ds_val)
         n_params = sum(p.numel() for p in model.parameters())
-        print(f"\nDATA ROOT: {data_root}")
+        print(f"\n[{now()}] DATA ROOT: {data_root}")
         print(f"  Train docs: {n_tr:,} | Val docs: {n_va:,}")
-        print(f"  Vocab size: {vocab_size:,}")
-        print(f"  Seq len: {args.seq_len}")
-        print(f"\nModel: GPT-2 small (124M parameters)")
-        print(f"  Total parameters: {n_params:,}")
-        print(f"  Learning rate: {args.learning_rate}")
-        print(f"  Batch size per GPU: {args.batch_size}")
-        print(f"  Total batch size (no accum): {args.batch_size * args.world_size}")
-        print(f"  Gradient accumulation steps: {args.gradient_accumulation_steps}")
-        print(f"  Effective batch size: {args.batch_size * args.world_size * max(1, args.gradient_accumulation_steps)}")
+        print(f"  Vocab size: {vocab_size:,} | Seq len: {args.seq_len}")
+        print(f"[{now()}] Model: GPT-2 small | Params: {n_params:,}")
+        print(f"  LR: {args.learning_rate} | Batch/GPU: {args.batch_size} | GA: {args.gradient_accumulation_steps}")
         print("=" * 60, flush=True)
 
-    # Build AdamW param groups: no weight decay on bias/LN (ndim < 2)
+    # param groups
     decay_params, nodecay_params = [], []
-    for n, p in model.named_parameters():
-        if not p.requires_grad:
-            continue
-        if p.ndim >= 2:
-            decay_params.append(p)
-        else:
-            nodecay_params.append(p)
+    for p in model.parameters():
+        if not p.requires_grad: continue
+        (decay_params if p.ndim >= 2 else nodecay_params).append(p)
 
-    optimizer = optim.AdamW(
-        [
-            {"params": decay_params, "weight_decay": args.weight_decay},
-            {"params": nodecay_params, "weight_decay": 0.0},
-        ],
-        lr=args.learning_rate,
-        betas=(0.9, 0.95),
-        eps=1e-8,
+    optimizer = AdamW(
+        [{"params": decay_params, "weight_decay": args.weight_decay},
+         {"params": nodecay_params, "weight_decay": 0.0}],
+        lr=args.learning_rate, betas=(0.9, 0.95), eps=1e-8
     )
+    scaler = torch.amp.GradScaler('cuda', enabled=(device.type == "cuda" and args.amp))
 
-    # Mixed precision scaler
-    scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" and args.amp else None
+    # -------- schedule planning (auto) --------
+    GA = max(1, args.gradient_accumulation_steps)
 
-    best_ppl = float('inf')
-    total_updates = 0
+    # force micro_steps_per_epoch to a multiple of GA (trim down)
+    orig_micro_steps_per_epoch = args.micro_steps_per_epoch
+    adj_micro_steps_per_epoch = (orig_micro_steps_per_epoch // GA) * GA
+    if adj_micro_steps_per_epoch <= 0:
+        raise ValueError("micro_steps_per_epoch must be at least gradient_accumulation_steps.")
+    if args.rank == 0 and adj_micro_steps_per_epoch != orig_micro_steps_per_epoch:
+        print(
+            f"[{now()}][Note] micro_steps_per_epoch adjusted from {orig_micro_steps_per_epoch} "
+            f"to {adj_micro_steps_per_epoch} to be a multiple of GA={GA}.",
+            flush=True
+        )
+    args.micro_steps_per_epoch = adj_micro_steps_per_epoch  # keep arg as micro-steps/epoch
 
-    # Compute default decay horizon in **updates** if not specified (>0 means user-specified)
-    updates_per_epoch = max(1, args.steps_per_epoch // max(1, args.gradient_accumulation_steps))
-    total_updates_planned = args.epochs * updates_per_epoch
-    warmup_iters = args.warmup_iters
-    lr_decay_iters = args.lr_decay_iters if args.lr_decay_iters > 0 else total_updates_planned
+    # Optimizer steps per epoch & total planned optimizer steps
+    steps_per_epoch = args.micro_steps_per_epoch // GA
+    total_steps_planned = args.epochs * steps_per_epoch
+
+    # resolve LR schedule (auto unless explicitly set)
+    lr_decay_iters = args.lr_decay_iters if args.lr_decay_iters > 0 else total_steps_planned
+    warmup_steps = args.warmup_steps if args.warmup_steps >= 0 else min(1000, max(1, total_steps_planned // 10))
 
     if args.rank == 0:
-        if args.json is None:
-            args.json = "gpt2_openwebtext_fixed.json"
+        print(
+            f"[{now()}] Plan: epochs={args.epochs}, micro_steps/epoch={args.micro_steps_per_epoch} "
+            f"(GA={GA} → steps/epoch={steps_per_epoch}), total_steps_planned={total_steps_planned}"
+        )
+        print(f"[{now()}] LR schedule: warmup {warmup_steps} steps, cosine decay to {lr_decay_iters} (min_lr={args.min_lr}).")
+
+        # Window logging info
+        if args.log_every_steps > 0:
+            if steps_per_epoch >= args.log_every_steps:
+                n_logs_per_epoch = steps_per_epoch // args.log_every_steps
+                print(f"[{now()}] Periodic logging: every {args.log_every_steps} steps (~{n_logs_per_epoch} times per epoch)")
+            else:
+                print(f"[{now()}] Periodic logging: disabled (epoch too short: {steps_per_epoch} < {args.log_every_steps})")
+        else:
+            print(f"[{now()}] Periodic logging: disabled")
+
+    # init JSON log
+    if args.rank == 0:
+        if args.json is None: args.json = "gpt2_training.json"
         log = {
             "time": now(),
             "data_root": str(data_root),
             "cache_dir": str(cache_dir),
             "config": vars(args),
+            "plan": {
+                "ga": GA,
+                "micro_steps_per_epoch_original": int(orig_micro_steps_per_epoch),
+                "micro_steps_per_epoch": int(args.micro_steps_per_epoch),
+                "steps_per_epoch": int(steps_per_epoch),             # optimizer steps per epoch
+                "total_steps_planned": int(total_steps_planned),     # total optimizer steps planned
+                "lr_decay_iters": int(lr_decay_iters),
+                "warmup_steps": int(warmup_steps),
+            },
             "vocab_size": vocab_size,
-            "epochs": {}
+            "epochs": {},
+            "updates": {},  # window logs keyed during training
         }
         save_log(args.json, log)
-        print(f"LR schedule: warmup {warmup_iters} updates, cosine decay to {lr_decay_iters} updates (min_lr={args.min_lr}).")
+        print(f"[{now()}] Logging to {args.json}")
 
-    # Training loop
+    best_ppl = float('inf')
+    global_step = 0  # cumulative optimizer steps so far
+
     for epoch in range(args.epochs):
         if args.rank == 0:
-            if epoch == 0 and warmup_iters > 0:
-                print(f"[{now()}][Epoch {epoch:03d}] Starting... first {warmup_iters} updates are warmup...", flush=True)
-            else:
-                print(f"[{now()}][Epoch {epoch:03d}] Starting...", flush=True)
+            print(f"[{now()}][Epoch {epoch:03d}] Start", flush=True)
+        train_ds.set_epoch(epoch)
 
-        train_ds.set_epoch(epoch)  # shuffle order
+        # train
+        train_metrics = train_one_epoch(model, train_loader, optimizer, device, scaler, args, epoch, global_step, warmup_steps, lr_decay_iters, val_loader)
+        global_step += train_metrics['steps']  # accumulate optimizer steps
 
-        # Train for one epoch
-        train_metrics = train_one_epoch(
-            model, train_loader, optimizer, device, scaler, args,
-            epoch, total_updates, warmup_iters, lr_decay_iters
-        )
-        total_updates = train_metrics['total_steps']  # updated inside
-
-        # Validate (more batches for lower variance)
-        val_metrics = validate(model, val_loader, device, args, max_batches=200)
-
-        epoch_time = train_metrics['epoch_duration']
+        # validate full (only at end of epoch)
+        val_metrics = validate(model, val_loader, device, args, max_batches=args.val_max_batches)
         current_lr = optimizer.param_groups[0]['lr']
 
+        # stdout per-epoch
         if args.rank == 0:
-            print(f"[{now()}][Epoch {epoch:03d}] "
-                  f"train_loss={train_metrics['train_loss']:.4f} "
-                  f"train_ppl={train_metrics['train_ppl']:.2f} "
-                  f"val_loss={val_metrics['val_loss']:.4f} "
-                  f"val_ppl={val_metrics['val_ppl']:.2f} "
-                  f"lr={current_lr:.6f} time={epoch_time:.2f}s "
-                  f"tok/s={train_metrics['epoch_throughput']:.0f}",
-                  flush=True)
+            print(
+                f"[{now()}][Epoch {epoch:03d}] "
+                f"loss={train_metrics['train_loss']:.4f} "
+                f"ppl={train_metrics['train_ppl']:.2f} "
+                f"val_ppl={val_metrics['val_ppl']:.2f} "
+                f"micro_steps={train_metrics['micro_steps']} "
+                f"steps={train_metrics['steps']} "
+                f"step_time={train_metrics['step_time_s']:.3f}s "
+                f"micro_time={train_metrics['micro_step_time_s']:.3f}s "
+                f"tok/s={train_metrics['tok_per_s']:.0f} "
+                f"global_step={global_step}",
+                flush=True
+            )
 
-            # Log metrics
+            # JSON epoch log
             epoch_metrics = {
                 "train_loss": float(train_metrics['train_loss']),
-                "train_loss_global": float(train_metrics['train_loss_global']),
-                "train_step_time": float(train_metrics['train_step_time']),
-                "train_data_time": float(train_metrics['train_data_time']),
-                "train_comp_time": float(train_metrics['train_comp_time']),
-                "train_duration": float(train_metrics['epoch_duration']),
-                "train_throughput": float(train_metrics['epoch_throughput']),
-                "val_loss": float(val_metrics['val_loss']),
-                "val_ppl": float(val_metrics['val_ppl']),
-                "lr": float(current_lr),
-                "epoch_time": float(epoch_time),
-                "epoch_throughput": float(train_metrics['epoch_throughput']),
-                "steps": int(train_metrics['batches']),  # microbatches this epoch
-                "updates_total": int(total_updates),
-            }
+                "train_ppl":  float(train_metrics['train_ppl']),
+                "val_loss":   float(val_metrics['val_loss']),
+                "val_ppl":    float(val_metrics['val_ppl']),
+                "lr":         float(current_lr),
 
+                "micro_steps": int(train_metrics['micro_steps']),
+                "steps":       int(train_metrics['steps']),        # optimizer steps this epoch
+                "global_step": int(global_step),                   # cumulative optimizer steps
+                "tokens":      int(train_metrics['tokens']),
+
+                "micro_step_time_s":       float(train_metrics['micro_step_time_s']),
+                "micro_step_time_min_s":   float(train_metrics['micro_step_time_min_s']),
+                "micro_step_time_max_s":   float(train_metrics['micro_step_time_max_s']),
+                "step_time_s":             float(train_metrics['step_time_s']),
+                "step_time_min_s":         float(train_metrics['step_time_min_s']),
+                "step_time_max_s":         float(train_metrics['step_time_max_s']),
+                "time_epoch_s":            float(train_metrics['time_epoch_s']),
+                "tok_per_s":               float(train_metrics['tok_per_s']),
+            }
             with open(args.json, "r") as f:
                 log = json.load(f)
             log["epochs"][str(epoch)] = epoch_metrics
             save_log(args.json, log)
 
-            # Track best model
             if val_metrics['val_ppl'] < best_ppl:
                 best_ppl = val_metrics['val_ppl']
+                print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
 
     if args.rank == 0:
-        print(f"\n[{now()}] Training completed!")
-        print(f"Best validation perplexity: {best_ppl:.2f}")
+        print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
 
-# ------------------------- DDP setup / teardown -------------------
+
+# ------------------------- DDP setup/teardown -------------------------
 def setup_ddp(args):
-    def env_int(k, d):
-        return d if os.environ.get(k) in (None, "") else int(os.environ.get(k))
-    def env_str(k, d):
-        return d if os.environ.get(k) in (None, "") else os.environ.get(k)
+    def env_int(k, d): return d if os.environ.get(k) in (None, "") else int(os.environ.get(k))
+    def env_str(k, d): return d if os.environ.get(k) in (None, "") else os.environ.get(k)
 
     args.rank = env_int("RANK", args.rank)
     args.world_size = env_int("WORLD_SIZE", args.world_size)
@@ -564,8 +659,7 @@ def setup_ddp(args):
     args.iface = env_str("IFACE", args.iface)
     args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
 
-    if args.device == 'cuda' and torch.cuda.is_available():
-        torch.cuda.set_device(args.local_rank)
+    if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
 
     os.environ.setdefault("RANK", str(args.rank))
     os.environ.setdefault("WORLD_SIZE", str(args.world_size))
@@ -573,117 +667,101 @@ def setup_ddp(args):
     os.environ.setdefault("MASTER_PORT", str(args.master_port))
     os.environ.setdefault("LOCAL_RANK", str(args.local_rank))
     os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
-    os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
-    os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
+    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
 
-    dist.init_process_group(
-        backend=args.backend,
-        init_method="env://",
-        rank=args.rank,
-        world_size=args.world_size,
-        timeout=datetime.timedelta(seconds=300),
-    )
+    dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size,
+                            timeout=datetime.timedelta(seconds=300))
 
-    if args.rank == 0:
-        print(f"[DDP] backend={args.backend} world_size={args.world_size} "
-              f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
+    print(f"[{now()}][DDP] backend={args.backend} world_size={args.world_size} "
+          f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
-def cleanup():
-    if dist.is_available() and dist.is_initialized():
-        dist.destroy_process_group()
-
-# ------------------------- Entry ----------------------------------
+# ------------------------- main -------------------------
 def main():
-    p = argparse.ArgumentParser("GPT-2 small on OpenWebText (Parquet) — fixed")
+    parser = argparse.ArgumentParser(description='GPT-2 DDP on OpenWebText (with periodic update logging)')
 
-    # DDP/system
-    p.add_argument('--rank', type=int, default=0)
-    p.add_argument('--world_size', type=int, default=6, help='Number of GPUs')
-    p.add_argument('--iface', type=str, default="ens4f0", help='Network interface')
-    p.add_argument('--master_addr', type=str, default="127.0.0.1")
-    p.add_argument("--master_port", type=int, default=29500)
-    p.add_argument("--backend", type=str, default="nccl", choices=['gloo', 'nccl'], help='DDP backend')
-    p.add_argument("--device", type=str, choices=['cuda','cpu'], default='cuda')
-    p.add_argument("--deterministic", action='store_true')
-    p.add_argument("--static_graph", action='store_true', help='DDP static graph optimization')
-    p.add_argument("--workers", type=int, default=4)
-    p.add_argument("--json", type=str, default=None)
-    p.add_argument('--seed', type=int, default=1337)
+    # DDP/System
+    parser.add_argument('--rank', type=int, default=0)
+    parser.add_argument('--world_size', type=int, default=6)
+    parser.add_argument('--iface', type=str, default='ens4f0')
+    parser.add_argument('--master_addr', type=str, default='127.0.0.1')
+    parser.add_argument('--master_port', type=int, default=29500)
+    parser.add_argument('--backend', type=str, default='gloo', choices=['nccl', 'gloo'])
+    parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'])
+    parser.add_argument('--deterministic', action='store_true')
+    parser.add_argument('--static_graph', action='store_true')
+    parser.add_argument('--workers', type=int, default=4)
+    parser.add_argument('--json', type=str, default=None)
+    parser.add_argument('--seed', type=int, default=1337)
 
     # Data
-    p.add_argument('--data', type=str, required=True, help='Path to OpenWebText parquet files')
-    p.add_argument('--cache_dir', type=str, default=None)
-    p.add_argument('--val_fraction', type=float, default=0.0005, help='Fraction for validation')
-    p.add_argument('--tokenizer', type=str, default="gpt2", help='Tokenizer to use')
+    parser.add_argument('--data', type=str, required=True)
+    parser.add_argument('--cache_dir', type=str, default=None)
+    parser.add_argument('--val_fraction', type=float, default=0.0005)
+    parser.add_argument('--tokenizer', type=str, default='gpt2')
 
-    # Training hyperparameters
-    p.add_argument('--epochs', type=int, default=10, help='Number of epochs')
-    p.add_argument('--steps_per_epoch', type=int, default=500, help='Microbatches per epoch (before grad accumulation)')
-    p.add_argument('--batch_size', type=int, default=12, help='Batch size per GPU')
-    p.add_argument('--gradient_accumulation_steps', type=int, default=5, help='Gradient accumulation')
-    p.add_argument('--learning_rate', type=float, default=6e-4, help='Max learning rate')
-    p.add_argument('--min_lr', type=float, default=6e-5, help='Min learning rate')
-    p.add_argument('--warmup_iters', type=int, default=200, help='Warmup **updates**')
-    p.add_argument('--lr_decay_iters', type=int, default=-1, help='Decay to min_lr by this many **updates** (-1=auto to total)')
-    p.add_argument('--weight_decay', type=float, default=0.1, help='Weight decay (decay params only)')
-    p.add_argument('--grad_clip', type=float, default=1.0, help='Gradient clipping')
-    p.add_argument("--amp", action="store_true", help='Use mixed precision')
-    p.add_argument("--prefetch_factor", type=int, default=2)
+    # Training
+    parser.add_argument('--epochs', type=int, default=12)
+    parser.add_argument('--micro_steps_per_epoch', '--steps_per_epoch', dest='micro_steps_per_epoch', type=int, default=6000,
+                        help='Micro-batches per epoch (alias: --steps_per_epoch). Optimizer steps/epoch ~= this / GA.')
+    
+    parser.add_argument('--batch_size', type=int, default=12)
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=5)
+    parser.add_argument('--learning_rate', type=float, default=6e-4)
+    parser.add_argument('--min_lr', type=float, default=6e-5)
+    parser.add_argument('--warmup_steps', '--warmup_optimizer_steps', dest='warmup_steps', type=int, default=-1,
+        help='Warmup in OPTIMIZER steps (not micro-steps). -1 = auto (10% of total optimizer steps, capped at 1000).'
+    )
+    parser.add_argument('--lr_decay_iters', type=int, default=-1, help='-1 = auto (total planned optimizer steps)')
+    parser.add_argument('--weight_decay', type=float, default=0.1)
+    parser.add_argument('--grad_clip', type=float, default=1.0)
+    parser.add_argument('--amp', action='store_true')
+    parser.add_argument('--prefetch_factor', type=int, default=2)
+    parser.add_argument('--val_max_batches', type=int, default=200)
+    parser.add_argument('--mini_val_every_steps', type=int, default=0, help='Run a small validation every N optimizer steps. 0=off.')
+    parser.add_argument('--mini_val_max_batches', type=int, default=64, help='Batches to use for mini validation.')
 
-    # Model configuration
-    p.add_argument('--seq_len', type=int, default=1024, help='Sequence length')
-    p.add_argument('--dropout', type=float, default=0.1, help='Residual/embedding dropout rate')
+    # Model config -- mostly fixed
+    parser.add_argument('--seq_len', type=int, default=1024)
 
-    args = p.parse_args()
+    parser.add_argument('--log_every_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
+                            'Automatically disabled if epoch has fewer than N steps.')
 
-    # Determinism
+    args = parser.parse_args()
+
+    # Determinism & CUDA opts
     if args.deterministic:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-        torch.manual_seed(args.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(args.seed)
+        random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
+        if torch.cuda.is_available(): torch.cuda.manual_seed_all(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
 
-    # CUDA optimizations
     if args.device == 'cuda' and torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
-
-    # Fallback to CPU if needed
     if args.device == 'cuda' and not torch.cuda.is_available():
         args.device = 'cpu'
-        print("[Info] Using device=cpu because CUDA is not available", flush=True)
-
+        print(f"[{now()}][Info] Using device=cpu because CUDA is not available", flush=True)
     if args.amp and args.device == 'cpu':
         args.amp = False
-        print("[Info] Disabling AMP because CUDA is not available", flush=True)
+        print(f"[{now()}][Info] Disabling AMP because CUDA is not available", flush=True)
 
-    if args.workers < 0:
-        args.workers = 0
+    args.workers = max(args.workers, 0)
 
-    # Line-buffered stdout
-    try:
-        sys.stdout.reconfigure(line_buffering=True)
-    except Exception:
-        pass
 
-    # DDP setup
+    sys.stdout.reconfigure(line_buffering=True)
+
     setup_ddp(args)
-
-    if args.rank == 0:
-        print("Configuration:")
-        print(json.dumps(vars(args), indent=2))
+    print(f"[{now()}] Configuration:\n{json.dumps(vars(args), indent=2)}")
 
     try:
         train(args)
     finally:
-        cleanup()
+        if dist.is_available() and dist.is_initialized():
+            dist.destroy_process_group()
 
 if __name__ == "__main__":
     main()

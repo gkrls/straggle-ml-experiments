@@ -60,10 +60,15 @@ class AverageMeter:
         self.sum = 0.0
         self.count = 0.0
         self.avg = 0.0
+        self.min = 0.0
+        self.max = 0xFFFFFFFF
     def update(self, val, n=1):
         self.sum += float(val) * n
         self.count += n
         self.avg = self.sum / max(1.0, self.count)
+        self.min = min(self.min, val)
+        self.max = max(self.max, val)
+
     def all_reduce(self):
         if dist.is_available() and dist.is_initialized():
             backend = dist.get_backend()
@@ -198,6 +203,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
         'train_loss': local_loss,
         'train_top1': top1.avg,
         'train_top5': top5.avg,
+        'train_step_time_min': step_time.min,
+        'train_step_time_max': step_time.max,
         'train_step_time': step_time.avg,
         'train_data_time': data_time.avg,
         'train_comp_time': step_time.avg - data_time.avg,
@@ -293,7 +300,8 @@ def train(args):
                 f"train_loss={train_metrics['train_loss']:.4f} (global={train_metrics['train_loss_global']:.4f}) "
                 f"val_loss={val_metrics['val_loss']:.4f} "
                 f"top1={val_metrics['val_top1']:.2f}% top5={val_metrics['val_top5']:.2f}% "
-                f"lr={current_lr:.6f} time={epoch_time:.2f}s tp=~{epoch_throughput:.1f} img/s", 
+                f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['train_step_time']:.2f} "
+                f"(min={train_metrics['train_step_time_min']:.2f}s, max={train_metrics['train_step_time_max']:.2f}) tp=~{epoch_throughput:.1f} img/s", 
                 f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True)
         
         # Combine all metrics into one dictionary for logging
@@ -303,6 +311,8 @@ def train(args):
             "train_loss_global": float(train_metrics['train_loss_global']), # Global average loss
             "train_top1": float(train_metrics['train_top1']),
             "train_top5": float(train_metrics['train_top5']),
+            "train_step_time_min": float(train_metrics['train_step_time_min']),
+            "train_step_time_max": float(train_metrics['train_step_time_max']),
             "train_step_time": float(train_metrics['train_step_time']),
             "train_data_time": float(train_metrics['train_data_time']),
             "train_comp_time": float(train_metrics['train_comp_time']),

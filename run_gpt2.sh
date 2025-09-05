@@ -37,7 +37,7 @@ set -x
 
 # Standard settings for GPT2 on a 16GB GPU
 # Consumes around ~15.3GB of memory
-exec python -u $HOME/straggle-ml-experiments/models/gpt2.py \
+exec python -u $HOME/straggle-ml-experiments/models/gpt2_2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
