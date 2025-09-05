@@ -220,4 +220,4 @@ class SlowWorkerPattern:
             ranks_str = f"ranks={list(self.ranks)}" if self.ranks else "all_ranks"
             multi_str = f"×{self.multi_range[0]:.1f}-{self.multi_range[1]:.1f}" if self.multi_range != (1.0, 1.0) else ""
             return (f"SlowWorkerPattern(points={self.points}, prob={self.prob:.1%}, "
-                    f"amount={self.amount:.2f}s{multi_str}, {ranks_str}, enabled={self.enabled})")
+                    f"amount={self.amount:.2f}s{multi_str}, {ranks_str}, active={self.active})")
