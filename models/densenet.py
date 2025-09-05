@@ -240,7 +240,7 @@ def train(args):
 
     # Straggle sim
     straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                     ranks=args.ranks, multiplier_range=args.straggle_multiplier, seed=42, verbose=1)
+                                     ranks=args.straggle_ranks, multiplier_range=args.straggle_multiplier, seed=42, verbose=1)
     
     if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
     else: straggle_sim = None
