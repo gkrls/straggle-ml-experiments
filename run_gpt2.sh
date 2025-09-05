@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- minimal config (can be overridden by env) ---
 IFACE="${IFACE:-ens4f0}"                 # network interface to read IP from
 WORLD_SIZE="${WORLD_SIZE:-1}"            # set by launcher or leave 1 for single-node
 BACKEND="${BACKEND:-gloo}"
@@ -15,11 +14,9 @@ if [[ -z "${IP}" ]]; then
 fi
 RANK=$(( ${IP##*.} - 1 ))
 
-# Default master = same /24, .1 (override with env MASTER_ADDR if you want)
 MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
 echo "[run_gpt2.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
-
 
 # sync repo: clone if missing, otherwise reset/pull
 if [ ! -d "$HOME/straggle-ml-experiments/.git" ]; then
@@ -36,8 +33,10 @@ python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.t
 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
 NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
-# Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 set -x
+
+# Standard settings for GPT2 on a 16GB GPU
+# Consumes around ~15.3GB of memory
 exec python -u $HOME/straggle-ml-experiments/models/gpt2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
