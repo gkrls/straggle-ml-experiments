@@ -16,7 +16,7 @@ import re
 import random
 import numpy as np
 
-from .straggle_sim import SlowWorkerPattern
+from straggle_sim import SlowWorkerPattern
 
 # ------------------------- Dataset ------------------------------
 
