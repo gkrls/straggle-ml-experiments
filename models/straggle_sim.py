@@ -189,13 +189,13 @@ class SlowWorkerPattern:
     # ---- hook callbacks ----
     def _on_fwd_start(self, module, inputs):
         self._step_has_straggled = False  # Reset for new step
-        self._maybe_sleep("forward_start")
+        self._maybe_sleep("forward_sta")
 
     def _on_fwd_end(self, module, inputs, outputs):
         self._maybe_sleep("forward_end")
 
     def _on_bwd_end(self, module, grad_input, grad_output):
-        self._maybe_sleep("backward_end")
+        self._maybe_sleep("bckward_end")
 
     def get_stats(self) -> dict:
         """Get current statistics."""
@@ -217,7 +217,7 @@ class SlowWorkerPattern:
 
     def __repr__(self) -> str:
             """Pretty print configuration in one line."""
-            ranks_str = f"ranks={list(self.ranks)}" if self.ranks else "all_ranks"
-            multi_str = f"×{self.multi_range[0]:.1f}-{self.multi_range[1]:.1f}" if self.multi_range != (1.0, 1.0) else ""
+            ranks_str = f"ranks={list(self.ranks)}" if self.ranks else "all"
             return (f"SlowWorkerPattern(points={self.points}, prob={self.prob:.1%}, "
-                    f"amount={self.amount:.2f}s{multi_str}, {ranks_str}, active={self.active})")
+                    f"amount={self.amount:.2f}s multiplier_range=[{self.multi_range[0]:.1f},{self.multi_range[0]:.1f}]"
+                    f"{ranks_str}, active={self.active})")
