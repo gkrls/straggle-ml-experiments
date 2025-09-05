@@ -483,7 +483,7 @@ def train(args):
         bos_token_id=tokenizer.bos_token_id,
         eos_token_id=tokenizer.eos_token_id,
         pad_token_id=tokenizer.eos_token_id,
-        use_return_dict=False # IMPORTANT for straggle sim
+        return_dict=False # IMPORTANT for straggle sim
     )
     model = GPT2LMHeadModel(cfg).to(device)
     model.config.use_cache = False
