@@ -3,7 +3,7 @@
 GPT-2 (124M) DDP trainer on local Parquet OpenWebText.
 """
 
-import os, sys, argparse, time, datetime, json, math, random, warnings, logging
+import os, sys, argparse, time, datetime, json, math, random, warnings, logging, re
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -17,6 +17,8 @@ from torch.optim import AdamW
 
 from transformers import GPT2LMHeadModel, GPT2Config, GPT2Tokenizer
 from datasets import load_dataset
+
+from straggle_sim import SlowWorkerPattern
 
 
 # ------------------------- utilities -------------------------
@@ -467,7 +469,7 @@ def train(args):
         worker_init_fn=_seed_worker,
     )
 
-    # model config (GPT-2 small)
+    # Model config (GPT-2 small)
     cfg = GPT2Config(
         vocab_size=vocab_size,
         n_positions=args.seq_len,
@@ -491,6 +493,13 @@ def train(args):
         find_unused_parameters=False,
         static_graph=args.static_graph,
     )
+
+    # Straggle sim
+    straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
+                                     ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
+                                     verbose=args.straggle_verbose)
+    if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
+    else: straggle_sim = None
 
     if args.rank == 0:
         n_tr = len(ds_train); n_va = len(ds_val)
@@ -609,7 +618,7 @@ def train(args):
                 f"micro_time={train_metrics['micro_step_time_s']:.3f}s "
                 f"tok/s={train_metrics['tok_per_s']:.0f} "
                 f"global_step={global_step}",
-                flush=True
+                f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True
             )
 
             # JSON epoch log
@@ -633,6 +642,9 @@ def train(args):
                 "step_time_max_s":         float(train_metrics['step_time_max_s']),
                 "time_epoch_s":            float(train_metrics['time_epoch_s']),
                 "tok_per_s":               float(train_metrics['tok_per_s']),
+
+                # straggle-sim
+                "straggle" : straggle_sim.get_stats() if straggle_sim else {}
             }
             with open(args.json, "r") as f:
                 log = json.load(f)
@@ -690,8 +702,10 @@ def main():
     parser.add_argument('--deterministic', action='store_true')
     parser.add_argument('--static_graph', action='store_true')
     parser.add_argument('--workers', type=int, default=4)
-    parser.add_argument('--json', type=str, default=None)
     parser.add_argument('--seed', type=int, default=1337)
+    parser.add_argument('--json', type=str, default="gpt2.json", help="Path to JSON run log")
+    parser.add_argument('--log_every_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
+                            'Automatically disabled if epoch has fewer than N steps.')
 
     # Data
     parser.add_argument('--data', type=str, required=True)
@@ -703,14 +717,12 @@ def main():
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--micro_steps_per_epoch', '--steps_per_epoch', dest='micro_steps_per_epoch', type=int, default=6000,
                         help='Micro-batches per epoch (alias: --steps_per_epoch). Optimizer steps/epoch ~= this / GA.')
-    
     parser.add_argument('--batch_size', type=int, default=12)
     parser.add_argument('--gradient_accumulation_steps', type=int, default=5)
     parser.add_argument('--learning_rate', type=float, default=6e-4)
     parser.add_argument('--min_lr', type=float, default=6e-5)
     parser.add_argument('--warmup_steps', '--warmup_optimizer_steps', dest='warmup_steps', type=int, default=-1,
-        help='Warmup in OPTIMIZER steps (not micro-steps). -1 = auto (10% of total optimizer steps, capped at 1000).'
-    )
+        help='Warmup in OPTIMIZER steps (not micro-steps). -1 = auto (10% of total optimizer steps, capped at 1000).')
     parser.add_argument('--lr_decay_iters', type=int, default=-1, help='-1 = auto (total planned optimizer steps)')
     parser.add_argument('--weight_decay', type=float, default=0.1)
     parser.add_argument('--grad_clip', type=float, default=1.0)
@@ -723,8 +735,19 @@ def main():
     # Model config -- mostly fixed
     parser.add_argument('--seq_len', type=int, default=1024)
 
-    parser.add_argument('--log_every_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
-                            'Automatically disabled if epoch has fewer than N steps.')
+    # Straggle
+    def csv_ints(s: str) -> list[int]:
+        if not s: return []
+        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
+        except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
+    parser.add_argument("--straggle_points", type=int, help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
+    parser.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
+    parser.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
+    parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=10)
+    parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
+    parser.add_argument("--straggle_verbose", action='store_true')
+
+
 
     args = parser.parse_args()
 

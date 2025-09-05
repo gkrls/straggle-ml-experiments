@@ -249,7 +249,6 @@ def train(args):
     straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
                                      ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
                                      verbose=args.straggle_verbose)
-    
     if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
     else: straggle_sim = None
 
@@ -398,6 +397,8 @@ def cleanup():
 
 def main():
     parser = argparse.ArgumentParser()
+
+    # DDP/System
     parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--iface', type=str, default="ens4f0")
@@ -405,13 +406,11 @@ def main():
     parser.add_argument("--master_port", type=int, default=29500)
     parser.add_argument("--backend", type=str, default="gloo", help="DDP backend (e.g., gloo, nccl)")
     parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
-
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
 
-    parser.add_argument('--model', type=str, 
-                       choices=['densenet121', 'densenet161', 'densenet169', 'densenet201'], 
-                       help="DenseNet model", default="densenet121")
+    # Training/model
+    parser.add_argument('--model', type=str, choices=['densenet121', 'densenet161', 'densenet169', 'densenet201'], help="DenseNet model", default="densenet121")
     parser.add_argument('--data', type=str, required=True)
     parser.add_argument('--epochs', type=int, default=100)  # DenseNet original paper used 300 epochs for CIFAR, ImageNet typically uses fewer
     parser.add_argument('--batch_size', type=int, default=128)
@@ -425,7 +424,7 @@ def main():
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
 
-
+    # Straggle
     def csv_ints(s: str) -> list[int]:
         if not s: return []
         try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
