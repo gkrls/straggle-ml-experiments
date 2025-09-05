@@ -56,7 +56,7 @@ exec python -u $HOME/straggle-ml-experiments/models/gpt2_2.py \
   --straggle_points 3 \
   --straggle_prob 2 \
   --straggle_ranks 1 \
-  --straggle_amount 0.6 \
+  --straggle_amount 1.69 \
   --straggle_multiply 0.5 2 \
   --straggle_verbose \
   --log_every_steps 50 \
