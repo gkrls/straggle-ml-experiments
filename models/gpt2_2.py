@@ -594,7 +594,7 @@ def train(args):
 
     for epoch in range(args.epochs):
         if args.rank == 0:
-            print(f"[{now()}][Epoch {epoch:03d}] Start", flush=True)
+            print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
         train_ds.set_epoch(epoch)
 
         # train
