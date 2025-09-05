@@ -240,7 +240,8 @@ def train(args):
 
     # Straggle sim
     straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                     ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42, verbose=1)
+                                     ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
+                                     verbose=args.straggle_verbose)
     
     if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
     else: straggle_sim = None
@@ -424,7 +425,7 @@ def main():
     parser.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
     parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=10)
     parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
-    
+    parser.add_argument("--straggle_verbose", action='store_true')
     parser.add_argument("--json", type=str, default="densenet.json", help="Path to JSON run log")
     args = parser.parse_args()
 
