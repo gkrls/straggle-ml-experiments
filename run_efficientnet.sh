@@ -46,6 +46,12 @@ exec python -u $HOME/straggle-ml-experiments/models/efficientnet.py \
   --master_port "$MASTER_PORT" \
   --backend gloo \
   --data ~/datasets/imagenet \
+  --model efficientnet_b0 \
+  --epochs 90 \
+  --batch_size 128 \
+  --deterministic \
+  --drop_last_val \
+  --prefetch_factor 4 \
   --workers 8 \
   --json $HOME/straggle-ml-experiments/models/efficientnet.json \
   "$@"
