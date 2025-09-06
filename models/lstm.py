@@ -128,7 +128,7 @@ class LSTMTextModel(nn.Module):
     def __init__(self, vocab_size, num_classes=2):
         super().__init__()
         embed_dim  = 300
-        hidden_dim = 512
+        hidden_dim = 256 #512
         num_layers = 2
         dropout    = 0.5
 
