@@ -28,8 +28,8 @@ except Exception:
 PAD_ID         = 0
 UNK_ID         = 1
 MIN_FREQ       = 1            # keep rare tokens (helps sentiment)
-WORD_DROPOUT_P = 0.10         # replace ~10% tokens with <unk> during training only
-EMB_DROPOUT_P  = 0.10         # light embedding dropout
+WORD_DROPOUT_P = 0.2          # replace ~10% tokens with <unk> during training only
+EMB_DROPOUT_P  = 0.2          # light embedding dropout
 CLIP_NORM      = 5.0
 WARMUP_RATIO   = 0.10         # 10% warmup for cosine
 
@@ -516,8 +516,8 @@ def main():
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--batch_size', type=int, default=32)        # smaller per-rank batch helps generalization
-    parser.add_argument('--learning_rate', type=float, default=0.001)
-    parser.add_argument('--weight_decay', type=float, default=2e-5)
+    parser.add_argument('--learning_rate', type=float, default=0.0005)
+    parser.add_argument('--weight_decay', type=float, default=0.0001)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
