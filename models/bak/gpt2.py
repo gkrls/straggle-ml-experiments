@@ -3,7 +3,7 @@
 GPT-2 (124M) DDP trainer on local Parquet OpenWebText.
 """
 
-import os, sys, argparse, time, datetime, json, math, random, warnings, logging, re
+import os, sys, argparse, time, datetime, json, math, random, warnings, logging
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -18,10 +18,8 @@ from torch.optim import AdamW
 from transformers import GPT2LMHeadModel, GPT2Config, GPT2Tokenizer
 from datasets import load_dataset
 
-from straggle_sim import SlowWorkerPattern
 
-
-# ------------------------- utilities -------------------------
+# ------------------------- small helpers -------------------------
 def now():
     return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -35,18 +33,8 @@ def save_log(path, log):
 
 class AverageMeter:
     def __init__(self): self.reset()
-    def reset(self): 
-        self.sum = 0.0; 
-        self.count = 0.0; 
-        self.avg = 0.0
-        # self.min = 0.0
-        # self.max = 0.0
-    def update(self, val, n=1): 
-        self.sum += float(val)*n
-        self.count += n
-        self.avg = self.sum / max(1.0, self.count)
-        # self.min = min(self.min, val)
-        # self.max = max(self.max, val)
+    def reset(self): self.sum = 0.0; self.count = 0.0; self.avg = 0.0
+    def update(self, val, n=1): self.sum += float(val)*n; self.count += n; self.avg = self.sum / max(1.0, self.count)
     def all_reduce(self):
         if dist.is_available() and dist.is_initialized():
             backend = dist.get_backend()
@@ -57,6 +45,7 @@ class AverageMeter:
             self.avg = self.sum / max(1.0, self.count)
 
 
+# ------------------------- parquet helpers -------------------------
 def _resolve_parquet_layout(data_root: Path):
     r = data_root
     if (r / "parquet" / "train").is_dir() and (r / "parquet" / "val").is_dir():
@@ -171,7 +160,6 @@ def get_lr(update_idx, warmup_steps, learning_rate, lr_decay_iters, min_lr):
 def validate(model, loader, device, args, max_batches=200):
     model.eval()
     losses = AverageMeter()
-    step_start = time.perf_counter()
     for batch_idx, inputs in enumerate(loader):
         if batch_idx >= max_batches: break
         if inputs.size(1) != args.seq_len + 1:
@@ -180,59 +168,92 @@ def validate(model, loader, device, args, max_batches=200):
         y = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
             attn = torch.ones_like(x, dtype=torch.long)            # <— all tokens attend
-            # logits = model(x, attention_mask=attn).logits
-            logits = model(x, attention_mask=attn)[0]
+            logits = model(x, attention_mask=attn).logits
             B, T, V = logits.shape
             loss = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
         losses.update(loss.item(), B*T)
     losses.all_reduce()
     val_loss = losses.avg
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
-    return {'loss': val_loss, 'ppl': val_ppl, 'time': time.perf_counter() - step_start}
+    return {'val_loss': val_loss, 'val_ppl': val_ppl}
 
 
 # ------------------------- train (enhanced with periodic logging) -------------------------
 def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
-                    epoch, global_step_start, warmup_steps, lr_decay_iters,
+                    epoch, steps_total_start, warmup_steps, lr_decay_iters,
                     val_loader=None):
+    """
+    Terms:
+      - micro-step: one FWD/BWD on a micro-batch (no optimizer update yet)
+      - step: one optimizer update (after GA micro-steps)
+      - window: the run of steps since the last log (size = log_every_steps; tail can be shorter)
+
+    Behavior:
+      - Prints a window snapshot every args.log_every_steps steps.
+      - (Optional) Runs a mini validation every args.mini_val_every_steps steps.
+      - Epoch summary returns the *current* (tail-window) train_loss/train_ppl,
+        plus epoch-averaged timing/throughput and epoch totals.
+    """
     model.train()
-    use_cuda = (device.type == "cuda")
+
     def _sync():
-        if use_cuda: torch.cuda.synchronize()
+        if device.type == 'cuda': torch.cuda.synchronize()
 
-    GA = max(1, args.gradient_accumulation_steps)
-    steps_per_epoch = max(1, args.micro_steps_per_epoch // GA)
-    log_every = max(0, args.log_every_steps)
+    # ---- epoch totals / averages ----
+    micro_time_sum = 0.0; micro_time_n = 0
+    step_time_sum  = 0.0; step_time_n  = 0
+    tokens = 0
 
-    # ----- epoch counters -----
-    epoch_t0 = time.perf_counter()
-    micro_count = 0
-    step_count  = 0
-    tokens      = 0
-
-    # epoch time accumulators (+ min/max)
-    step_time = 0.0
-    micro_time = 0.0
-    step_time_min, step_time_max = float("inf"), 0.0
-    micro_time_min, micro_time_max = float("inf"), 0.0
-
-    # ----- window accumulators (reset each log) -----
-    w_start = time.perf_counter()
-    w_step_time = 0.0
-    w_step_count = 0
-    w_micro_time = 0.0
+    # ---- window accumulators (reset after each window log) ----
+    window_losses = AverageMeter()          # token-weighted CE over the window
+    w_micro_sum = 0.0; w_micro_n = 0
+    w_step_sum  = 0.0; w_step_n  = 0
     w_tokens = 0
-    w_loss_sum = 0.0      # token-weighted CE
-    w_token_count = 0
+    w_t0 = time.perf_counter()
 
-    last_train_loss = float("nan")
+    def snapshot_window():
+        """Compute metrics over the current logging window (or None if empty). All ranks participate."""
+        if window_losses.count <= 0:
+            return None
+        window_losses.all_reduce()
+        elapsed = time.perf_counter() - w_t0
+        avg_loss = window_losses.avg
+        return {
+            "train_loss": float(avg_loss),
+            "train_ppl":  float(np.exp(np.clip(avg_loss, 0, 20))),
+            "lr":         float(lr),
+            "micro_step_time_s": w_micro_sum / max(1, w_micro_n),
+            "step_time_s":       w_step_sum  / max(1, w_step_n),
+            "tok_per_s":         w_tokens / max(1e-6, elapsed),
+            "tokens":            int(w_tokens),
+            "time_s":            float(elapsed),
+            "steps_in_window":   int(w_step_n),
+        }
+
+    # ---- prep ----
+    _sync()
+    t_epoch0 = time.perf_counter()
+    steps = 0                 # optimizer updates this epoch
+    micro_steps = 0           # micro-batches this epoch
+    steps_total_so_far = steps_total_start
 
     optimizer.zero_grad(set_to_none=True)
     lr = args.learning_rate
-    micros_in_step = 0
-    step_t0 = None
-
     it = iter(dataloader)
+    micro_idx = 0
+
+    # GA = max(1, args.gradient_accumulation_steps)
+    # updates_per_epoch = args.steps_per_epoch // GA
+    # log_enabled = (args.log_every_n_steps > 0 and updates_per_epoch >= args.log_every_n_steps)
+
+    GA = max(1, args.gradient_accumulation_steps)
+    steps_per_epoch = args.micro_steps_per_epoch // GA
+    log_enabled = (args.log_every_steps > 0 and steps_per_epoch >= args.log_every_steps)
+
+
+    last_snap = None  # tail (current) window snapshot
+
+    # ---- loop ----
     while True:
         try:
             batch = next(it)
@@ -241,52 +262,47 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         if batch.size(1) != args.seq_len + 1:
             continue
 
-        # start a new optimizer step timing on first micro
-        if micros_in_step == 0:
-            _sync()
-            step_t0 = time.perf_counter()
-            global_step = global_step_start + step_count
-            lr = get_lr(global_step, warmup_steps, args.learning_rate, lr_decay_iters, args.min_lr)
-            for pg in optimizer.param_groups:
-                pg["lr"] = lr
+        if micro_idx == 0:
+            _sync(); t_step0 = time.perf_counter()
 
-        # ----- micro-step -----
+        # schedule
+        lr = get_lr(steps_total_so_far, warmup_steps, args.learning_rate, lr_decay_iters, args.min_lr)
+        for pg in optimizer.param_groups:
+            pg['lr'] = lr
+
+        # micro-step
         x = batch[:, :-1].contiguous().to(device, non_blocking=True)
         y = batch[:, 1:].contiguous().to(device, non_blocking=True)
-        is_last_micro = (micros_in_step == GA - 1)
-        ctx = nullcontext() if is_last_micro else model.no_sync()
+        last_micro_of_step = (micro_idx == GA - 1)
+        ctx = nullcontext() if last_micro_of_step else model.no_sync()
 
-        _sync(); t0 = time.perf_counter()
         with ctx:
-            with torch.amp.autocast(device_type="cuda", enabled=args.amp):
+            _sync(); t0 = time.perf_counter()
+            with torch.amp.autocast(device_type='cuda', enabled=args.amp):
                 attn = torch.ones_like(x, dtype=torch.long)
-                # logits = model(x, attention_mask=attn).logits
-                logits = model(x, attention_mask=attn)[0]
+                logits = model(x, attention_mask=attn).logits
                 B, T, V = logits.shape
                 loss_full = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
                 loss = loss_full / GA
-            if scaler is not None: scaler.scale(loss).backward()
-            else: loss.backward()
-        _sync()
-        micro_dt = time.perf_counter() - t0
+                # token-weighted update
+                window_losses.update(loss_full.item(), B*T)
+            if scaler is not None:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
+            _sync()
+            mt = time.perf_counter() - t0
+            micro_time_sum += mt; micro_time_n += 1
+            w_micro_sum    += mt; w_micro_n    += 1
 
-        # micro accounting
-        tok = x.numel()
-        tokens += tok
-        w_tokens += tok
-        w_loss_sum += float(loss_full.item()) * (B * T)
-        w_token_count += (B * T)
+        n_tok = x.numel()
+        tokens   += n_tok
+        w_tokens += n_tok
+        micro_steps += 1
+        micro_idx += 1
 
-        micro_count += 1
-        micros_in_step += 1
-
-        micro_time += micro_dt
-        w_micro_time += micro_dt
-        micro_time_min = min(micro_time_min, micro_dt)
-        micro_time_max = max(micro_time_max, micro_dt)
-
-        # ----- finish GA group → optimizer step -----
-        if is_last_micro:
+        # finish a step (optimizer update)
+        if last_micro_of_step:
             _sync()
             if scaler is not None:
                 scaler.unscale_(optimizer)
@@ -298,126 +314,164 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
             optimizer.zero_grad(set_to_none=True)
             _sync()
 
-            step_dt = time.perf_counter() - step_t0
-            step_count += 1
-            global_step = global_step_start + step_count
+            st = time.perf_counter() - t_step0
+            step_time_sum += st; step_time_n += 1
+            w_step_sum    += st; w_step_n    += 1
 
-            step_time += step_dt
-            w_step_time += step_dt
-            w_step_count += 1
-            step_time_min = min(step_time_min, step_dt)
-            step_time_max = max(step_time_max, step_dt)
+            steps              += 1
+            steps_total_so_far += 1
+            micro_idx = 0
 
-            micros_in_step = 0
-
-            # ----- periodic window log -----
-            if log_every > 0 and step_count % log_every == 0:
-                elapsed = max(1e-6, time.perf_counter() - w_start)
-                train_loss = (w_loss_sum / max(1, w_token_count)) if w_token_count > 0 else float("nan")
-                last_train_loss = train_loss
-                train_ppl = float(np.exp(np.clip(train_loss, 0, 20))) if math.isfinite(train_loss) else float("nan")
-
-                # window avgs
-                step_time_win = w_step_time / max(1, w_step_count)
-                micro_time_win = w_micro_time / max(1, w_step_count * GA)  # per-micro avg
-                tok_per_s = w_tokens / elapsed
-
-                if args.rank == 0:
+            # window print + JSON
+            if log_enabled and steps % args.log_every_steps == 0:
+                snap = snapshot_window()
+                last_snap = snap
+                if args.rank == 0 and snap is not None:
                     print(
-                        f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] global_step={global_step} "
-                        f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
-                        f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
-                        f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s",
+                        f"[{now()}][Epoch {epoch:03d}][Step {steps:04d}/{steps_per_epoch}] "
+                        f"loss={snap['train_loss']:.4f} "
+                        f"ppl={snap['train_ppl']:.2f} "
+                        f"lr={lr:.6f} "
+                        f"step_time={snap['step_time_s']:.3f}s "
+                        f"micro_time={snap['micro_step_time_s']:.3f}s "
+                        f"tok/s={snap['tok_per_s']:.0f} "
+                        f"steps_total={steps_total_so_far}",
                         flush=True
                     )
                     if args.json:
                         try:
                             with open(args.json, "r") as f:
                                 log = json.load(f)
-                            updates = log.setdefault("updates", {})
-                            ep = updates.setdefault(str(epoch), {})
-                            ep[f"{step_count:04d}"] = {
-                                "global_step": int(global_step),
-                                "train_loss": float(train_loss),
-                                "train_ppl":  float(train_ppl),
+                            log.setdefault("updates", {})[f"{epoch}_{steps_total_so_far}"] = {
+                                "epoch": int(epoch),
+                                "steps": int(steps),                    # updates since epoch start
+                                "steps_total": int(steps_total_so_far), # cumulative updates
+                                "train_loss": float(snap['train_loss']),
+                                "train_ppl":  float(snap['train_ppl']),
                                 "lr": float(lr),
-                                "step_time":       float(step_time_win),
-                                "micro_step_time": float(micro_time_win),
-                                "throughput":      float(tok_per_s),
-                                "tokens":          int(w_tokens),
+                                "micro_step_time_s": float(snap['micro_step_time_s']),
+                                "step_time_s":       float(snap['step_time_s']),
+                                "tok_per_s":         float(snap['tok_per_s']),
+                                "tokens":            int(snap['tokens']),
+                                "time_s":            float(snap['time_s']),
+                                "steps_in_window":   int(snap['steps_in_window']),
                             }
                             save_log(args.json, log)
                         except Exception as e:
                             print(f"[{now()}][Warning] Failed to update JSON log: {e}", flush=True)
 
-                # reset window
-                w_start = time.perf_counter()
-                w_step_time = 0.0; w_step_count = 0
-                w_micro_time = 0.0
+                # reset the window accumulators
+                window_losses.reset()
+                w_micro_sum = 0.0; w_micro_n = 0
+                w_step_sum  = 0.0; w_step_n  = 0
                 w_tokens = 0
-                w_loss_sum = 0.0; w_token_count = 0
+                w_t0 = time.perf_counter()
 
-            # ----- optional mini validation -----
-            if (val_loader is not None and getattr(args, "mini_val_every_steps", 0) > 0
-                    and step_count % args.mini_val_every_steps == 0):
-                val_metrics = validate(model, val_loader, device, args, max_batches=getattr(args, "mini_val_max_batches", 64))
-                model.train()
+            # mini-validation (independent cadence; safe at step boundary)
+            if (val_loader is not None and
+                getattr(args, "mini_val_every_steps", 0) > 0 and
+                steps % args.mini_val_every_steps == 0):
+                mini = validate(model, val_loader, device, args, max_batches=getattr(args, "mini_val_max_batches", 64))
+                model.train()  # return to train mode
                 if args.rank == 0:
                     print(
-                        f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
-                        f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
+                        f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {steps:04d}] "
+                        f"val_loss={mini['val_loss']:.4f} val_ppl={mini['val_ppl']:.2f} "
+                        f"(max_batches={getattr(args, 'mini_val_max_batches', 64)})",
                         flush=True
                     )
                     if args.json:
                         try:
                             with open(args.json, "r") as f:
                                 log = json.load(f)
-                                updates_minival = log.setdefault("minival", {})
-                                epm = updates_minival.setdefault(str(epoch), {})
-                                epm[f"{step_count:04d}"] = {
-                                    "global_step": int(global_step),
-                                    "mini_val_loss": float(val_metrics['loss']),
-                                    "mini_val_ppl":  float(val_metrics['ppl']),
-                                    "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
-                                }
+                            log.setdefault("updates", {})[f"minival_{epoch}_{steps_total_so_far}"] = {
+                                "epoch": int(epoch),
+                                "steps": int(steps),
+                                "steps_total": int(steps_total_so_far),
+                                "mini_val_loss": float(mini['val_loss']),
+                                "mini_val_ppl":  float(mini['val_ppl']),
+                                "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
+                            }
                             save_log(args.json, log)
                         except Exception as e:
                             print(f"[{now()}][Warning] Failed to update JSON log (mini-val): {e}", flush=True)
 
         # optional epoch cap by micro-steps
-        if args.micro_steps_per_epoch and micro_count >= args.micro_steps_per_epoch:
+        if args.micro_steps_per_epoch and micro_steps >= args.micro_steps_per_epoch:
             break
 
-    # ----- epoch summary -----
     _sync()
-    time_epoch_s = time.perf_counter() - epoch_t0
-    tok_per_s = tokens / max(1e-6, time_epoch_s)
+    time_epoch_s = time.perf_counter() - t_epoch0
+    tok_per_s_epoch = tokens / max(1e-6, time_epoch_s)
 
-    if not math.isfinite(last_train_loss):
-        last_train_loss = w_loss_sum / w_token_count if w_token_count > 0 else float("nan")
-
-    train_ppl = float(np.exp(np.clip(last_train_loss, 0, 20))) if math.isfinite(last_train_loss) else float("nan")
+    # Tail window snapshot (handles shorter-than-N tail naturally)
+    if last_snap is None:
+        last_snap = snapshot_window()
+    if last_snap is None:  # edge case: no data
+        last_snap = {
+            "train_loss": float("nan"),
+            "train_ppl":  float("nan"),
+            "lr":         float(lr),
+            "micro_step_time_s": micro_time_sum / max(1, micro_time_n),
+            "step_time_s":       step_time_sum  / max(1, step_time_n),
+            "tok_per_s":         tok_per_s_epoch,
+            "tokens":            int(tokens),
+            "time_s":            float(time_epoch_s),
+        }
 
     return {
-        "loss": float(last_train_loss),
-        "ppl":  float(train_ppl),
-        "lr":         float(lr),
+        # current (tail-window) train metrics for epoch line & JSON
+        'train_loss': float(last_snap['train_loss']),
+        'train_ppl':  float(last_snap['train_ppl']),
 
-        "micro_steps": int(micro_count),
-        "steps":       int(step_count),
-        "tokens":      int(tokens),
-
-        "micro_step_time":     float(micro_time / max(1, micro_count)),  # epoch avg
-        "micro_step_time_min": float(micro_time_min if micro_count > 0 else float("nan")),
-        "micro_step_time_max": float(micro_time_max if micro_count > 0 else float("nan")),
-        "step_time":           float(step_time / max(1, step_count)),    # epoch avg
-        "step_time_min":       float(step_time_min if step_count > 0 else float("nan")),
-        "step_time_max":       float(step_time_max if step_count > 0 else float("nan")),
-        "epoch_time":          float(time_epoch_s),
-
-        "throughput":    float(tok_per_s),
+        # LR + epoch totals/averages
+        'lr':         float(lr),
+        'micro_steps': int(micro_steps),
+        'steps':       int(steps),
+        'tokens':      int(tokens),
+        'micro_step_time_s': float(micro_time_sum / max(1, micro_time_n)),  # epoch avg
+        'step_time_s':       float(step_time_sum  / max(1, step_time_n)),   # epoch avg
+        'time_epoch_s':      float(time_epoch_s),
+        'tok_per_s':         float(tok_per_s_epoch),                         # epoch avg
     }
 
+
+# ------------------------- DDP setup/teardown -------------------------
+def setup_ddp(args):
+    def env_int(k, d): return d if os.environ.get(k) in (None, "") else int(os.environ.get(k))
+    def env_str(k, d): return d if os.environ.get(k) in (None, "") else os.environ.get(k)
+
+    args.rank = env_int("RANK", args.rank)
+    args.world_size = env_int("WORLD_SIZE", args.world_size)
+    args.master_addr = env_str("MASTER_ADDR", args.master_addr)
+    args.master_port = env_int("MASTER_PORT", args.master_port)
+    args.iface = env_str("IFACE", args.iface)
+    args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
+
+    if args.device == 'cuda' and torch.cuda.is_available():
+        torch.cuda.set_device(args.local_rank)
+
+    os.environ.setdefault("RANK", str(args.rank))
+    os.environ.setdefault("WORLD_SIZE", str(args.world_size))
+    os.environ.setdefault("MASTER_ADDR", args.master_addr)
+    os.environ.setdefault("MASTER_PORT", str(args.master_port))
+    os.environ.setdefault("LOCAL_RANK", str(args.local_rank))
+    os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
+
+    dist.init_process_group(
+        backend=args.backend,
+        init_method="env://",
+        rank=args.rank,
+        world_size=args.world_size,
+        timeout=datetime.timedelta(seconds=300),
+    )
+    if args.rank == 0:
+        print(f"[{now()}][DDP] backend={args.backend} world_size={args.world_size} "
+              f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
+
+def cleanup():
+    if dist.is_available() and dist.is_initialized():
+        dist.destroy_process_group()
 
 
 # ------------------------- training driver -------------------------
@@ -471,7 +525,7 @@ def train(args):
         worker_init_fn=_seed_worker,
     )
 
-    # Model config (GPT-2 small)
+    # model config (GPT-2 small)
     cfg = GPT2Config(
         vocab_size=vocab_size,
         n_positions=args.seq_len,
@@ -483,23 +537,18 @@ def train(args):
         bos_token_id=tokenizer.bos_token_id,
         eos_token_id=tokenizer.eos_token_id,
         pad_token_id=tokenizer.eos_token_id,
-        return_dict=False # IMPORTANT for straggle sim
     )
     model = GPT2LMHeadModel(cfg).to(device)
     model.config.use_cache = False
 
     # DDP
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
-                gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-
-    # Straggle sim
-    straggle_sim = None
-    if args.straggle_points > 0:
-        straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                        ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
-                                        verbose=args.straggle_verbose)
-        if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
-        else: straggle_sim = None
+    model = DDP(
+        model,
+        device_ids=[args.local_rank] if device.type == "cuda" else None,
+        gradient_as_bucket_view=True,
+        find_unused_parameters=False,
+        static_graph=args.static_graph,
+    )
 
     if args.rank == 0:
         n_tr = len(ds_train); n_va = len(ds_val)
@@ -590,66 +639,57 @@ def train(args):
         print(f"[{now()}] Logging to {args.json}")
 
     best_ppl = float('inf')
-    global_step = 0  # cumulative optimizer steps so far
+    steps_total = 0  # cumulative optimizer steps so far
 
     for epoch in range(args.epochs):
-        print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
-        
-        epoch_start = time.time()
+        if args.rank == 0:
+            print(f"[{now()}][Epoch {epoch:03d}] Start", flush=True)
         train_ds.set_epoch(epoch)
 
         # train
-        train_metrics = train_one_epoch(model, train_loader, optimizer, device, scaler, args, epoch, global_step, warmup_steps, lr_decay_iters, val_loader)
-        global_step += train_metrics['steps']  # accumulate optimizer steps
+        train_metrics = train_one_epoch(
+            model, train_loader, optimizer, device, scaler, args,
+            epoch, steps_total, warmup_steps, lr_decay_iters, val_loader
+        )
+        steps_total += train_metrics['steps']  # accumulate optimizer steps
 
         # validate full (only at end of epoch)
         val_metrics = validate(model, val_loader, device, args, max_batches=args.val_max_batches)
         current_lr = optimizer.param_groups[0]['lr']
 
-        epoch_time = time.time() - epoch_start
         # stdout per-epoch
         if args.rank == 0:
             print(
                 f"[{now()}][Epoch {epoch:03d}] "
-                f"global_step={global_step} ",
-                f"train_loss={train_metrics['loss']:.4f} "
-                f"train_ppl={train_metrics['ppl']:.2f} "
-                f"val_ppl={val_metrics['ppl']:.2f} "
                 f"micro_steps={train_metrics['micro_steps']} "
-                f"micro_time={train_metrics['micro_step_time']:.3f}s "
                 f"steps={train_metrics['steps']} "
-                f"step_time={train_metrics['step_time']:.3f}s "
-                f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
-                f"epoch_time={epoch_time:.3f}s "
-                f"tp={train_metrics['tok_per_s']:.0f} tok/s"
-                f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True
+                f"loss={train_metrics['train_loss']:.4f} "
+                f"ppl={train_metrics['train_ppl']:.2f} "
+                f"val_ppl={val_metrics['val_ppl']:.2f} "
+                f"step_time={train_metrics['step_time_s']:.3f}s "
+                f"micro_time={train_metrics['micro_step_time_s']:.3f}s "
+                f"tok/s={train_metrics['tok_per_s']:.0f} "
+                f"steps_total={steps_total}",
+                flush=True
             )
 
             # JSON epoch log
             epoch_metrics = {
-                "train_loss": float(train_metrics['loss']),
-                "train_ppl":  float(train_metrics['ppl']),
-                "val_loss":   float(val_metrics['loss']),
-                "val_ppl":    float(val_metrics['ppl']),
+                "train_loss": float(train_metrics['train_loss']),
+                "train_ppl":  float(train_metrics['train_ppl']),
+                "val_loss":   float(val_metrics['val_loss']),
+                "val_ppl":    float(val_metrics['val_ppl']),
                 "lr":         float(current_lr),
 
                 "micro_steps": int(train_metrics['micro_steps']),
                 "steps":       int(train_metrics['steps']),        # optimizer steps this epoch
-                "global_step": int(global_step),                   # cumulative optimizer steps
+                "steps_total": int(steps_total),                   # cumulative optimizer steps
                 "tokens":      int(train_metrics['tokens']),
 
-                "micro_step_time":        float(train_metrics['micro_step_time']),
-                "micro_step_time_min":    float(train_metrics['micro_step_time_min']),
-                "micro_step_time_max":    float(train_metrics['micro_step_time_max']),
-                "step_time":              float(train_metrics['step_time']),
-                "step_time_min":          float(train_metrics['step_time_min']),
-                "step_time_max":          float(train_metrics['step_time_max']),
-                "epoch_time":             float(epoch_time),
-                "epoch_train_time":       float(train_metrics['epoch_time']),
-                "epoch_train_throughput": float(train_metrics['throughput']),
-
-                # straggle-sim
-                "straggle" : straggle_sim.get_stats() if straggle_sim else {}
+                "micro_step_time_s": float(train_metrics['micro_step_time_s']),
+                "step_time_s":       float(train_metrics['step_time_s']),
+                "time_epoch_s":      float(train_metrics['time_epoch_s']),
+                "tok_per_s":         float(train_metrics['tok_per_s']),
             }
             with open(args.json, "r") as f:
                 log = json.load(f)
@@ -664,38 +704,9 @@ def train(args):
         print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
 
 
-# ------------------------- DDP setup/teardown -------------------------
-def setup_ddp(args):
-    def env_int(k, d): return d if os.environ.get(k) in (None, "") else int(os.environ.get(k))
-    def env_str(k, d): return d if os.environ.get(k) in (None, "") else os.environ.get(k)
-
-    args.rank = env_int("RANK", args.rank)
-    args.world_size = env_int("WORLD_SIZE", args.world_size)
-    args.master_addr = env_str("MASTER_ADDR", args.master_addr)
-    args.master_port = env_int("MASTER_PORT", args.master_port)
-    args.iface = env_str("IFACE", args.iface)
-    args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
-
-    if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
-
-    os.environ.setdefault("RANK", str(args.rank))
-    os.environ.setdefault("WORLD_SIZE", str(args.world_size))
-    os.environ.setdefault("MASTER_ADDR", args.master_addr)
-    os.environ.setdefault("MASTER_PORT", str(args.master_port))
-    os.environ.setdefault("LOCAL_RANK", str(args.local_rank))
-    os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
-    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
-
-    dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size,
-                            timeout=datetime.timedelta(seconds=300))
-
-    print(f"[{now()}][DDP] backend={args.backend} world_size={args.world_size} "
-          f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
-
 # ------------------------- main -------------------------
 def main():
     parser = argparse.ArgumentParser(description='GPT-2 DDP on OpenWebText (with periodic update logging)')
-
     # DDP/System
     parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=6)
@@ -707,10 +718,8 @@ def main():
     parser.add_argument('--deterministic', action='store_true')
     parser.add_argument('--static_graph', action='store_true')
     parser.add_argument('--workers', type=int, default=4)
+    parser.add_argument('--json', type=str, default=None)
     parser.add_argument('--seed', type=int, default=1337)
-    parser.add_argument('--json', type=str, default="gpt2.json", help="Path to JSON run log")
-    parser.add_argument('--log_every_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
-                            'Automatically disabled if epoch has fewer than N steps.')
 
     # Data
     parser.add_argument('--data', type=str, required=True)
@@ -718,16 +727,19 @@ def main():
     parser.add_argument('--val_fraction', type=float, default=0.0005)
     parser.add_argument('--tokenizer', type=str, default='gpt2')
 
-    # Training
+    # Training (choose these; schedule is auto-computed)
     parser.add_argument('--epochs', type=int, default=12)
+    # parser.add_argument('--steps_per_epoch', type=int, default=6000)  # micro-steps per epoch (will be trimmed to multiple of GA)
     parser.add_argument('--micro_steps_per_epoch', '--steps_per_epoch', dest='micro_steps_per_epoch', type=int, default=6000,
                         help='Micro-batches per epoch (alias: --steps_per_epoch). Optimizer steps/epoch ~= this / GA.')
+    
     parser.add_argument('--batch_size', type=int, default=12)
     parser.add_argument('--gradient_accumulation_steps', type=int, default=5)
     parser.add_argument('--learning_rate', type=float, default=6e-4)
     parser.add_argument('--min_lr', type=float, default=6e-5)
     parser.add_argument('--warmup_steps', '--warmup_optimizer_steps', dest='warmup_steps', type=int, default=-1,
-        help='Warmup in OPTIMIZER steps (not micro-steps). -1 = auto (10% of total optimizer steps, capped at 1000).')
+        help='Warmup in OPTIMIZER steps (not micro-steps). -1 = auto (10% of total optimizer steps, capped at 1000).'
+    )
     parser.add_argument('--lr_decay_iters', type=int, default=-1, help='-1 = auto (total planned optimizer steps)')
     parser.add_argument('--weight_decay', type=float, default=0.1)
     parser.add_argument('--grad_clip', type=float, default=1.0)
@@ -736,23 +748,12 @@ def main():
     parser.add_argument('--val_max_batches', type=int, default=200)
     parser.add_argument('--mini_val_every_steps', type=int, default=0, help='Run a small validation every N optimizer steps. 0=off.')
     parser.add_argument('--mini_val_max_batches', type=int, default=64, help='Batches to use for mini validation.')
-
-    # Model config -- mostly fixed
+    # Model
     parser.add_argument('--seq_len', type=int, default=1024)
 
-    # Straggle
-    def csv_ints(s: str) -> list[int]:
-        if not s: return []
-        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
-        except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
-    parser.add_argument("--straggle_points", type=int, help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
-    parser.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
-    parser.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
-    parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=0)
-    parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
-    parser.add_argument("--straggle_verbose", action='store_true')
-
-
+    # Periodic logging (NEW - single argument)
+    parser.add_argument('--log_every_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
+                            'Automatically disabled if epoch has fewer than N steps.')
 
     args = parser.parse_args()
 
@@ -776,20 +777,22 @@ def main():
     if args.amp and args.device == 'cpu':
         args.amp = False
         print(f"[{now()}][Info] Disabling AMP because CUDA is not available", flush=True)
+    if args.workers < 0:
+        args.workers = 0
 
-    args.workers = max(args.workers, 0)
-
-
-    sys.stdout.reconfigure(line_buffering=True)
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:
+        pass
 
     setup_ddp(args)
-    print(f"[{now()}] Configuration:\n{json.dumps(vars(args), indent=2)}")
-
+    if args.rank == 0:
+        print(f"[{now()}] Configuration:\n{json.dumps(vars(args), indent=2)}")
     try:
         train(args)
     finally:
-        if dist.is_available() and dist.is_initialized():
-            dist.destroy_process_group()
+        cleanup()
+
 
 if __name__ == "__main__":
     main()

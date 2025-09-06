@@ -3,14 +3,14 @@ set -euo pipefail
 
 # --- minimal config (can be overridden by env) ---
 IFACE="${IFACE:-ens4f0}"                 # network interface to read IP from
-WORLD_SIZE="${WORLD_SIZE:-1}"
+WORLD_SIZE="${WORLD_SIZE:-1}"            # set by launcher or leave 1 for single-node
 BACKEND="${BACKEND:-gloo}"
 MASTER_PORT="${MASTER_PORT:-29500}"
 
 # Derive IP on IFACE, rank = last octet - 1
 IP=$(ip -4 -o addr show dev "$IFACE" | awk '{print $4}' | cut -d/ -f1 || true)
 if [[ -z "${IP}" ]]; then
-  echo "[run_resnet.sh] ERROR: could not get IPv4 for IFACE=$IFACE" >&2
+  echo "[run_vgg.sh] ERROR: could not get IPv4 for IFACE=$IFACE" >&2
   exit 1
 fi
 RANK=$(( ${IP##*.} - 1 ))
@@ -18,7 +18,7 @@ RANK=$(( ${IP##*.} - 1 ))
 # Default master = same /24, .1 (override with env MASTER_ADDR if you want)
 MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
-echo "[run_efficientnet_straggle.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
+echo "[run_lstm_classify.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
 
 
 # sync repo: clone if missing, otherwise reset/pull
@@ -29,37 +29,27 @@ else
   git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
 fi
 
-source $HOME/straggle-ml/venv/bin/activate
-python -m pip install --upgrade pip 
-python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
+source $HOME/straggle-ml-experiments/venv/bin/activate
 
 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
 NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 # Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 set -x
-exec python -u $HOME/straggle-ml-experiments/models/efficientnet_2.py \
+exec python -u $HOME/straggle-ml-experiments/models/lstm_classify.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
+  --model lstm_base \
   --backend gloo \
-  --data ~/datasets/imagenet \
-  --model efficientnet_b0 \
-  --epochs 90 \
+  --epochs 20 \
   --batch_size 128 \
-  --deterministic \
-  --drop_last_val \
-  --prefetch_factor 6 \
   --workers 8 \
-  --straggle_points 3 \
-  --straggle_prob 2 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.6 \
-  --straggle_multiply 0.5 2 \
-  --straggle_verbose \
-  --json $HOME/straggle-ml-experiments/models/efficientnet_straggle.json \
+  --prefetch_factor 8 \
+  --deterministic \
+  --json $HOME/straggle-ml-experiments/models/lstm_classify.json \
   "$@"
 
 

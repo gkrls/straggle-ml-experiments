@@ -16,7 +16,7 @@ RANK=$(( ${IP##*.} - 1 ))
 
 MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
-echo "[run_gpt2.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
+echo "[run_gpt2_straggle.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
 
 # sync repo: clone if missing, otherwise reset/pull
 if [ ! -d "$HOME/straggle-ml-experiments/.git" ]; then
@@ -37,7 +37,7 @@ set -x
 
 # Standard settings for GPT2 on a 16GB GPU
 # Consumes around ~15.3GB of memory
-exec python -u $HOME/straggle-ml-experiments/models/gpt2_2.py \
+exec python -u $HOME/straggle-ml-experiments/models/gpt2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -60,7 +60,7 @@ exec python -u $HOME/straggle-ml-experiments/models/gpt2_2.py \
   --straggle_multiply 0.5 2 \
   --straggle_verbose \
   --log_every_steps 50 \
-  --json $HOME/straggle-ml-experiments/models/gpt2.json \
+  --json $HOME/straggle-ml-experiments/models/gpt2_straggle.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
   "$@"
