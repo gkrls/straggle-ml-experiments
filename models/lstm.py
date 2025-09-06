@@ -130,7 +130,7 @@ class LSTMTextModel(nn.Module):
         embed_dim  = 300
         hidden_dim = 512
         num_layers = 2
-        dropout    = 0.6
+        dropout    = 0.5
 
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
         self.emb_drop = nn.Dropout(EMB_DROPOUT_P)
@@ -515,7 +515,7 @@ def main():
 
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
-    parser.add_argument('--batch_size', type=int, default=24)        # smaller per-rank batch helps generalization
+    parser.add_argument('--batch_size', type=int, default=32)        # smaller per-rank batch helps generalization
     parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--weight_decay', type=float, default=2e-5)
     parser.add_argument('--num_classes', type=int, default=2)
