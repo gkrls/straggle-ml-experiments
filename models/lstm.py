@@ -206,7 +206,7 @@ def build_per_step_cosine(optimizer, total_steps: int, warmup_steps: int):
 def validate(model, loader, device, args, num_classes: int):
     model.eval()
     top1, top5, losses = AverageMeter(), AverageMeter(), AverageMeter()
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.05).to(device)
 
     def run_validation(dataloader):
         for x, y, lengths in dataloader:
