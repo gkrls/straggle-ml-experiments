@@ -24,11 +24,11 @@ try:
 except Exception:
     SlowWorkerPattern = None
 
-# ------------------------- Fixed NLP defaults (simplified) -------------------------
-MIN_FREQ       = 1
-LABEL_SMOOTH   = 0.05
+# ------------------------- Fixed NLP defaults (tuned) -------------------------
+MIN_FREQ       = 2        # prune singletons for SST-2
+LABEL_SMOOTH   = 0.0      # better on binary tasks
 CLIP_NORM      = 1.0
-WARMUP_RATIO   = 0.10  # 10% warmup for cosine
+WARMUP_RATIO   = 0.10     # 10% warmup for cosine
 
 # ------------------------- Tokenizer / Vocab ------------------------------
 
@@ -118,7 +118,7 @@ def accuracy_topk(output: torch.Tensor, target: torch.Tensor, num_classes: int, 
 MODEL_PRESETS = {
     "lstm_tiny":  {"embed": 128, "hidden": 128, "dropout": 0.2},
     "lstm_small": {"embed": 200, "hidden": 256, "dropout": 0.3},
-    "lstm_base":  {"embed": 300, "hidden": 256, "dropout": 0.4},  # current default
+    "lstm_base":  {"embed": 300, "hidden": 256, "dropout": 0.4},  # default
     "lstm_big":   {"embed": 300, "hidden": 512, "dropout": 0.4},
 }
 
@@ -136,11 +136,11 @@ class LSTMTextModel(nn.Module):
             _, (h, _) = self.lstm(packed)
         else:
             _, (h, _) = self.lstm(emb)
-        # out = self.dropout(h[-1])
-        # return self.fc(out)
-        out = self.dropout(h[-1])   # for biLSTM, last layer gives 2 directions; torch stacks them so:
-        out = torch.cat([h[-2], h[-1]], dim=1) if self.lstm.bidirectional else h[-1]
-        return self.fc(self.dropout(out))
+        if self.lstm.bidirectional:
+            h_out = torch.cat([h[-2], h[-1]], dim=1)  # concat both directions
+        else:
+            h_out = h[-1]
+        return self.fc(self.dropout(h_out))
 
 # ------------------------- Scheduler (per-step cosine+warmup) ------------------------------
 
@@ -177,14 +177,19 @@ def validate(model, loader, device, args, num_classes: int):
             top1.update(a1[0].item(), bs)
             top5.update(a5[0].item(), bs)
 
+    # main distributed eval
     run_validation(loader)
+    # global reduce for main part
     top1.all_reduce(); top5.all_reduce(); losses.all_reduce()
 
-    # Leftover handling (mirrors your DenseNet script)
+    # leftover eval AFTER reduce (no further all-reduce)
     if hasattr(loader, "sampler") and len(loader.sampler) * args.world_size < len(loader.dataset):
         start = len(loader.sampler) * args.world_size
         aux = Subset(loader.dataset, range(start, len(loader.dataset)))
-        aux_loader = DataLoader(aux, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
+        aux_loader = DataLoader(
+            aux, batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True
+        )
         run_validation(aux_loader)
 
     return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg}
@@ -257,7 +262,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
 
     return {
         'loss_global' : loss_global,
-        'loss': losses.avg,         
+        'loss': losses.avg,         # local avg (parity with your DenseNet print)
         'top1': top1.avg,
         'top5': top5.avg,
         'step_time_min': step_time.min,
@@ -304,6 +309,23 @@ def get_dataloaders(args, vocab: dict):
     )
     return train_loader, val_loader
 
+# ------------------------- Optimizer / Param groups ------------------------------
+
+def build_optimizer(model: torch.nn.Module, lr: float, weight_decay: float):
+    decay, no_decay = [], []
+    for n, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+        if n.endswith(".bias") or ("embedding" in n):
+            no_decay.append(p)
+        else:
+            decay.append(p)
+    groups = [
+        {"params": decay, "weight_decay": weight_decay},
+        {"params": no_decay, "weight_decay": 0.0},
+    ]
+    return optim.AdamW(groups, lr=lr, betas=(0.9, 0.999), eps=1e-8)
+
 # ------------------------- Train Driver ------------------------------
 
 def train(args):
@@ -335,7 +357,6 @@ def train(args):
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
     print(f"Model '{args.model}' initialized. (embed={cfg['embed']}, hidden={cfg['hidden']}, drop={cfg['dropout']})", flush=True)
 
-
     # Straggle sim
     straggle_sim = None
     if SlowWorkerPattern is not None and args.straggle_points > 0:
@@ -347,7 +368,7 @@ def train(args):
 
     # Loss / Optim / Scheduler / AMP
     criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTH).to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, betas=(0.9, 0.999), eps=1e-8)
+    optimizer = build_optimizer(model, lr=args.learning_rate, weight_decay=args.weight_decay)
 
     steps_per_epoch = max(1, len(train_loader))
     total_steps = steps_per_epoch * args.epochs
@@ -477,10 +498,10 @@ def main():
 
     # Training
     parser.add_argument('--model', type=str, default='lstm_base', choices=list(MODEL_PRESETS.keys()))
-    parser.add_argument('--epochs', type=int, default=15)
+    parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--batch_size', type=int, default=128)
-    parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--weight_decay', type=float, default=1e-2)
+    parser.add_argument('--learning_rate', type=float, default=2e-3)
+    parser.add_argument('--weight_decay', type=float, default=1e-3)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
@@ -491,7 +512,7 @@ def main():
     parser.add_argument("--max_len", type=int, default=128, help="Max tokens per sample")
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
 
-
+    # Straggle (same interface as your DenseNet script)
     def csv_ints(s: str) -> List[int]:
         if not s: return []
         try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
