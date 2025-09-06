@@ -130,7 +130,7 @@ class LSTMTextModel(nn.Module):
         embed_dim  = 300
         hidden_dim = 512
         num_layers = 2
-        dropout    = 0.5
+        dropout    = 0.6
 
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
         self.emb_drop = nn.Dropout(EMB_DROPOUT_P)
@@ -525,7 +525,7 @@ def main():
     parser.add_argument("--json", type=str, default="lstm_sst.json", help="Path to JSON run log")
 
     # Text knobs
-    parser.add_argument("--max_len", type=int, default=64, help="Max tokens per sample")
+    parser.add_argument("--max_len", type=int, default=32, help="Max tokens per sample")
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
 
     # Straggle
