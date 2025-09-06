@@ -334,10 +334,10 @@ def train(args):
         save_log(args.json, log)
         
         # Track best validation accuracy
-        if val_metrics['val_top1'] > best_top1: 
-            best_top1 = val_metrics['val_top1']
-        if val_metrics['val_top5'] > best_top5: 
-            best_top5 = val_metrics['val_top5']
+        if val_metrics['top1'] > best_top1: 
+            best_top1 = val_metrics['top1']
+        if val_metrics['top5'] > best_top5: 
+            best_top5 = val_metrics['top5']
 
         # Step the scheduler after evaluation (end of epoch)
         scheduler.step()
