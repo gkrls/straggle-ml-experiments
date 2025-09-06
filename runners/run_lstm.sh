@@ -42,7 +42,7 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --model lstm_base \
+  --model lstm_big \
   --backend gloo \
   --epochs 20 \
   --batch_size 128 \

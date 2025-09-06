@@ -25,8 +25,8 @@ except Exception:
     SlowWorkerPattern = None
 
 # ------------------------- Fixed NLP defaults (tuned) -------------------------
-MIN_FREQ       = 2        # prune singletons for SST-2
-LABEL_SMOOTH   = 0.0      # better on binary tasks
+MIN_FREQ       = 1        # prune singletons for SST-2
+LABEL_SMOOTH   = 0.5      # better on binary tasks
 CLIP_NORM      = 5.0
 WARMUP_RATIO   = 0.10     # 10% warmup for cosine
 
