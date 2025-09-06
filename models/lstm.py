@@ -522,7 +522,7 @@ def main():
     parser.add_argument("--static_graph", action='store_true')
 
     # Training (only BIG model)
-    parser.add_argument('--epochs', type=int, default=12)  # 12 is enough with stronger regularization
+    parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--weight_decay', type=float, default=2e-05)

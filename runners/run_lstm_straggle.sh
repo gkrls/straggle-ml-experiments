@@ -3,7 +3,7 @@ set -euo pipefail
 
 # --- minimal config (can be overridden by env) ---
 IFACE="${IFACE:-ens4f0}"                 # network interface to read IP from
-WORLD_SIZE="${WORLD_SIZE:-1}"
+WORLD_SIZE="${WORLD_SIZE:-1}"            # set by launcher or leave 1 for single-node
 BACKEND="${BACKEND:-gloo}"
 MASTER_PORT="${MASTER_PORT:-29500}"
 
@@ -18,7 +18,7 @@ RANK=$(( ${IP##*.} - 1 ))
 # Default master = same /24, .1 (override with env MASTER_ADDR if you want)
 MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
-echo "[run_densenet.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
+echo "[run_lstm.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
 
 
 # sync repo: clone if missing, otherwise reset/pull
@@ -36,22 +36,25 @@ NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 # Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 set -x
-exec python -u $HOME/straggle-ml-experiments/models/densenet.py \
+exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --backend gloo \
-  --data ~/datasets/imagenet \
-  --model densenet121 \
-  --epochs 100 \
-  --batch_size 128 \
+  --epochs 12 \
+  --batch_size 32 \
   --workers 8 \
+  --prefetch_factor 8 \
   --deterministic \
-  --drop_last_val \
-  --prefetch_factor 4 \
-  --json $HOME/straggle-ml-experiments/models/densenet.json \
+  --straggle_points 3 \
+  --straggle_prob 2 \
+  --straggle_ranks 1 \
+  --straggle_amount 0.12 \
+  --straggle_multiply 0.5 2 \
+  --straggle_verbose \
+  --json $HOME/straggle-ml-experiments/models/lstm.json \
   "$@"
 
 

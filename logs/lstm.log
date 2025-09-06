@@ -1,0 +1,65 @@
++ exec python -u /home/gks/straggle-ml-experiments/models/lstm.py --rank 0 --world_size 6 --iface ens4f0 --master_addr 42.0.0.1 --master_port 29500 --backend gloo --epochs 12 --batch_size 32 --workers 8 --prefetch_factor 8 --deterministic --json /home/gks/straggle-ml-experiments/models/lstm.json
+[DDP] backend=gloo world_size=6 master=42.0.0.1:29500 iface=ens4f0 local_rank=0
+{
+  "rank": 0,
+  "world_size": 6,
+  "iface": "ens4f0",
+  "master_addr": "42.0.0.1",
+  "master_port": 29500,
+  "backend": "gloo",
+  "device": "cuda",
+  "deterministic": true,
+  "workers": 8,
+  "prefetch_factor": 8,
+  "static_graph": false,
+  "epochs": 12,
+  "batch_size": 32,
+  "learning_rate": 0.001,
+  "weight_decay": 2e-05,
+  "num_classes": 2,
+  "amp": false,
+  "drop_last_train": false,
+  "drop_last_val": false,
+  "json": "/home/gks/straggle-ml-experiments/models/lstm.json",
+  "max_len": 50,
+  "max_vocab": 60000,
+  "label_smoothing": 0.05,
+  "cosine_min_lr_mult": 0.15,
+  "straggle_points": 0,
+  "straggle_prob": 0,
+  "straggle_ranks": [],
+  "straggle_amount": 0,
+  "straggle_multiply": [
+    1.0,
+    1.0
+  ],
+  "straggle_verbose": false,
+  "local_rank": 0,
+  "seed": 42
+}
+[Vocab] size=14495 (includes PAD/UNK)
+Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.6)
+[2025-09-07 00:33:00][Epoch 000] ...
+[2025-09-07 00:33:48][Epoch 000] train_loss=0.6421 (global=0.6416) val_loss=0.5249 top1=73.40% top5=100.00% lr=0.000836 epoch_time=48.14s step_time=0.14 (min=0.12s, max=0.75) tp=~234.6 samples/s straggle_events=none
+[2025-09-07 00:33:48][Epoch 001] ...
+[2025-09-07 00:34:36][Epoch 001] train_loss=0.4749 (global=0.4800) val_loss=0.4566 top1=79.22% top5=100.00% lr=0.000989 epoch_time=47.46s step_time=0.14 (min=0.12s, max=0.24) tp=~236.9 samples/s straggle_events=none
+[2025-09-07 00:34:36][Epoch 002] ...
+[2025-09-07 00:35:23][Epoch 002] train_loss=0.3864 (global=0.3816) val_loss=0.4388 top1=81.28% top5=100.00% lr=0.000943 epoch_time=47.14s step_time=0.13 (min=0.12s, max=0.20) tp=~238.5 samples/s straggle_events=none
+[2025-09-07 00:35:23][Epoch 003] ...
+[2025-09-07 00:36:11][Epoch 003] train_loss=0.3329 (global=0.3313) val_loss=0.4721 top1=81.74% top5=100.00% lr=0.000867 epoch_time=47.60s step_time=0.14 (min=0.12s, max=0.23) tp=~236.2 samples/s straggle_events=none
+[2025-09-07 00:36:11][Epoch 004] ...
+[2025-09-07 00:36:58][Epoch 004] train_loss=0.2957 (global=0.2989) val_loss=0.4532 top1=82.31% top5=100.00% lr=0.000766 epoch_time=47.31s step_time=0.13 (min=0.12s, max=0.20) tp=~237.6 samples/s straggle_events=none
+[2025-09-07 00:36:58][Epoch 005] ...
+[2025-09-07 00:37:45][Epoch 005] train_loss=0.2811 (global=0.2780) val_loss=0.4231 top1=83.33% top5=100.00% lr=0.000649 epoch_time=47.39s step_time=0.13 (min=0.12s, max=0.22) tp=~237.2 samples/s straggle_events=none
+[2025-09-07 00:37:45][Epoch 006] ...
+[2025-09-07 00:38:33][Epoch 006] train_loss=0.2664 (global=0.2614) val_loss=0.4445 top1=83.22% top5=100.00% lr=0.000526 epoch_time=47.45s step_time=0.13 (min=0.12s, max=0.22) tp=~236.9 samples/s straggle_events=none
+[2025-09-07 00:38:33][Epoch 007] ...
+[2025-09-07 00:39:20][Epoch 007] train_loss=0.2417 (global=0.2447) val_loss=0.4401 top1=83.22% top5=100.00% lr=0.000407 epoch_time=47.54s step_time=0.14 (min=0.12s, max=0.24) tp=~236.5 samples/s straggle_events=none
+[2025-09-07 00:39:20][Epoch 008] ...
+[2025-09-07 00:40:08][Epoch 008] train_loss=0.2352 (global=0.2335) val_loss=0.4368 top1=82.31% top5=100.00% lr=0.000302 epoch_time=47.10s step_time=0.13 (min=0.12s, max=0.22) tp=~238.7 samples/s straggle_events=none
+[2025-09-07 00:40:08][Epoch 009] ...
+[2025-09-07 00:40:55][Epoch 009] train_loss=0.2284 (global=0.2236) val_loss=0.4372 top1=83.90% top5=100.00% lr=0.000220 epoch_time=47.51s step_time=0.14 (min=0.12s, max=0.23) tp=~236.7 samples/s straggle_events=none
+[2025-09-07 00:40:55][Epoch 010] ...
+[2025-09-07 00:41:42][Epoch 010] train_loss=0.2158 (global=0.2183) val_loss=0.4462 top1=84.36% top5=100.00% lr=0.000168 epoch_time=47.06s step_time=0.13 (min=0.12s, max=0.19) tp=~238.9 samples/s straggle_events=none
+[2025-09-07 00:41:42][Epoch 011] ...
+[2025-09-07 00:42:29][Epoch 011] train_loss=0.2144 (global=0.2132) val_loss=0.4510 top1=83.22% top5=100.00% lr=0.000150 epoch_time=47.29s step_time=0.13 (min=0.12s, max=0.22) tp=~237.8 samples/s straggle_events=none
