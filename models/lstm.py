@@ -525,7 +525,7 @@ def main():
     parser.add_argument("--json", type=str, default="lstm_sst.json", help="Path to JSON run log")
 
     # Text knobs
-    parser.add_argument("--max_len", type=int, default=32, help="Max tokens per sample")
+    parser.add_argument("--max_len", type=int, default=50, help="Max tokens per sample")
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
 
     # Straggle
