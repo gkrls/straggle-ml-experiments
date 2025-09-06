@@ -45,7 +45,6 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --backend gloo \
   --epochs 15 \
   --batch_size 32 \
-  --learning_rate 0.0015 \
   --workers 8 \
   --prefetch_factor 8 \
   --deterministic \

@@ -515,8 +515,8 @@ def main():
 
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
-    parser.add_argument('--batch_size', type=int, default=32)        # smaller per-rank batch helps generalization
-    parser.add_argument('--learning_rate', type=float, default=0.0015)
+    parser.add_argument('--batch_size', type=int, default=24)        # smaller per-rank batch helps generalization
+    parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--weight_decay', type=float, default=2e-5)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
