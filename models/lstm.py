@@ -115,6 +115,13 @@ def accuracy_topk(output: torch.Tensor, target: torch.Tensor, num_classes: int, 
 
 # ------------------------- Model ------------------------------
 
+MODEL_PRESETS = {
+    "lstm_tiny":  {"embed": 128, "hidden": 128, "dropout": 0.2},
+    "lstm_small": {"embed": 200, "hidden": 256, "dropout": 0.3},
+    "lstm_base":  {"embed": 300, "hidden": 256, "dropout": 0.4},  # current default
+    "lstm_big":   {"embed": 300, "hidden": 512, "dropout": 0.4},
+}
+
 class LSTMTextModel(nn.Module):
     def __init__(self, vocab_size, embed_dim=300, hidden_dim=256, num_classes=2, dropout=0.4):
         super().__init__()
@@ -314,10 +321,18 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args, vocab)
 
     # Model
-    model = LSTMTextModel(vocab_size=len(vocab), embed_dim=300, hidden_dim=256, num_classes=args.num_classes, dropout=0.4).to(device)
+    cfg = MODEL_PRESETS[args.model]
+    model = LSTMTextModel(
+        vocab_size=len(vocab),
+        embed_dim=cfg["embed"],
+        hidden_dim=cfg["hidden"],
+        num_classes=args.num_classes,
+        dropout=cfg["dropout"],
+    ).to(device)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    print(f"Model 'lstm_base' initialized.", flush=True)
+    print(f"Model '{args.model}' initialized. (embed={cfg['embed']}, hidden={cfg['hidden']}, drop={cfg['dropout']})", flush=True)
+
 
     # Straggle sim
     straggle_sim = None
@@ -459,7 +474,7 @@ def main():
     parser.add_argument("--static_graph", action='store_true')
 
     # Training
-    parser.add_argument('--data', type=str, default="", help="(unused for SST-2; kept for CLI parity)")
+    parser.add_argument('--model', type=str, default='lstm_base', choices=list(MODEL_PRESETS.keys()))
     parser.add_argument('--epochs', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=2e-3)
