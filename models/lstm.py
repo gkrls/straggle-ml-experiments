@@ -171,7 +171,9 @@ class LSTMTextModel(nn.Module):
 
         # attention pool (masked softmax)
         scores = self.attn(out).squeeze(-1)                # (B,T)
-        scores = scores.masked_fill(~mask.squeeze(-1), -1e9)
+        mask_t = mask.squeeze(-1)
+        fill = torch.finfo(scores.dtype).min if scores.dtype != torch.float64 else -1e9
+        scores = scores.masked_fill(~mask_t, fill)
         alpha  = torch.softmax(scores, dim=1).unsqueeze(-1)  # (B,T,1)
         attn_pool = (out * alpha).sum(dim=1)               # (B,2H)
 
