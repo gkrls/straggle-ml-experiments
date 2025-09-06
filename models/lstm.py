@@ -24,34 +24,36 @@ try:
 except Exception:
     SlowWorkerPattern = None
 
-# ------------------------- Fixed NLP defaults (tuned) -------------------------
-MIN_FREQ       = 1        # prune singletons for SST-2
-LABEL_SMOOTH   = 0.5      # better on binary tasks
+# ------------------------- Fixed NLP defaults (no external downloads) -------------------------
+PAD_ID         = 0
+UNK_ID         = 1
+MIN_FREQ       = 1            # keep rare tokens (helps sentiment)
+WORD_DROPOUT_P = 0.10         # replace ~10% tokens with <unk> during training only
+EMB_DROPOUT_P  = 0.10         # light embedding dropout
 CLIP_NORM      = 5.0
-WARMUP_RATIO   = 0.10     # 10% warmup for cosine
-
-PAD, UNK = "<pad>", "<unk>"
+WARMUP_RATIO   = 0.10         # 10% warmup for cosine
 
 # ------------------------- Tokenizer / Vocab ------------------------------
 
+_token_re = re.compile(r"[a-z0-9']+|[!?.,;:()\-]+")
+
 def simple_tokenizer(text: str) -> List[str]:
     text = text.lower().replace("\n", " ")
-    # keep apostrophes (negations), strip other edge punctuation
-    keep = "".join(ch for ch in r"!\"#$%&()*+,-./:;<=>?@[\]^_`{|}~" if ch != "'")
-    toks = []
-    for tok in text.split():
-        tok = tok.strip(keep)
-        if tok:
-            toks.append(tok)
-    return toks
+    text = re.sub(r"\d+", "<num>", text)  # fold numbers
+    return _token_re.findall(text)
 
 def build_vocab_sst(max_vocab: Optional[int], min_freq: int) -> dict:
     from collections import Counter
-    ds = load_dataset("glue", "sst2", split="train")
+    # build from train + validation to reduce OOV (no external data)
+    ds_train = load_dataset("glue", "sst2", split="train")
+    ds_val   = load_dataset("glue", "sst2", split="validation")
     ctr = Counter()
-    for ex in ds:
+    for ex in ds_train:
         ctr.update(simple_tokenizer(ex["sentence"]))
-    vocab = {PAD: 0, UNK: 1}
+    for ex in ds_val:
+        ctr.update(simple_tokenizer(ex["sentence"]))
+
+    vocab = {"<pad>": PAD_ID, "<unk>": UNK_ID}
     words = [w for w, c in ctr.most_common() if c >= min_freq]
     if max_vocab and max_vocab > 0:
         words = words[: max(0, max_vocab - len(vocab))]
@@ -60,17 +62,17 @@ def build_vocab_sst(max_vocab: Optional[int], min_freq: int) -> dict:
     return vocab
 
 def encode(text: str, vocab: dict, max_len: int) -> Tuple[torch.Tensor, int]:
-    toks = simple_tokenizer(text) or [UNK]
-    ids = [vocab.get(t, vocab[UNK]) for t in toks][:max_len]
+    toks = simple_tokenizer(text) or ["<unk>"]
+    ids = [vocab.get(t, UNK_ID) for t in toks][:max_len]
     length = len(ids)
     if length < max_len:
-        ids += [vocab[PAD]] * (max_len - length)
+        ids += [PAD_ID] * (max_len - length)
     return torch.tensor(ids, dtype=torch.long), length
 
 # ------------------------- Dataset ------------------------------
 
 class SSTDataset(Dataset):
-    def __init__(self, split: str, vocab: dict, max_len: int = 256):
+    def __init__(self, split: str, vocab: dict, max_len: int = 128):
         self.data = load_dataset("glue", "sst2", split=split)
         self.vocab = vocab
         self.max_len = max_len
@@ -113,39 +115,46 @@ def accuracy_topk(output: torch.Tensor, target: torch.Tensor, num_classes: int, 
         res.append(correct_k.mul_(100.0 / batch))
     return res
 
-# ------------------------- Model ------------------------------
-
-MODEL_PRESETS = {
-    "lstm_tiny":  {"embed": 128, "hidden": 128, "dropout": 0.2, "layers": 1},
-    "lstm_small": {"embed": 200, "hidden": 256, "dropout": 0.3, "layers": 1},
-    "lstm_base":  {"embed": 300, "hidden": 256, "dropout": 0.4, "layers": 1},
-    # amp it up: 2-layer BiLSTM + higher dropout -> better SST-2
-    "lstm_big":   {"embed": 300, "hidden": 512, "dropout": 0.5, "layers": 2},
-}
+# ------------------------- Model (only BIG preset) ------------------------------
 
 class LSTMTextModel(nn.Module):
     """
     2-layer BiLSTM encoder + pooled readout:
-      - mean pool over time (masked)
-      - max  pool over time (masked)
-      - single-head self-attention pooling
-    Final feature = [mean, max, attn] -> Dropout -> FC
+      - mean pool (masked)
+      - max  pool (masked)
+      - single-head self-attention pooling (fp16 safe)
+    Final feature -> LayerNorm -> small MLP head.
     """
-    def __init__(self, vocab_size, embed_dim=300, hidden_dim=512, num_layers=2, num_classes=2, dropout=0.5):
+    def __init__(self, vocab_size, num_classes=2):
         super().__init__()
-        self.unk_id = 1  # <unk>
-        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
-        self.emb_drop = nn.Dropout(0.1)  # light embedding dropout
+        embed_dim  = 300
+        hidden_dim = 512
+        num_layers = 2
+        dropout    = 0.5
+
+        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
+        self.emb_drop = nn.Dropout(EMB_DROPOUT_P)
 
         self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=num_layers,
                             batch_first=True, bidirectional=True,
                             dropout=dropout if num_layers > 1 else 0.0)
 
-        self.attn = nn.Linear(hidden_dim * 2, 1, bias=False)  # self-attention scores
+        self.attn = nn.Linear(hidden_dim * 2, 1, bias=False)   # attention scores
         self.dropout = nn.Dropout(dropout)
-        self.fc = nn.Linear(hidden_dim * 2 * 3, num_classes)  # [mean, max, attn] => 6H
+        self.norm = nn.LayerNorm(hidden_dim * 2 * 3)
+        self.proj = nn.Sequential(
+            nn.Linear(hidden_dim * 2 * 3, 512),
+            nn.GELU(),
+            nn.Dropout(0.3),
+            nn.Linear(512, num_classes),
+        )
 
     def forward(self, x, lengths: Optional[torch.Tensor] = None):
+        # --- word dropout (train-time only; keep PAD intact) ---
+        if self.training and WORD_DROPOUT_P > 0:
+            drop = (torch.rand_like(x, dtype=torch.float32) < WORD_DROPOUT_P) & (x != PAD_ID)
+            x = torch.where(drop, torch.full_like(x, UNK_ID), x)
+
         emb = self.emb_drop(self.embedding(x))
 
         if lengths is not None:
@@ -169,17 +178,17 @@ class LSTMTextModel(nn.Module):
         max_pool, _ = out_neg_inf.max(dim=1)
         max_pool[max_pool == float("-inf")] = 0.0
 
-        # attention pool (masked softmax)
-        scores = self.attn(out).squeeze(-1)                # (B,T)
-        mask_t = mask.squeeze(-1)
+        # attention pool (masked softmax), fp16-safe
+        scores = self.attn(out).squeeze(-1)      # (B,T)
+        mask_t = mask.squeeze(-1)                # (B,T)
         fill = torch.finfo(scores.dtype).min if scores.dtype != torch.float64 else -1e9
         scores = scores.masked_fill(~mask_t, fill)
         alpha  = torch.softmax(scores, dim=1).unsqueeze(-1)  # (B,T,1)
-        attn_pool = (out * alpha).sum(dim=1)               # (B,2H)
+        attn_pool = (out * alpha).sum(dim=1)     # (B,2H)
 
         feat = torch.cat([mean_pool, max_pool, attn_pool], dim=1)  # (B, 6H)
-        return self.fc(self.dropout(feat))
-
+        feat = self.norm(feat)
+        return self.proj(self.dropout(feat))
 
 # ------------------------- Scheduler (per-step cosine+warmup) ------------------------------
 
@@ -197,38 +206,28 @@ def build_per_step_cosine(optimizer, total_steps: int, warmup_steps: int):
 def validate(model, loader, device, args, num_classes: int):
     model.eval()
     top1, top5, losses = AverageMeter(), AverageMeter(), AverageMeter()
-    criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTH).to(device)
+    criterion = nn.CrossEntropyLoss().to(device)
 
     def run_validation(dataloader):
         for x, y, lengths in dataloader:
             x = x.to(device, non_blocking=True)
             y = y.to(device, non_blocking=True)
-            if args.amp and device.type == 'cuda':
-                with torch.amp.autocast(device_type='cuda'):
-                    out = model(x, lengths)
-                    loss = criterion(out, y)
-            else:
-                out = model(x, lengths)
-                loss = criterion(out, y)
+            out = model(x, lengths)   # lengths on CPU
+            loss = criterion(out, y)
             a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
             bs = y.size(0)
             losses.update(loss.item(), bs)
             top1.update(a1[0].item(), bs)
             top5.update(a5[0].item(), bs)
 
-    # main distributed eval
     run_validation(loader)
-    # global reduce for main part
     top1.all_reduce(); top5.all_reduce(); losses.all_reduce()
 
-    # leftover eval AFTER reduce (no further all-reduce)
+    # Leftover handling (AFTER all_reduce — matches your DenseNet script)
     if hasattr(loader, "sampler") and len(loader.sampler) * args.world_size < len(loader.dataset):
         start = len(loader.sampler) * args.world_size
         aux = Subset(loader.dataset, range(start, len(loader.dataset)))
-        aux_loader = DataLoader(
-            aux, batch_size=args.batch_size, shuffle=False,
-            num_workers=args.workers, pin_memory=True
-        )
+        aux_loader = DataLoader(aux, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
         run_validation(aux_loader)
 
     return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg}
@@ -238,6 +237,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
     losses = AverageMeter(); top1 = AverageMeter(); top5 = AverageMeter()
     step_time = AverageMeter(); data_time = AverageMeter()
 
+    # epoch timing
     if device.type == 'cuda':
         e_start = torch.cuda.Event(enable_timing=True); e_end = torch.cuda.Event(enable_timing=True); e_start.record()
     else:
@@ -256,7 +256,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         optimizer.zero_grad(set_to_none=True)
         if scaler is not None:
             with torch.amp.autocast(device_type='cuda'):
-                out = model(x, lengths)
+                out = model(x, lengths)  # lengths stays on CPU
                 loss = criterion(out, y)
             scaler.scale(loss).backward()
             if CLIP_NORM > 0:
@@ -271,8 +271,10 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
             optimizer.step()
 
+        # per-step scheduler
         scheduler.step()
 
+        # metrics
         a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
         bs = y.size(0)
         losses.update(loss.item(), bs)
@@ -282,6 +284,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         step_time.update(time.perf_counter() - step_start, 1)
         step_start = time.perf_counter()
 
+    # epoch duration
     if device.type == 'cuda':
         e_end.record(); e_end.synchronize()
         duration = e_start.elapsed_time(e_end) / 1000.0
@@ -290,6 +293,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
 
     throughput = samples_seen / max(1e-6, duration)
 
+    # global loss average
     t = torch.tensor([losses.sum, losses.count], device=device, dtype=torch.float64)
     dist.all_reduce(t, op=dist.ReduceOp.SUM)
     loss_global = (t[0] / torch.clamp(t[1], min=1.0)).item()
@@ -307,23 +311,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         'epoch_time': duration,
         'throughput': throughput,   # samples/s
     }
-
-# ------------------------- Optimizer / Param groups ------------------------------
-
-def build_optimizer(model: torch.nn.Module, lr: float, weight_decay: float):
-    decay, no_decay = [], []
-    for n, p in model.named_parameters():
-        if not p.requires_grad:
-            continue
-        if n.endswith(".bias") or ("embedding" in n):
-            no_decay.append(p)
-        else:
-            decay.append(p)
-    groups = [
-        {"params": decay, "weight_decay": weight_decay},
-        {"params": no_decay, "weight_decay": 0.0},
-    ]
-    return optim.AdamW(groups, lr=lr, betas=(0.9, 0.999), eps=1e-8)
 
 # ------------------------- Logging ------------------------------
 
@@ -378,19 +365,14 @@ def train(args):
     # Data
     train_loader, val_loader = get_dataloaders(args, vocab)
 
-    # Model
-    cfg = MODEL_PRESETS[args.model]
+    # Model (only BIG)
     model = LSTMTextModel(
         vocab_size=len(vocab),
-        embed_dim=cfg["embed"],
-        hidden_dim=cfg["hidden"],
-        num_layers=cfg["layers"],
         num_classes=args.num_classes,
-        dropout=cfg["dropout"],
     ).to(device)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    print(f"Model '{args.model}' initialized. (embed={cfg['embed']}, hidden={cfg['hidden']}, layers={cfg['layers']}, drop={cfg['dropout']})", flush=True)
+    print(f"Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.5)", flush=True)
 
     # Straggle sim
     straggle_sim = None
@@ -402,8 +384,8 @@ def train(args):
         else: straggle_sim = None
 
     # Loss / Optim / Scheduler / AMP
-    criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTH).to(device)
-    optimizer = build_optimizer(model, lr=args.learning_rate, weight_decay=args.weight_decay)
+    criterion = nn.CrossEntropyLoss().to(device)
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, betas=(0.9, 0.999), eps=1e-8)
 
     steps_per_epoch = max(1, len(train_loader))
     total_steps = steps_per_epoch * args.epochs
@@ -468,6 +450,7 @@ def train(args):
 # ------------------------- DDP Setup / Main ------------------------------
 
 def setup_ddp(args):
+    # Prefer ENV vars; fall back to provided defaults (mirror your DenseNet)
     def env_int(k, d): return d if os.environ.get(k) in (None,"") else int(os.environ.get(k))
     def env_str(k, d): return d if os.environ.get(k) in (None,"") else os.environ.get(k)
 
@@ -517,7 +500,7 @@ def cleanup():
 def main():
     parser = argparse.ArgumentParser()
 
-    # DDP/System
+    # DDP/System (mirrors your DenseNet CLI)
     parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--iface', type=str, default="ens4f0")
@@ -526,15 +509,14 @@ def main():
     parser.add_argument("--backend", type=str, default="gloo", help="DDP backend (e.g., gloo, nccl)")
     parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
     parser.add_argument("--deterministic", action='store_true')
-    parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--prefetch_factor", type=int, default=2)
+    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--prefetch_factor", type=int, default=8)
     parser.add_argument("--static_graph", action='store_true')
 
-    # Training
-    parser.add_argument('--model', type=str, default='lstm_big', choices=list(MODEL_PRESETS.keys()))
-    parser.add_argument('--epochs', type=int, default=25)
-    parser.add_argument('--batch_size', type=int, default=128)
-    parser.add_argument('--learning_rate', type=float, default=1e-3)
+    # Training (only BIG model)
+    parser.add_argument('--epochs', type=int, default=12)
+    parser.add_argument('--batch_size', type=int, default=32)        # smaller per-rank batch helps generalization
+    parser.add_argument('--learning_rate', type=float, default=2.5e-3)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
@@ -560,6 +542,7 @@ def main():
 
     args = parser.parse_args()
 
+    # Determinism knobs
     if args.deterministic:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True, warn_only=True)

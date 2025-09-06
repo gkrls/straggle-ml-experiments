@@ -42,13 +42,14 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --model lstm_big \
   --backend gloo \
   --epochs 20 \
-  --batch_size 128 \
+  --batch_size 32 \
+  --learning_rate 0.0025 \
   --workers 8 \
   --prefetch_factor 8 \
   --deterministic \
+  --drop_last_train \
   --json $HOME/straggle-ml-experiments/models/lstm.json \
   "$@"
 
