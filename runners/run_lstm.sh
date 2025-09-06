@@ -18,7 +18,7 @@ RANK=$(( ${IP##*.} - 1 ))
 # Default master = same /24, .1 (override with env MASTER_ADDR if you want)
 MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
-echo "[run_lstm_classify.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
+echo "[run_lstm.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
 
 
 # sync repo: clone if missing, otherwise reset/pull
@@ -36,7 +36,7 @@ NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 # Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 set -x
-exec python -u $HOME/straggle-ml-experiments/models/lstm_classify.py \
+exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -49,7 +49,7 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm_classify.py \
   --workers 8 \
   --prefetch_factor 8 \
   --deterministic \
-  --json $HOME/straggle-ml-experiments/models/lstm_classify.json \
+  --json $HOME/straggle-ml-experiments/models/lstm.json \
   "$@"
 
 
