@@ -52,6 +52,7 @@ def get_dataloaders(args):
 
 
 # ------------------------- Metrics ------------------------------
+import math
 
 class AverageMeter:
     def __init__(self):
@@ -60,8 +61,8 @@ class AverageMeter:
         self.sum = 0.0
         self.count = 0.0
         self.avg = 0.0
-        self.min = 0.0
-        self.max = 0xFFFFFFFF
+        self.min = math.inf
+        self.max = 0
     def update(self, val, n=1):
         self.sum += float(val) * n
         self.count += n
