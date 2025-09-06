@@ -3,7 +3,7 @@ set -euo pipefail
 
 # --- minimal config (can be overridden by env) ---
 IFACE="${IFACE:-ens4f0}"                 # network interface to read IP from
-WORLD_SIZE="${WORLD_SIZE:-1}"            # set by launcher or leave 1 for single-node
+WORLD_SIZE="${WORLD_SIZE:-1}"
 BACKEND="${BACKEND:-gloo}"
 MASTER_PORT="${MASTER_PORT:-29500}"
 
