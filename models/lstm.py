@@ -125,46 +125,59 @@ MODEL_PRESETS = {
 
 class LSTMTextModel(nn.Module):
     """
-    1) Embedding
-    2) BiLSTM (num_layers as preset)
-    3) Mean+Max pooling over time (masked) -> concat -> Dropout -> FC
+    2-layer BiLSTM encoder + pooled readout:
+      - mean pool over time (masked)
+      - max  pool over time (masked)
+      - single-head self-attention pooling
+    Final feature = [mean, max, attn] -> Dropout -> FC
     """
     def __init__(self, vocab_size, embed_dim=300, hidden_dim=512, num_layers=2, num_classes=2, dropout=0.5):
         super().__init__()
+        self.unk_id = 1  # <unk>
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
+        self.emb_drop = nn.Dropout(0.1)  # light embedding dropout
+
         self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=num_layers,
                             batch_first=True, bidirectional=True,
                             dropout=dropout if num_layers > 1 else 0.0)
+
+        self.attn = nn.Linear(hidden_dim * 2, 1, bias=False)  # self-attention scores
         self.dropout = nn.Dropout(dropout)
-        self.fc = nn.Linear(hidden_dim * 4, num_classes)  # [mean, max] of 2H -> 4H
+        self.fc = nn.Linear(hidden_dim * 2 * 3, num_classes)  # [mean, max, attn] => 6H
 
     def forward(self, x, lengths: Optional[torch.Tensor] = None):
-        emb = self.embedding(x)
+        emb = self.emb_drop(self.embedding(x))
+
         if lengths is not None:
             packed = nn.utils.rnn.pack_padded_sequence(emb, lengths.cpu(), batch_first=True, enforce_sorted=False)
             out, _ = self.lstm(packed)
             out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)  # (B, T, 2H)
+            T = out.size(1)
+            mask = (torch.arange(T, device=out.device).unsqueeze(0) < lengths.to(out.device).unsqueeze(1)).unsqueeze(-1)  # (B,T,1)
         else:
-            out, _ = self.lstm(emb)  # (B, T, 2H)
-
-        # mask pads for pooling
-        if lengths is not None:
-            B, T, _ = out.size()
-            mask = (torch.arange(T, device=out.device).unsqueeze(0) < lengths.unsqueeze(1).to(out.device)).unsqueeze(-1)  # (B,T,1)
-        else:
+            out, _ = self.lstm(emb)
             mask = torch.ones_like(out[..., :1], dtype=torch.bool)
 
+        # mean pool (masked)
         out_masked = out.masked_fill(~mask, 0.0)
         sum_pool = out_masked.sum(dim=1)
         len_pool = mask.sum(dim=1).clamp(min=1)
         mean_pool = sum_pool / len_pool
 
+        # max pool (masked)
         out_neg_inf = out.masked_fill(~mask, float("-inf"))
         max_pool, _ = out_neg_inf.max(dim=1)
         max_pool[max_pool == float("-inf")] = 0.0
 
-        feat = torch.cat([mean_pool, max_pool], dim=1)  # (B, 4H)
+        # attention pool (masked softmax)
+        scores = self.attn(out).squeeze(-1)                # (B,T)
+        scores = scores.masked_fill(~mask.squeeze(-1), -1e9)
+        alpha  = torch.softmax(scores, dim=1).unsqueeze(-1)  # (B,T,1)
+        attn_pool = (out * alpha).sum(dim=1)               # (B,2H)
+
+        feat = torch.cat([mean_pool, max_pool, attn_pool], dim=1)  # (B, 6H)
         return self.fc(self.dropout(feat))
+
 
 # ------------------------- Scheduler (per-step cosine+warmup) ------------------------------
 
