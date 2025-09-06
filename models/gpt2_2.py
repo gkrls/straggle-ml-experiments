@@ -324,7 +324,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 
                 if args.rank == 0:
                     print(
-                        f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] global_step={global_step}"
+                        f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] global_step={global_step} "
                         f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
                         f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
                         f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s",
@@ -609,7 +609,7 @@ def train(args):
         if args.rank == 0:
             print(
                 f"[{now()}][Epoch {epoch:03d}] "
-                f"global_step={global_step}",
+                f"global_step={global_step} ",
                 f"train_loss={train_metrics['loss']:.4f} "
                 f"train_ppl={train_metrics['ppl']:.2f} "
                 f"val_ppl={val_metrics['ppl']:.2f} "
