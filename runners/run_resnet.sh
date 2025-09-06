@@ -44,6 +44,7 @@ exec python -u $HOME/straggle-ml-experiments/models/resnet.py \
   --master_port "$MASTER_PORT" \
   --backend gloo \
   --data ~/datasets/imagenet \
+  --model resnet50 \
   --batch_size 128 \
   --workers 8 \
   --deterministic \

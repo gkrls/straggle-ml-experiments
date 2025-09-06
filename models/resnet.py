@@ -258,7 +258,7 @@ def train(args):
         model,
         device_ids=[args.local_rank] if device.type == "cuda" else None,
         gradient_as_bucket_view=True,
-        find_unused_parameters=not args.static_graph,
+        find_unused_parameters=False, #not args.static_graph,
         static_graph=args.static_graph,
     )
 
