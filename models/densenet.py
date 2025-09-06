@@ -130,7 +130,7 @@ def validate(model, loader, device, args):
         aux_val_loader = torch.utils.data.DataLoader(aux_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
         run_validation(aux_val_loader)
 
-    return {'val_loss': losses.avg, 'val_top1': top1.avg, 'val_top5': top5.avg }
+    return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg }
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     """Perform 1 full pass over the dataset. Return loss, epoch duration, epoch throughput (imgs/sec)"""
@@ -199,17 +199,17 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     
     # return total_loss / max(1, len(dataloader)), duration, throughput
     return {
-        'train_loss_global' : losses.avg,
-        'train_loss': local_loss,
-        'train_top1': top1.avg,
-        'train_top5': top5.avg,
-        'train_step_time_min': step_time.min,
-        'train_step_time_max': step_time.max,
-        'train_step_time': step_time.avg,
-        'train_data_time': data_time.avg,
-        'train_comp_time': step_time.avg - data_time.avg,
-        'epoch_duration': duration,
-        'epoch_throughput': throughput,
+        'loss_global' : losses.avg,
+        'loss': local_loss,
+        'top1': top1.avg,
+        'top5': top5.avg,
+        'step_time_min': step_time.min,
+        'step_time_max': step_time.max,
+        'step_time': step_time.avg,
+        'data_time': data_time.avg,
+        'comp_time': step_time.avg - data_time.avg,
+        'epoch_time': duration,
+        'throughput': throughput,
     }
 
 
@@ -289,46 +289,43 @@ def train(args):
 
         # Calculate total epoch time and overall throughput
         epoch_time = time.time() - epoch_start
-        epoch_throughput = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
+        # epoch_throughput = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
 
         # Print epoch summary with learning rate
         current_lr = scheduler.get_last_lr()[0]
 
         # if args.rank == 0:
         print(f"[{now()}][Epoch {epoch:03d}] "
-                f"train_loss={train_metrics['train_loss']:.4f} (global={train_metrics['train_loss_global']:.4f}) "
-                f"val_loss={val_metrics['val_loss']:.4f} "
-                f"top1={val_metrics['val_top1']:.2f}% top5={val_metrics['val_top5']:.2f}% "
-                f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['train_step_time']:.2f} "
-                f"(min={train_metrics['train_step_time_min']:.2f}s, max={train_metrics['train_step_time_max']:.2f}) tp=~{epoch_throughput:.1f} img/s", 
+                f"train_loss={train_metrics['loss']:.4f} (global={train_metrics['loss_global']:.4f}) "
+                f"val_loss={val_metrics['loss']:.4f} "
+                f"top1={val_metrics['top1']:.2f}% top5={val_metrics['top5']:.2f}% "
+                f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
+                f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) tp=~{train_metrics['throughput']:.1f} img/s", 
                 f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True)
         
         # Combine all metrics into one dictionary for logging
         epoch_metrics = {
             # Training metrics
-            "train_loss": float(train_metrics['train_loss']),           # Local loss for rank 0
-            "train_loss_global": float(train_metrics['train_loss_global']), # Global average loss
-            "train_top1": float(train_metrics['train_top1']),
-            "train_top5": float(train_metrics['train_top5']),
-            "train_step_time_min": float(train_metrics['train_step_time_min']),
-            "train_step_time_max": float(train_metrics['train_step_time_max']),
-            "train_step_time": float(train_metrics['train_step_time']),
-            "train_data_time": float(train_metrics['train_data_time']),
-            "train_comp_time": float(train_metrics['train_comp_time']),
-            "train_duration": float(train_metrics['epoch_duration']),
-            "train_throughput": float(train_metrics['epoch_throughput']),
+            "lr": float(current_lr),
+            "train_loss": float(train_metrics['loss']),           # Local loss for rank 0
+            "train_loss_global": float(train_metrics['loss_global']), # Global average loss
+            "train_top1": float(train_metrics['top1']),
+            "train_top5": float(train_metrics['top5']),
+            "steps": int(len(train_loader)),
+            "step_time_min": float(train_metrics['step_time_min']),
+            "step_time_max": float(train_metrics['step_time_max']),
+            "step_time": float(train_metrics['step_time']),
+            "data_time": float(train_metrics['data_time']),
+            "comp_time": float(train_metrics['comp_time']),
+            "epoch_time": float(epoch_time),
+            "epoch_train_time": float(train_metrics['epoch_time']),
+            "epoch_train_throughput": float(train_metrics['throughput']),
             
             # Validation metrics
-            "val_loss": float(val_metrics['val_loss']),
-            "val_top1": float(val_metrics['val_top1']),
-            "val_top5": float(val_metrics['val_top5']),
+            "val_loss": float(val_metrics['loss']),
+            "val_top1": float(val_metrics['top1']),
+            "val_top5": float(val_metrics['top5']),
             
-            # Epoch-level metrics
-            "lr": float(current_lr),
-            "epoch_time": float(epoch_time),
-            "epoch_throughput": float(epoch_throughput),
-            "steps": int(len(train_loader)),
-
             # straggle-sim
             "straggle" : straggle_sim.get_stats() if straggle_sim else {}
         }

@@ -188,7 +188,7 @@ def validate(model, loader, device, args, max_batches=200):
     losses.all_reduce()
     val_loss = losses.avg
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
-    return {'val_loss': val_loss, 'val_ppl': val_ppl, 'val_time': time.perf_counter() - step_start}
+    return {'loss': val_loss, 'ppl': val_ppl, 'time': time.perf_counter() - step_start}
 
 
 # ------------------------- train (enhanced with periodic logging) -------------------------
@@ -324,10 +324,10 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 
                 if args.rank == 0:
                     print(
-                        f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] "
-                        f"loss={train_loss:.4f} ppl={train_ppl:.2f} lr={lr:.6f} "
+                        f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] global_step={global_step}"
+                        f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
                         f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
-                        f"micro_time={micro_time_win:.3f}s tok/s={tok_per_s:.0f} global_step={global_step}",
+                        f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s",
                         flush=True
                     )
                     if args.json:
@@ -341,10 +341,10 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                                 "train_loss": float(train_loss),
                                 "train_ppl":  float(train_ppl),
                                 "lr": float(lr),
-                                "step_time_s":       float(step_time_win),
-                                "micro_step_time_s": float(micro_time_win),
-                                "tok_per_s":         float(tok_per_s),
-                                "tokens":            int(w_tokens),
+                                "step_time":       float(step_time_win),
+                                "micro_step_time": float(micro_time_win),
+                                "throughput":      float(tok_per_s),
+                                "tokens":          int(w_tokens),
                             }
                             save_log(args.json, log)
                         except Exception as e:
@@ -360,12 +360,12 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
             # ----- optional mini validation -----
             if (val_loader is not None and getattr(args, "mini_val_every_steps", 0) > 0
                     and step_count % args.mini_val_every_steps == 0):
-                mini = validate(model, val_loader, device, args, max_batches=getattr(args, "mini_val_max_batches", 64))
+                val_metrics = validate(model, val_loader, device, args, max_batches=getattr(args, "mini_val_max_batches", 64))
                 model.train()
                 if args.rank == 0:
                     print(
                         f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
-                        f"val_loss={mini['val_loss']:.4f} val_ppl={mini['val_ppl']:.2f}",
+                        f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
                         flush=True
                     )
                     if args.json:
@@ -376,8 +376,8 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                                 epm = updates_minival.setdefault(str(epoch), {})
                                 epm[f"{step_count:04d}"] = {
                                     "global_step": int(global_step),
-                                    "mini_val_loss": float(mini['val_loss']),
-                                    "mini_val_ppl":  float(mini['val_ppl']),
+                                    "mini_val_loss": float(val_metrics['loss']),
+                                    "mini_val_ppl":  float(val_metrics['ppl']),
                                     "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
                                 }
                             save_log(args.json, log)
@@ -399,23 +399,23 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
     train_ppl = float(np.exp(np.clip(last_train_loss, 0, 20))) if math.isfinite(last_train_loss) else float("nan")
 
     return {
-        "train_loss": float(last_train_loss),
-        "train_ppl":  float(train_ppl),
+        "loss": float(last_train_loss),
+        "ppl":  float(train_ppl),
         "lr":         float(lr),
 
         "micro_steps": int(micro_count),
         "steps":       int(step_count),
         "tokens":      int(tokens),
 
-        "micro_step_time_s": float(micro_time / max(1, micro_count)),  # epoch avg
-        "micro_step_time_min_s": float(micro_time_min if micro_count > 0 else float("nan")),
-        "micro_step_time_max_s": float(micro_time_max if micro_count > 0 else float("nan")),
-        "step_time_s":       float(step_time / max(1, step_count)),    # epoch avg
-        "step_time_min_s":        float(step_time_min if step_count > 0 else float("nan")),
-        "step_time_max_s":        float(step_time_max if step_count > 0 else float("nan")),
+        "micro_step_time":     float(micro_time / max(1, micro_count)),  # epoch avg
+        "micro_step_time_min": float(micro_time_min if micro_count > 0 else float("nan")),
+        "micro_step_time_max": float(micro_time_max if micro_count > 0 else float("nan")),
+        "step_time":           float(step_time / max(1, step_count)),    # epoch avg
+        "step_time_min":       float(step_time_min if step_count > 0 else float("nan")),
+        "step_time_max":       float(step_time_max if step_count > 0 else float("nan")),
+        "epoch_time":          float(time_epoch_s),
 
-        "time_epoch_s": float(time_epoch_s),
-        "tok_per_s":    float(tok_per_s),
+        "throughput":    float(tok_per_s),
     }
 
 
@@ -591,8 +591,9 @@ def train(args):
     global_step = 0  # cumulative optimizer steps so far
 
     for epoch in range(args.epochs):
-        if args.rank == 0:
-            print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
+        print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
+        
+        epoch_start = time.time()
         train_ds.set_epoch(epoch)
 
         # train
@@ -603,28 +604,31 @@ def train(args):
         val_metrics = validate(model, val_loader, device, args, max_batches=args.val_max_batches)
         current_lr = optimizer.param_groups[0]['lr']
 
+        epoch_time = time.time() - epoch_start
         # stdout per-epoch
         if args.rank == 0:
             print(
                 f"[{now()}][Epoch {epoch:03d}] "
-                f"loss={train_metrics['train_loss']:.4f} "
-                f"ppl={train_metrics['train_ppl']:.2f} "
-                f"val_ppl={val_metrics['val_ppl']:.2f} "
-                f"micro_steps={train_metrics['micro_steps']} "
-                f"steps={train_metrics['steps']} "
-                f"step_time={train_metrics['step_time_s']:.3f}s "
-                f"micro_time={train_metrics['micro_step_time_s']:.3f}s "
-                f"tok/s={train_metrics['tok_per_s']:.0f} "
                 f"global_step={global_step}",
+                f"train_loss={train_metrics['loss']:.4f} "
+                f"train_ppl={train_metrics['ppl']:.2f} "
+                f"val_ppl={val_metrics['ppl']:.2f} "
+                f"micro_steps={train_metrics['micro_steps']} "
+                f"micro_time={train_metrics['micro_step_time']:.3f}s "
+                f"steps={train_metrics['steps']} "
+                f"step_time={train_metrics['step_time']:.3f}s "
+                f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
+                f"epoch_time={epoch_time:.3f}s "
+                f"tp={train_metrics['tok_per_s']:.0f} tok/s"
                 f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True
             )
 
             # JSON epoch log
             epoch_metrics = {
-                "train_loss": float(train_metrics['train_loss']),
-                "train_ppl":  float(train_metrics['train_ppl']),
-                "val_loss":   float(val_metrics['val_loss']),
-                "val_ppl":    float(val_metrics['val_ppl']),
+                "train_loss": float(train_metrics['loss']),
+                "train_ppl":  float(train_metrics['ppl']),
+                "val_loss":   float(val_metrics['loss']),
+                "val_ppl":    float(val_metrics['ppl']),
                 "lr":         float(current_lr),
 
                 "micro_steps": int(train_metrics['micro_steps']),
@@ -632,14 +636,15 @@ def train(args):
                 "global_step": int(global_step),                   # cumulative optimizer steps
                 "tokens":      int(train_metrics['tokens']),
 
-                "micro_step_time_s":       float(train_metrics['micro_step_time_s']),
-                "micro_step_time_min_s":   float(train_metrics['micro_step_time_min_s']),
-                "micro_step_time_max_s":   float(train_metrics['micro_step_time_max_s']),
-                "step_time_s":             float(train_metrics['step_time_s']),
-                "step_time_min_s":         float(train_metrics['step_time_min_s']),
-                "step_time_max_s":         float(train_metrics['step_time_max_s']),
-                "time_epoch_s":            float(train_metrics['time_epoch_s']),
-                "tok_per_s":               float(train_metrics['tok_per_s']),
+                "micro_step_time":        float(train_metrics['micro_step_time']),
+                "micro_step_time_min":    float(train_metrics['micro_step_time_min']),
+                "micro_step_time_max":    float(train_metrics['micro_step_time_max']),
+                "step_time":              float(train_metrics['step_time']),
+                "step_time_min":          float(train_metrics['step_time_min']),
+                "step_time_max":          float(train_metrics['step_time_max']),
+                "epoch_time":             float(epoch_time),
+                "epoch_train_time":       float(train_metrics['epoch_time']),
+                "epoch_train_throughput": float(train_metrics['throughput']),
 
                 # straggle-sim
                 "straggle" : straggle_sim.get_stats() if straggle_sim else {}
