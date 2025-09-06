@@ -27,12 +27,12 @@ except Exception:
 # ------------------------- Fixed NLP defaults (tuned) -------------------------
 MIN_FREQ       = 2        # prune singletons for SST-2
 LABEL_SMOOTH   = 0.0      # better on binary tasks
-CLIP_NORM      = 1.0
+CLIP_NORM      = 5.0
 WARMUP_RATIO   = 0.10     # 10% warmup for cosine
 
-# ------------------------- Tokenizer / Vocab ------------------------------
-
 PAD, UNK = "<pad>", "<unk>"
+
+# ------------------------- Tokenizer / Vocab ------------------------------
 
 def simple_tokenizer(text: str) -> List[str]:
     text = text.lower().replace("\n", " ")
@@ -55,8 +55,8 @@ def build_vocab_sst(max_vocab: Optional[int], min_freq: int) -> dict:
     words = [w for w, c in ctr.most_common() if c >= min_freq]
     if max_vocab and max_vocab > 0:
         words = words[: max(0, max_vocab - len(vocab))]
-    for i, w in enumerate(words, start=len(vocab)):
-        vocab[w] = i
+    for w in words:
+        vocab[w] = len(vocab)
     return vocab
 
 def encode(text: str, vocab: dict, max_len: int) -> Tuple[torch.Tensor, int]:
@@ -70,7 +70,7 @@ def encode(text: str, vocab: dict, max_len: int) -> Tuple[torch.Tensor, int]:
 # ------------------------- Dataset ------------------------------
 
 class SSTDataset(Dataset):
-    def __init__(self, split: str, vocab: dict, max_len: int = 128):
+    def __init__(self, split: str, vocab: dict, max_len: int = 256):
         self.data = load_dataset("glue", "sst2", split=split)
         self.vocab = vocab
         self.max_len = max_len
@@ -111,36 +111,60 @@ def accuracy_topk(output: torch.Tensor, target: torch.Tensor, num_classes: int, 
         k = min(k, num_classes)
         correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch))
-    return res  # list of tensors
+    return res
 
 # ------------------------- Model ------------------------------
 
 MODEL_PRESETS = {
-    "lstm_tiny":  {"embed": 128, "hidden": 128, "dropout": 0.2},
-    "lstm_small": {"embed": 200, "hidden": 256, "dropout": 0.3},
-    "lstm_base":  {"embed": 300, "hidden": 256, "dropout": 0.4},  # default
-    "lstm_big":   {"embed": 300, "hidden": 512, "dropout": 0.4},
+    "lstm_tiny":  {"embed": 128, "hidden": 128, "dropout": 0.2, "layers": 1},
+    "lstm_small": {"embed": 200, "hidden": 256, "dropout": 0.3, "layers": 1},
+    "lstm_base":  {"embed": 300, "hidden": 256, "dropout": 0.4, "layers": 1},
+    # amp it up: 2-layer BiLSTM + higher dropout -> better SST-2
+    "lstm_big":   {"embed": 300, "hidden": 512, "dropout": 0.5, "layers": 2},
 }
 
 class LSTMTextModel(nn.Module):
-    def __init__(self, vocab_size, embed_dim=300, hidden_dim=256, num_classes=2, dropout=0.4):
+    """
+    1) Embedding
+    2) BiLSTM (num_layers as preset)
+    3) Mean+Max pooling over time (masked) -> concat -> Dropout -> FC
+    """
+    def __init__(self, vocab_size, embed_dim=300, hidden_dim=512, num_layers=2, num_classes=2, dropout=0.5):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
-        self.lstm = nn.LSTM(embed_dim, hidden_dim, batch_first=True, bidirectional=True)
+        self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=num_layers,
+                            batch_first=True, bidirectional=True,
+                            dropout=dropout if num_layers > 1 else 0.0)
         self.dropout = nn.Dropout(dropout)
-        self.fc = nn.Linear(hidden_dim * 2, num_classes)
+        self.fc = nn.Linear(hidden_dim * 4, num_classes)  # [mean, max] of 2H -> 4H
+
     def forward(self, x, lengths: Optional[torch.Tensor] = None):
         emb = self.embedding(x)
         if lengths is not None:
             packed = nn.utils.rnn.pack_padded_sequence(emb, lengths.cpu(), batch_first=True, enforce_sorted=False)
-            _, (h, _) = self.lstm(packed)
+            out, _ = self.lstm(packed)
+            out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)  # (B, T, 2H)
         else:
-            _, (h, _) = self.lstm(emb)
-        if self.lstm.bidirectional:
-            h_out = torch.cat([h[-2], h[-1]], dim=1)  # concat both directions
+            out, _ = self.lstm(emb)  # (B, T, 2H)
+
+        # mask pads for pooling
+        if lengths is not None:
+            B, T, _ = out.size()
+            mask = (torch.arange(T, device=out.device).unsqueeze(0) < lengths.unsqueeze(1).to(out.device)).unsqueeze(-1)  # (B,T,1)
         else:
-            h_out = h[-1]
-        return self.fc(self.dropout(h_out))
+            mask = torch.ones_like(out[..., :1], dtype=torch.bool)
+
+        out_masked = out.masked_fill(~mask, 0.0)
+        sum_pool = out_masked.sum(dim=1)
+        len_pool = mask.sum(dim=1).clamp(min=1)
+        mean_pool = sum_pool / len_pool
+
+        out_neg_inf = out.masked_fill(~mask, float("-inf"))
+        max_pool, _ = out_neg_inf.max(dim=1)
+        max_pool[max_pool == float("-inf")] = 0.0
+
+        feat = torch.cat([mean_pool, max_pool], dim=1)  # (B, 4H)
+        return self.fc(self.dropout(feat))
 
 # ------------------------- Scheduler (per-step cosine+warmup) ------------------------------
 
@@ -166,7 +190,7 @@ def validate(model, loader, device, args, num_classes: int):
             y = y.to(device, non_blocking=True)
             if args.amp and device.type == 'cuda':
                 with torch.amp.autocast(device_type='cuda'):
-                    out = model(x, lengths)   # lengths on CPU
+                    out = model(x, lengths)
                     loss = criterion(out, y)
             else:
                 out = model(x, lengths)
@@ -199,7 +223,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
     losses = AverageMeter(); top1 = AverageMeter(); top5 = AverageMeter()
     step_time = AverageMeter(); data_time = AverageMeter()
 
-    # epoch timing
     if device.type == 'cuda':
         e_start = torch.cuda.Event(enable_timing=True); e_end = torch.cuda.Event(enable_timing=True); e_start.record()
     else:
@@ -218,7 +241,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         optimizer.zero_grad(set_to_none=True)
         if scaler is not None:
             with torch.amp.autocast(device_type='cuda'):
-                out = model(x, lengths)  # lengths stays on CPU for pack_padded_sequence
+                out = model(x, lengths)
                 loss = criterion(out, y)
             scaler.scale(loss).backward()
             if CLIP_NORM > 0:
@@ -233,10 +256,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
             optimizer.step()
 
-        # per-step scheduler
         scheduler.step()
 
-        # metrics
         a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
         bs = y.size(0)
         losses.update(loss.item(), bs)
@@ -246,7 +267,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         step_time.update(time.perf_counter() - step_start, 1)
         step_start = time.perf_counter()
 
-    # epoch duration
     if device.type == 'cuda':
         e_end.record(); e_end.synchronize()
         duration = e_start.elapsed_time(e_end) / 1000.0
@@ -255,14 +275,13 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
 
     throughput = samples_seen / max(1e-6, duration)
 
-    # global loss average
     t = torch.tensor([losses.sum, losses.count], device=device, dtype=torch.float64)
     dist.all_reduce(t, op=dist.ReduceOp.SUM)
     loss_global = (t[0] / torch.clamp(t[1], min=1.0)).item()
 
     return {
         'loss_global' : loss_global,
-        'loss': losses.avg,         # local avg (parity with your DenseNet print)
+        'loss': losses.avg,
         'top1': top1.avg,
         'top5': top5.avg,
         'step_time_min': step_time.min,
@@ -273,6 +292,23 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         'epoch_time': duration,
         'throughput': throughput,   # samples/s
     }
+
+# ------------------------- Optimizer / Param groups ------------------------------
+
+def build_optimizer(model: torch.nn.Module, lr: float, weight_decay: float):
+    decay, no_decay = [], []
+    for n, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+        if n.endswith(".bias") or ("embedding" in n):
+            no_decay.append(p)
+        else:
+            decay.append(p)
+    groups = [
+        {"params": decay, "weight_decay": weight_decay},
+        {"params": no_decay, "weight_decay": 0.0},
+    ]
+    return optim.AdamW(groups, lr=lr, betas=(0.9, 0.999), eps=1e-8)
 
 # ------------------------- Logging ------------------------------
 
@@ -309,23 +345,6 @@ def get_dataloaders(args, vocab: dict):
     )
     return train_loader, val_loader
 
-# ------------------------- Optimizer / Param groups ------------------------------
-
-def build_optimizer(model: torch.nn.Module, lr: float, weight_decay: float):
-    decay, no_decay = [], []
-    for n, p in model.named_parameters():
-        if not p.requires_grad:
-            continue
-        if n.endswith(".bias") or ("embedding" in n):
-            no_decay.append(p)
-        else:
-            decay.append(p)
-    groups = [
-        {"params": decay, "weight_decay": weight_decay},
-        {"params": no_decay, "weight_decay": 0.0},
-    ]
-    return optim.AdamW(groups, lr=lr, betas=(0.9, 0.999), eps=1e-8)
-
 # ------------------------- Train Driver ------------------------------
 
 def train(args):
@@ -350,12 +369,13 @@ def train(args):
         vocab_size=len(vocab),
         embed_dim=cfg["embed"],
         hidden_dim=cfg["hidden"],
+        num_layers=cfg["layers"],
         num_classes=args.num_classes,
         dropout=cfg["dropout"],
     ).to(device)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    print(f"Model '{args.model}' initialized. (embed={cfg['embed']}, hidden={cfg['hidden']}, drop={cfg['dropout']})", flush=True)
+    print(f"Model '{args.model}' initialized. (embed={cfg['embed']}, hidden={cfg['hidden']}, layers={cfg['layers']}, drop={cfg['dropout']})", flush=True)
 
     # Straggle sim
     straggle_sim = None
@@ -433,7 +453,6 @@ def train(args):
 # ------------------------- DDP Setup / Main ------------------------------
 
 def setup_ddp(args):
-    # Prefer ENV vars; fall back to provided defaults (mirror your DenseNet)
     def env_int(k, d): return d if os.environ.get(k) in (None,"") else int(os.environ.get(k))
     def env_str(k, d): return d if os.environ.get(k) in (None,"") else os.environ.get(k)
 
@@ -483,7 +502,7 @@ def cleanup():
 def main():
     parser = argparse.ArgumentParser()
 
-    # DDP/System (mirrors your DenseNet CLI)
+    # DDP/System
     parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--iface', type=str, default="ens4f0")
@@ -497,22 +516,22 @@ def main():
     parser.add_argument("--static_graph", action='store_true')
 
     # Training
-    parser.add_argument('--model', type=str, default='lstm_base', choices=list(MODEL_PRESETS.keys()))
-    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--model', type=str, default='lstm_big', choices=list(MODEL_PRESETS.keys()))
+    parser.add_argument('--epochs', type=int, default=25)
     parser.add_argument('--batch_size', type=int, default=128)
-    parser.add_argument('--learning_rate', type=float, default=2e-3)
-    parser.add_argument('--weight_decay', type=float, default=1e-3)
+    parser.add_argument('--learning_rate', type=float, default=1e-3)
+    parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
     parser.add_argument("--drop_last_val", action='store_true')
     parser.add_argument("--json", type=str, default="lstm_sst.json", help="Path to JSON run log")
 
-    # Text knobs (only the ones that matter)
-    parser.add_argument("--max_len", type=int, default=128, help="Max tokens per sample")
+    # Text knobs
+    parser.add_argument("--max_len", type=int, default=256, help="Max tokens per sample")
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
 
-    # Straggle (same interface as your DenseNet script)
+    # Straggle
     def csv_ints(s: str) -> List[int]:
         if not s: return []
         try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
@@ -526,7 +545,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Determinism knobs
     if args.deterministic:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True, warn_only=True)
