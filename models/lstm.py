@@ -28,8 +28,8 @@ except Exception:
 PAD_ID         = 0
 UNK_ID         = 1
 MIN_FREQ       = 1            # keep rare tokens (helps sentiment)
-WORD_DROPOUT_P = 0.15         # replace ~10% tokens with <unk> during training only
-EMB_DROPOUT_P  = 0.2          # light embedding dropout
+WORD_DROPOUT_P = 0.15         # bumped from 0.10
+EMB_DROPOUT_P  = 0.20         # bumped from 0.10
 CLIP_NORM      = 5.0
 WARMUP_RATIO   = 0.10         # 10% warmup for cosine
 
@@ -127,10 +127,10 @@ class LSTMTextModel(nn.Module):
     """
     def __init__(self, vocab_size, num_classes=2):
         super().__init__()
-        embed_dim  = 100 #300
-        hidden_dim = 256 #512
+        embed_dim  = 300
+        hidden_dim = 512
         num_layers = 2
-        dropout    = 0.5
+        dropout    = 0.6   # bumped from 0.5
 
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
         self.emb_drop = nn.Dropout(EMB_DROPOUT_P)
@@ -190,14 +190,20 @@ class LSTMTextModel(nn.Module):
         feat = self.norm(feat)
         return self.proj(self.dropout(feat))
 
-# ------------------------- Scheduler (per-step cosine+warmup) ------------------------------
+# ------------------------- Scheduler (per-step cosine+warmup, with floor) ------------------------------
 
-def build_per_step_cosine(optimizer, total_steps: int, warmup_steps: int):
+def build_per_step_cosine(optimizer, total_steps: int, warmup_steps: int, min_lr_mult: float = 0.15):
+    """
+    Cosine schedule with warmup and a non-zero floor so LR never collapses.
+    Effective LR = base_lr * lambda(step); lambda in [min_lr_mult, 1].
+    """
     def lr_lambda(step):
         if step < warmup_steps:
             return float(step + 1) / float(max(1, warmup_steps))
         progress = (step - warmup_steps) / float(max(1, total_steps - warmup_steps))
-        return 0.5 * (1.0 + math.cos(math.pi * progress))
+        progress = min(max(progress, 0.0), 1.0)
+        cos = 0.5 * (1.0 + math.cos(math.pi * progress))
+        return min_lr_mult + (1.0 - min_lr_mult) * cos
     return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
 
 # ------------------------- Train / Eval ------------------------------
@@ -206,7 +212,7 @@ def build_per_step_cosine(optimizer, total_steps: int, warmup_steps: int):
 def validate(model, loader, device, args, num_classes: int):
     model.eval()
     top1, top5, losses = AverageMeter(), AverageMeter(), AverageMeter()
-    criterion = nn.CrossEntropyLoss(label_smoothing=0.05).to(device)
+    criterion = nn.CrossEntropyLoss().to(device)
 
     def run_validation(dataloader):
         for x, y, lengths in dataloader:
@@ -372,7 +378,7 @@ def train(args):
     ).to(device)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    print(f"Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.5)", flush=True)
+    print(f"Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.6)", flush=True)
 
     # Straggle sim
     straggle_sim = None
@@ -384,13 +390,15 @@ def train(args):
         else: straggle_sim = None
 
     # Loss / Optim / Scheduler / AMP
-    criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, betas=(0.9, 0.999), eps=1e-8)
+    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
+
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate,
+                            weight_decay=args.weight_decay, betas=(0.9, 0.999), eps=1e-8)
 
     steps_per_epoch = max(1, len(train_loader))
     total_steps = steps_per_epoch * args.epochs
     warmup_steps = int(WARMUP_RATIO * total_steps)
-    scheduler = build_per_step_cosine(optimizer, total_steps, warmup_steps)
+    scheduler = build_per_step_cosine(optimizer, total_steps, warmup_steps, min_lr_mult=args.cosine_min_lr_mult)
 
     scaler = torch.amp.GradScaler('cuda', enabled=(args.amp and device.type == "cuda"))
 
@@ -514,10 +522,10 @@ def main():
     parser.add_argument("--static_graph", action='store_true')
 
     # Training (only BIG model)
-    parser.add_argument('--epochs', type=int, default=12)
-    parser.add_argument('--batch_size', type=int, default=32)        # smaller per-rank batch helps generalization
-    parser.add_argument('--learning_rate', type=float, default=0.0005)
-    parser.add_argument('--weight_decay', type=float, default=0.0001)
+    parser.add_argument('--epochs', type=int, default=12)  # 12 is enough with stronger regularization
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--learning_rate', type=float, default=0.001)
+    parser.add_argument('--weight_decay', type=float, default=2e-05)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
@@ -527,6 +535,11 @@ def main():
     # Text knobs
     parser.add_argument("--max_len", type=int, default=50, help="Max tokens per sample")
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
+
+    # Regularization knobs added
+    parser.add_argument("--label_smoothing", type=float, default=0.05, help="CrossEntropy label smoothing")
+    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.15,
+                        help="Cosine LR floor as a fraction of base LR (e.g., 0.15 keeps LR >= 15% of base)")
 
     # Straggle
     def csv_ints(s: str) -> List[int]:

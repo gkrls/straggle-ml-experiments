@@ -44,11 +44,11 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --master_port "$MASTER_PORT" \
   --backend gloo \
   --epochs 15 \
-  --batch_size 64 \
+  --batch_size 32 \
   --workers 8 \
   --prefetch_factor 8 \
   --deterministic \
-  --drop_last_train \
+  --drop_last_val \
   --json $HOME/straggle-ml-experiments/models/lstm.json \
   "$@"
 
