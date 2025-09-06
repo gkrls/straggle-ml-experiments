@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import Dataset, DataLoader, DistributedSampler
+from torch.utils.data import Dataset, DataLoader, DistributedSampler, Subset
 from datasets import load_dataset  # Hugging Face
 
 # -------- optional straggle sim (same API as your DenseNet script) --------
@@ -25,8 +25,8 @@ except Exception:
     SlowWorkerPattern = None
 
 # ------------------------- Fixed NLP defaults (simplified) -------------------------
-MIN_FREQ       = 2
-LABEL_SMOOTH   = 0.1
+MIN_FREQ       = 1
+LABEL_SMOOTH   = 0.05
 CLIP_NORM      = 1.0
 WARMUP_RATIO   = 0.10  # 10% warmup for cosine
 
@@ -126,9 +126,9 @@ class LSTMTextModel(nn.Module):
     def __init__(self, vocab_size, embed_dim=300, hidden_dim=256, num_classes=2, dropout=0.4):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
-        self.lstm = nn.LSTM(embed_dim, hidden_dim, batch_first=True)
+        self.lstm = nn.LSTM(embed_dim, hidden_dim, batch_first=True, bidirectional=True)
         self.dropout = nn.Dropout(dropout)
-        self.fc = nn.Linear(hidden_dim, num_classes)
+        self.fc = nn.Linear(hidden_dim * 2, num_classes)
     def forward(self, x, lengths: Optional[torch.Tensor] = None):
         emb = self.embedding(x)
         if lengths is not None:
@@ -136,8 +136,11 @@ class LSTMTextModel(nn.Module):
             _, (h, _) = self.lstm(packed)
         else:
             _, (h, _) = self.lstm(emb)
-        out = self.dropout(h[-1])
-        return self.fc(out)
+        # out = self.dropout(h[-1])
+        # return self.fc(out)
+        out = self.dropout(h[-1])   # for biLSTM, last layer gives 2 directions; torch stacks them so:
+        out = torch.cat([h[-2], h[-1]], dim=1) if self.lstm.bidirectional else h[-1]
+        return self.fc(self.dropout(out))
 
 # ------------------------- Scheduler (per-step cosine+warmup) ------------------------------
 
@@ -179,7 +182,6 @@ def validate(model, loader, device, args, num_classes: int):
 
     # Leftover handling (mirrors your DenseNet script)
     if hasattr(loader, "sampler") and len(loader.sampler) * args.world_size < len(loader.dataset):
-        from torch.utils.data import Subset
         start = len(loader.sampler) * args.world_size
         aux = Subset(loader.dataset, range(start, len(loader.dataset)))
         aux_loader = DataLoader(aux, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
@@ -477,7 +479,7 @@ def main():
     parser.add_argument('--model', type=str, default='lstm_base', choices=list(MODEL_PRESETS.keys()))
     parser.add_argument('--epochs', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=128)
-    parser.add_argument('--learning_rate', type=float, default=2e-3)
+    parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--weight_decay', type=float, default=1e-2)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
