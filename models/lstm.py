@@ -28,7 +28,7 @@ except Exception:
 PAD_ID         = 0
 UNK_ID         = 1
 MIN_FREQ       = 1            # keep rare tokens (helps sentiment)
-WORD_DROPOUT_P = 0.2          # replace ~10% tokens with <unk> during training only
+WORD_DROPOUT_P = 0.15         # replace ~10% tokens with <unk> during training only
 EMB_DROPOUT_P  = 0.2          # light embedding dropout
 CLIP_NORM      = 5.0
 WARMUP_RATIO   = 0.10         # 10% warmup for cosine
@@ -127,7 +127,7 @@ class LSTMTextModel(nn.Module):
     """
     def __init__(self, vocab_size, num_classes=2):
         super().__init__()
-        embed_dim  = 300
+        embed_dim  = 100 #300
         hidden_dim = 256 #512
         num_layers = 2
         dropout    = 0.5
