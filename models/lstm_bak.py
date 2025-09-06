@@ -516,8 +516,8 @@ def main():
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--batch_size', type=int, default=32)        # smaller per-rank batch helps generalization
-    parser.add_argument('--learning_rate', type=float, default=0.0015)
-    parser.add_argument('--weight_decay', type=float, default=2e-5)
+    parser.add_argument('--learning_rate', type=float, default=2.5e-3)
+    parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
@@ -525,7 +525,7 @@ def main():
     parser.add_argument("--json", type=str, default="lstm_sst.json", help="Path to JSON run log")
 
     # Text knobs
-    parser.add_argument("--max_len", type=int, default=64, help="Max tokens per sample")
+    parser.add_argument("--max_len", type=int, default=256, help="Max tokens per sample")
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
 
     # Straggle

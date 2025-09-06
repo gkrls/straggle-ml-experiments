@@ -43,9 +43,9 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --backend gloo \
-  --epochs 20 \
+  --epochs 15 \
   --batch_size 32 \
-  --learning_rate 0.0025 \
+  --learning_rate 0.0015 \
   --workers 8 \
   --prefetch_factor 8 \
   --deterministic \
