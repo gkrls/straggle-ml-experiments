@@ -372,10 +372,7 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args, vocab)
 
     # Model (only BIG)
-    model = LSTMTextModel(
-        vocab_size=len(vocab),
-        num_classes=args.num_classes,
-    ).to(device)
+    model = LSTMTextModel(vocab_size=len(vocab), num_classes=args.num_classes).to(device)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
     print(f"Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.6)", flush=True)
@@ -387,7 +384,7 @@ def train(args):
                                     ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
                                     verbose=args.straggle_verbose)
     if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
-    else: print(f"Straggle sim not initialized")
+    else: print(f"Straggle sim inactive")
     # else: straggle_sim = None
 
     # Loss / Optim / Scheduler / AMP
@@ -411,16 +408,18 @@ def train(args):
 
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
+        epoch_start = time.time()
 
         straggle_sim.reset_stats()
+
         train_loader.sampler.set_epoch(epoch)
-        epoch_start = time.time()
 
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, scheduler, device, scaler,
                                         num_classes=args.num_classes)
         val_metrics   = validate(model, val_loader, device, args, num_classes=args.num_classes)
 
         epoch_time = time.time() - epoch_start
+
         current_lr = optimizer.param_groups[0]['lr']
 
         print(f"[{now()}][Epoch {epoch:03d}] "
@@ -430,7 +429,7 @@ def train(args):
               f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
               f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) "
               f"tp=~{train_metrics['throughput']:.1f} samples/s",
-              f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}",
+              f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}",
               flush=True)
 
         # JSON epoch record
@@ -452,7 +451,7 @@ def train(args):
             "val_loss": float(val_metrics['loss']),
             "val_top1": float(val_metrics['top1']),
             "val_top5": float(val_metrics['top5']),
-            "straggle": straggle_sim.get_stats()
+            "straggle": straggle_sim.get_stats() if straggle_sim.active else {}
         }
         log["epochs"][str(epoch)] = epoch_metrics
         save_log(args.json, log)

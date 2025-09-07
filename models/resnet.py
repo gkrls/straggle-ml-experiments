@@ -259,13 +259,11 @@ def train(args):
     print(f"Model '{args.model}' initialized.", flush=True)
 
     # Straggle sim
-    straggle_sim = None
-    if args.straggle_points > 0:
-        straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                        ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
-                                        verbose=args.straggle_verbose)
-        if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
-        else: straggle_sim = None
+    straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
+                                    ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
+                                    verbose=args.straggle_verbose)
+    if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
+    else: print(f"Straggle sim inactive")
 
     # Optimizer / Scheduler / AMP (unchanged from original resnet script)
     criterion = nn.CrossEntropyLoss().to(device)
@@ -287,6 +285,9 @@ def train(args):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
 
         epoch_wall_start = time.time()
+
+        straggle_sim.reset_stats()
+
         train_loader.sampler.set_epoch(epoch)
 
         # Train for one epoch and get metrics
@@ -310,7 +311,7 @@ def train(args):
             f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
             f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) "
             f"tp=~{train_metrics['throughput']:.1f} img/s",
-            f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True)
+            f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}", flush=True)
 
         # Log all metrics in a single dict
         epoch_metrics = {
@@ -334,6 +335,9 @@ def train(args):
             "val_loss": float(val_metrics['loss']),
             "val_top1": float(val_metrics['top1']),
             "val_top5": float(val_metrics['top5']),
+
+            # straggle-sim
+            "straggle" : straggle_sim.get_stats() if straggle_sim.active else {}
         }
 
         log["epochs"][str(epoch)] = epoch_metrics

@@ -493,13 +493,11 @@ def train(args):
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
 
     # Straggle sim
-    straggle_sim = None
-    if args.straggle_points > 0:
-        straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                        ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
-                                        verbose=args.straggle_verbose)
-        if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
-        else: straggle_sim = None
+    straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
+                                    ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
+                                    verbose=args.straggle_verbose)
+    if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
+    else: print(f"Straggle sim inactive")
 
     if args.rank == 0:
         n_tr = len(ds_train); n_va = len(ds_val)
@@ -596,6 +594,9 @@ def train(args):
         print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
         
         epoch_start = time.time()
+
+        straggle_sim.reset_stats()
+        
         train_ds.set_epoch(epoch)
 
         # train
@@ -622,7 +623,7 @@ def train(args):
                 f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
                 f"epoch_time={epoch_time:.3f}s "
                 f"tp={train_metrics['tok_per_s']:.0f} tok/s"
-                f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True
+                f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}", flush=True
             )
 
             # JSON epoch log
@@ -649,7 +650,7 @@ def train(args):
                 "epoch_train_throughput": float(train_metrics['throughput']),
 
                 # straggle-sim
-                "straggle" : straggle_sim.get_stats() if straggle_sim else {}
+                "straggle" : straggle_sim.get_stats() if straggle_sim.active else {}
             }
             with open(args.json, "r") as f:
                 log = json.load(f)

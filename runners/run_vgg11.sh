@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- minimal config (can be overridden by env) ---
+IFACE="${IFACE:-ens4f0}"                 # network interface to read IP from
+WORLD_SIZE="${WORLD_SIZE:-1}"            # set by launcher or leave 1 for single-node
+BACKEND="${BACKEND:-gloo}"
+MASTER_PORT="${MASTER_PORT:-29500}"
+
+# Derive IP on IFACE, rank = last octet - 1
+IP=$(ip -4 -o addr show dev "$IFACE" | awk '{print $4}' | cut -d/ -f1 || true)
+if [[ -z "${IP}" ]]; then
+  echo "[run_resnet.sh] ERROR: could not get IPv4 for IFACE=$IFACE" >&2
+  exit 1
+fi
+RANK=$(( ${IP##*.} - 1 ))
+
+# Default master = same /24, .1 (override with env MASTER_ADDR if you want)
+MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
+
+echo "[run_vgg11.sh] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
+
+
+# sync repo: clone if missing, otherwise reset/pull
+if [ ! -d "$HOME/straggle-ml-experiments/.git" ]; then
+  git clone https://github.com/gkrls/straggle-ml-experiments.git "$HOME/straggle-ml-experiments"
+else
+  git -C "$HOME/straggle-ml-experiments" reset --hard >/dev/null 2>&1 || true
+  git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
+fi
+
+source $HOME/straggle-ml-experiments/venv/bin/activate
+
+NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
+NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
+
+# Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
+set -x
+exec python -u $HOME/straggle-ml-experiments/models/vgg.py \
+  --rank "$RANK" \
+  --world_size "$WORLD_SIZE" \
+  --iface "$IFACE" \
+  --master_addr "$MASTER_ADDR" \
+  --master_port "$MASTER_PORT" \
+  --backend gloo \
+  --data ~/datasets/imagenet \
+  --model vgg11 \
+  --batch_size 128 \
+  --workers 8 \
+  --deterministic \
+  --drop_last_val \
+  --prefetch_factor 4 \
+  --json $HOME/straggle-ml-experiments/models/vgg11.json \
+  "$@"

@@ -12,12 +12,8 @@ import sys
 import json
 import datetime
 import time 
-import re
 import random
 import numpy as np
-import math
-
-from straggle_sim import SlowWorkerPattern
 
 # ------------------------- Dataset ------------------------------
 
@@ -61,15 +57,10 @@ class AverageMeter:
         self.sum = 0.0
         self.count = 0.0
         self.avg = 0.0
-        self.min = math.inf
-        self.max = 0
     def update(self, val, n=1):
         self.sum += float(val) * n
         self.count += n
         self.avg = self.sum / max(1.0, self.count)
-        self.min = min(self.min, val)
-        self.max = max(self.max, val)
-
     def all_reduce(self):
         if dist.is_available() and dist.is_initialized():
             backend = dist.get_backend()
@@ -130,33 +121,21 @@ def validate(model, loader, device, args):
         aux_val_dataset = Subset(loader.dataset, range(len(loader.sampler) * args.world_size, len(loader.dataset)))
         aux_val_loader = torch.utils.data.DataLoader(aux_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
         run_validation(aux_val_loader)
-
-    return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg }
+    return top1.avg, top5.avg, losses.avg
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
-    """Perform 1 full pass over the dataset. Return loss"""
+    """Perform 1 full pass over the dataset. Return loss, epoch duration, epoch throughput (imgs/sec)"""
     model.train()
+    total_loss, samples_seen = 0.0, 0.0
     
-    # meters
-    losses = AverageMeter()
-    top1 = AverageMeter() 
-    top5 = AverageMeter()
-    step_time = AverageMeter()
-    data_time = AverageMeter()
-
     if device.type == 'cuda':
-        epoch_start = torch.cuda.Event(enable_timing=True)
-        epoch_end   = torch.cuda.Event(enable_timing=True)
-        epoch_start.record()  # on current stream
+        start = torch.cuda.Event(enable_timing=True)
+        end   = torch.cuda.Event(enable_timing=True)
+        start.record()  # on current stream
     else:
-        epoch_start = time.perf_counter()
+        start = time.perf_counter()
 
-    step_start = time.perf_counter()
-
-    samples_seen = 0.0
     for images, targets in dataloader:
-        data_time.update(time.perf_counter() - step_start, n=1)
-
         images = images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
         samples_seen += images.size(0)
@@ -175,44 +154,17 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
             loss.backward()
             optimizer.step()
 
-        # Calculate accuracy
-        acc1, acc5 = accuracy(outputs, targets, topk=(1, 5))
-
-        # Update meters
-        losses.update(loss.item(), images.size(0))
-        top1.update(acc1[0].item(), images.size(0))
-        top5.update(acc5[0].item(), images.size(0))
-        
-        step_time.update(time.perf_counter() - step_start, n=1)
-        step_start = time.perf_counter()
+        total_loss += float(loss.item())
 
     if device.type == 'cuda':
-        epoch_end.record() 
-        epoch_end.synchronize()
-        duration = epoch_start.elapsed_time(epoch_end) / 1000.0  # seconds
+        end.record() 
+        end.synchronize()
+        duration = start.elapsed_time(end) / 1000.0  # seconds
     else:
-        duration = time.perf_counter() - epoch_start
+        duration = time.perf_counter() - start
 
     throughput = samples_seen / max(1e-6, duration)
-
-    local_loss = losses.avg
-    losses.all_reduce()
-    
-    # return total_loss / max(1, len(dataloader)), duration, throughput
-    return {
-        'loss_global' : losses.avg,
-        'loss': local_loss,
-        'top1': top1.avg,
-        'top5': top5.avg,
-        'step_time_min': step_time.min,
-        'step_time_max': step_time.max,
-        'step_time': step_time.avg,
-        'data_time': data_time.avg,
-        'comp_time': step_time.avg - data_time.avg,
-        'epoch_time': duration,
-        'throughput': throughput,
-    }
-
+    return total_loss / max(1, len(dataloader)), duration, throughput
 
 def save_log(path, log):
     """Atomically write log dict to JSON file."""
@@ -229,39 +181,20 @@ def train(args):
     # Data
     train_loader, val_loader = get_dataloaders(args)
 
-    # Model - DenseNet variants
+    # Model
     model = None
-    if args.model == 'densenet121': 
-        model = models.densenet121(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
-    elif args.model == 'densenet161': 
-        model = models.densenet161(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
-    elif args.model == 'densenet169': 
-        model = models.densenet169(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
-    elif args.model == 'densenet201': 
-        model = models.densenet201(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
-    else: 
-        raise ValueError(f"Unsupported model: {args.model}")
+    if args.model == 'vgg11': model = models.vgg11(num_classes=args.num_classes).to(device, memory_format=torch.channels_last)
+    elif args.model == 'vgg19': model = models.vgg19(num_classes=args.num_classes).to(device, memory_format=torch.channels_last)
+    else: raise ValueError(f"Unsupported model: {args.model}")
 
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True,
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, \
                 find_unused_parameters=False, static_graph=args.static_graph)
 
     print(f"Model '{args.model}' initialized.", flush=True)
 
-    # Straggle sim
-    straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                    ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
-                                    verbose=args.straggle_verbose)
-    if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
-    else: print(f"Straggle sim inactive")
-
     criterion = nn.CrossEntropyLoss().to(device)
-    
-    # DenseNet typically uses SGD with Nesterov momentum based on research findings
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay, nesterov=True, foreach=True)
-    
-    # Learning rate schedule: reduce by 0.1 at 50% and 75% of total epochs (common DenseNet practice)
-    # milestones = [int(args.epochs * 0.5), int(args.epochs * 0.75)]
-    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.1)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum,  weight_decay=args.weight_decay, foreach=True) # fused=True 
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer,milestones=[30, 60, 80],gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
@@ -270,81 +203,46 @@ def train(args):
     best_top1 = 0.0
     best_top5 = 0.0
 
-    # if args.rank == 0:
-    log = {"time": now(), "config": vars(args), "epochs": {}}
-    save_log(args.json, log)
+    if args.rank == 0:
+        log = {"time": now(), "config": vars(args), "epochs": {}}
+        save_log(args.json, log)
     
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
+
         epoch_start = time.time()
-
-        straggle_sim.reset_stats()
-
         train_loader.sampler.set_epoch(epoch)
         
-        # Get current learning rate
-        # current_lr = optimizer.param_groups[0]['lr']
-
-        # Train for one epoch and get metrics
-        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
-
-        # Validate and get metrics
-        val_metrics  = validate(model, val_loader, device, args)
-
-        # Calculate total epoch time and overall throughput
-        epoch_time = time.time() - epoch_start
-        # epoch_throughput = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
+        train_loss, train_time, train_tp = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
+        top1, top5, val_loss = validate(model, val_loader, device, args)
 
         # Print epoch summary with learning rate
         current_lr = scheduler.get_last_lr()[0]
-
-        # if args.rank == 0:
-        print(f"[{now()}][Epoch {epoch:03d}] "
-                f"train_loss={train_metrics['loss']:.4f} (global={train_metrics['loss_global']:.4f}) "
-                f"val_loss={val_metrics['loss']:.4f} "
-                f"top1={val_metrics['top1']:.2f}% top5={val_metrics['top5']:.2f}% "
-                f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
-                f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) tp=~{train_metrics['throughput']:.1f} img/s", 
-                f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}", flush=True)
+        if args.rank == 0:
+            epoch_time = time.time() - epoch_start
+            epoch_tp = (len(train_loader.dataset) / max(1, args.world_size)) / max(1e-6, epoch_time)
         
-        # Combine all metrics into one dictionary for logging
-        epoch_metrics = {
-            # Training metrics
-            "lr": float(current_lr),
-            "train_loss": float(train_metrics['loss']),           # Local loss for rank 0
-            "train_loss_global": float(train_metrics['loss_global']), # Global average loss
-            "train_top1": float(train_metrics['top1']),
-            "train_top5": float(train_metrics['top5']),
-            "steps": int(len(train_loader)),
-            "step_time_min": float(train_metrics['step_time_min']),
-            "step_time_max": float(train_metrics['step_time_max']),
-            "step_time": float(train_metrics['step_time']),
-            "data_time": float(train_metrics['data_time']),
-            "comp_time": float(train_metrics['comp_time']),
-            "epoch_time": float(epoch_time),
-            "epoch_train_time": float(train_metrics['epoch_time']),
-            "epoch_train_throughput": float(train_metrics['throughput']),
-            
-            # Validation metrics
-            "val_loss": float(val_metrics['loss']),
-            "val_top1": float(val_metrics['top1']),
-            "val_top5": float(val_metrics['top5']),
-            
-            # straggle-sim
-            "straggle": straggle_sim.get_stats() if straggle_sim.active else {}
-        }
-        
-        log["epochs"][str(epoch)] = epoch_metrics
-        save_log(args.json, log)
-        
-        # Track best validation accuracy
-        if val_metrics['top1'] > best_top1: 
-            best_top1 = val_metrics['top1']
-        if val_metrics['top5'] > best_top5: 
-            best_top5 = val_metrics['top5']
+            print(f"[{now()}][Epoch {epoch:03d}] train_loss={train_loss:.4f} val_loss={val_loss:.4f} top1={top1:.2f}% top5={top5:.2f}% "
+                  f"lr={current_lr:.6f} time={epoch_time:.2f}s tp= ~{epoch_tp:.1f} img/s", flush=True)
+            log["epochs"][str(epoch)] = {
+                "train_loss": float(train_loss),
+                "val_loss": float(val_loss),
+                "top1": float(top1),
+                "top5": float(top5),
+                "steps": int(len(train_loader)),
+                "lr": float(current_lr),
+                "train_time_sec": float(train_time),
+                "epoch_time_sec": float(epoch_time),
+                "train_throughput_ips": float(train_tp),
+                "epoch_throughput_ips": float(epoch_tp)
+            }
+            save_log(args.json, log)
 
         # Step the scheduler after evaluation (end of epoch)
         scheduler.step()
+        
+        if args.rank == 0 and top1 > best_top1: best_top1 = top1
+        if args.rank == 0 and top5 > best_top5: best_top5 = top5
 
 # ------------------------- Entry / Setup ------------------------
 
@@ -359,7 +257,8 @@ def setup_ddp(args):
     args.master_port = env_int("MASTER_PORT", args.master_port)
     args.iface       = env_str("IFACE", args.iface)
     args.local_rank  = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
-    if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
+    if args.device == 'cuda' and torch.cuda.is_available():
+        torch.cuda.set_device(args.local_rank)
 
     # Ensure the variables torch.distributed expects are present.
     os.environ.setdefault("RANK",        str(args.rank))
@@ -397,8 +296,6 @@ def cleanup():
 
 def main():
     parser = argparse.ArgumentParser()
-
-    # DDP/System
     parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--iface', type=str, default="ens4f0")
@@ -406,36 +303,25 @@ def main():
     parser.add_argument("--master_port", type=int, default=29500)
     parser.add_argument("--backend", type=str, default="gloo", help="DDP backend (e.g., gloo, nccl)")
     parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
+
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
 
-    # Training/model
-    parser.add_argument('--model', type=str, choices=['densenet121', 'densenet161', 'densenet169', 'densenet201'], help="DenseNet model", default="densenet121")
+    parser.add_argument('--model', type=str, choices=['vgg11', 'vgg19'], help="VGG model", default="vgg11")
     parser.add_argument('--data', type=str, required=True)
-    parser.add_argument('--epochs', type=int, default=100)  # DenseNet original paper used 300 epochs for CIFAR, ImageNet typically uses fewer
-    parser.add_argument('--batch_size', type=int, default=128)
-    parser.add_argument('--learning_rate', type=float, default=0.1, help="Initial learning rate (standard for DenseNet)")
-    parser.add_argument('--momentum', type=float, default=0.9, help="SGD momentum")
-    parser.add_argument('--weight_decay', type=float, default=1e-4, help="Weight decay (L2 regularization)")
+    parser.add_argument('--epochs', type=int, default=90)
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--learning_rate', type=float, default=0.01)
+    parser.add_argument('--momentum', type=float, default=0.9)
+    parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--num_classes', type=int, default=1000)
     parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
     parser.add_argument("--drop_last_train", action='store_true', help="Drop last from train dataset")
     parser.add_argument("--drop_last_val", action='store_true', help="Drop last from val dataset")
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
-
-    # Straggle
-    def csv_ints(s: str) -> list[int]:
-        if not s: return []
-        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
-        except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
-    parser.add_argument("--straggle_points", type=int, help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
-    parser.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
-    parser.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
-    parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=0)
-    parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
-    parser.add_argument("--straggle_verbose", action='store_true')
-    parser.add_argument("--json", type=str, default="densenet.json", help="Path to JSON run log")
+    
+    parser.add_argument("--json", type=str, default="vgg11.json", help="Path to JSON run log")
     args = parser.parse_args()
 
     if args.deterministic:
