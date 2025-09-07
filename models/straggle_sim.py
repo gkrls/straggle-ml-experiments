@@ -64,7 +64,7 @@ class SlowWorkerPattern:
                  seed: int = None,
                  verbose: bool = False):
         
-        if not (1 <= points <= 3): raise ValueError("points must be in [1, 3]")
+        if not (0 <= points <= 3): raise ValueError("points must be in [1, 3]")
         self.points = points
 
         # probability: accept 0..1 or 0..100 (percent)
