@@ -15,6 +15,7 @@ import time
 import re
 import random
 import numpy as np
+import math
 
 from straggle_sim import SlowWorkerPattern
 
@@ -52,7 +53,6 @@ def get_dataloaders(args):
 
 
 # ------------------------- Metrics ------------------------------
-import math
 
 class AverageMeter:
     def __init__(self):
@@ -134,7 +134,7 @@ def validate(model, loader, device, args):
     return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg }
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
-    """Perform 1 full pass over the dataset. Return loss, epoch duration, epoch throughput (imgs/sec)"""
+    """Perform 1 full pass over the dataset. Return loss"""
     model.train()
     
     # meters
@@ -242,7 +242,8 @@ def train(args):
     else: 
         raise ValueError(f"Unsupported model: {args.model}")
 
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True,
+                find_unused_parameters=False, static_graph=args.static_graph)
 
     print(f"Model '{args.model}' initialized.", flush=True)
 
@@ -282,7 +283,7 @@ def train(args):
         train_loader.sampler.set_epoch(epoch)
         
         # Get current learning rate
-        current_lr = optimizer.param_groups[0]['lr']
+        # current_lr = optimizer.param_groups[0]['lr']
 
         # Train for one epoch and get metrics
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
@@ -358,8 +359,7 @@ def setup_ddp(args):
     args.master_port = env_int("MASTER_PORT", args.master_port)
     args.iface       = env_str("IFACE", args.iface)
     args.local_rank  = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
-    if args.device == 'cuda' and torch.cuda.is_available():
-        torch.cuda.set_device(args.local_rank)
+    if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
 
     # Ensure the variables torch.distributed expects are present.
     os.environ.setdefault("RANK",        str(args.rank))

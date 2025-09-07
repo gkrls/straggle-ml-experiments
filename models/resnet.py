@@ -16,6 +16,8 @@ import random
 import numpy as np
 import math
 
+from straggle_sim import SlowWorkerPattern
+
 # ------------------------- Dataset ------------------------------
 
 def get_dataloaders(args):
@@ -245,35 +247,33 @@ def train(args):
 
     # ------------------------- Model (ResNet variants; unchanged config) -------------------------
     model = None
-    if args.model == 'resnet50':
-        model = models.resnet50(num_classes=args.num_classes).to(device)
-    elif args.model == 'resnet101':
-        model = models.resnet101(num_classes=args.num_classes).to(device)
-    elif args.model == 'resnet152':
-        model = models.resnet152(num_classes=args.num_classes).to(device)
-    else:
-        raise ValueError(f"Unsupported model: {args.model}")
+    if args.model == 'resnet50': model = models.resnet50(num_classes=args.num_classes).to(device)
+    elif args.model == 'resnet101': model = models.resnet101(num_classes=args.num_classes).to(device)
+    elif args.model == 'resnet152': model = models.resnet152(num_classes=args.num_classes).to(device)
+    else: raise ValueError(f"Unsupported model: {args.model}")
 
-    model = DDP(
-        model,
-        device_ids=[args.local_rank] if device.type == "cuda" else None,
-        gradient_as_bucket_view=True,
-        find_unused_parameters=False, #not args.static_graph,
-        static_graph=args.static_graph,
-    )
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True,
+                find_unused_parameters=False, static_graph=args.static_graph)
 
     print(f"Model '{args.model}' initialized.", flush=True)
 
+    # Straggle sim
+    straggle_sim = None
+    if args.straggle_points > 0:
+        straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
+                                        ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
+                                        verbose=args.straggle_verbose)
+        if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
+        else: straggle_sim = None
+
     # Optimizer / Scheduler / AMP (unchanged from original resnet script)
     criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.SGD(
-        model.parameters(), lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay, foreach=True
-    )
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay, foreach=True)
+
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
-    def now():
-        return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     best_top1 = 0.0
     best_top5 = 0.0
@@ -288,8 +288,10 @@ def train(args):
         epoch_wall_start = time.time()
         train_loader.sampler.set_epoch(epoch)
 
-        # Train + Validate
+        # Train for one epoch and get metrics
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
+
+        # Validate and get metrics
         val_metrics = validate(model, val_loader, device, args)
 
         # Epoch wall time
@@ -307,8 +309,7 @@ def train(args):
             f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
             f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) "
             f"tp=~{train_metrics['throughput']:.1f} img/s",
-            flush=True,
-        )
+            f"straggle_events={straggle_sim.get_stats()['num_straggle_events'] if straggle_sim else 'none'}", flush=True)
 
         # Log all metrics in a single dict
         epoch_metrics = {
@@ -363,8 +364,7 @@ def setup_ddp(args):
     args.master_port = env_int("MASTER_PORT", args.master_port)
     args.iface = env_str("IFACE", args.iface)
     args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
-    if args.device == 'cuda' and torch.cuda.is_available():
-        torch.cuda.set_device(args.local_rank)
+    if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
 
     # Ensure the variables torch.distributed expects are present.
     os.environ.setdefault("RANK", str(args.rank))
@@ -381,9 +381,7 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)  # e.g. ens4f0
     os.environ.setdefault("NCCL_DEBUG", "WARN")
     os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
-    os.environ.setdefault(
-        "NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log"
-    )
+    os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
     os.environ.setdefault("NCCL_P2P_DISABLE", "1")  # P100 P2P is limited
     os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")  # Force ring for stability
     os.environ.setdefault("NCCL_IB_DISABLE", "0")  # Enable IB if available on 100G
@@ -442,6 +440,17 @@ def main():
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
 
+    # Straggle
+    def csv_ints(s: str) -> list[int]:
+        if not s: return []
+        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
+        except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
+    parser.add_argument("--straggle_points", type=int, help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
+    parser.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
+    parser.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
+    parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=0)
+    parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
+    parser.add_argument("--straggle_verbose", action='store_true')
     parser.add_argument("--json", type=str, default="resnet.json", help="Path to JSON run log")
     args = parser.parse_args()
 
