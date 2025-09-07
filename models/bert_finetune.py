@@ -9,7 +9,7 @@ from torch.utils.data import Subset, DataLoader
 import sys
 import json
 import datetime
-import time 
+import time
 import re
 import random
 import numpy as np
@@ -27,6 +27,7 @@ from transformers import (
     default_data_collator,
     get_linear_schedule_with_warmup,
 )
+from torch.cuda.amp import GradScaler, autocast
 
 # ------------------------- Dataset ------------------------------
 
@@ -137,7 +138,10 @@ def _prepare_features(args, raw, tokenizer):
     val_features   = raw['validation'].map(prep_val, batched=True, remove_columns=raw['validation'].column_names, desc='Tokenize val')
 
     # For train, tensors; for val, keep Python objects and collate manually
-    train_features.set_format(type='torch', columns=['input_ids','attention_mask','token_type_ids','start_positions','end_positions'])
+    train_cols = ['input_ids', 'attention_mask', 'start_positions', 'end_positions']
+    if 'token_type_ids' in train_features.column_names:
+        train_cols.insert(2, 'token_type_ids')
+    train_features.set_format(type='torch', columns=train_cols)
     val_features.set_format(type=None)
     return train_features, val_features
 
@@ -168,8 +172,11 @@ def get_dataloaders(args):
     dl_mode = DownloadMode.FORCE_REDOWNLOAD if args.force_download else DownloadMode.REUSE_DATASET_IF_EXISTS
     raw = load_dataset(name, cache_dir=os.environ.get('HF_DATASETS_CACHE', args.data), download_mode=dl_mode)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data), 
-                                              force_download=args.force_download)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_name, use_fast=True,
+        cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data),
+        force_download=args.force_download
+    )
 
     train_features, val_features = _prepare_features(args, raw, tokenizer)
 
@@ -203,7 +210,7 @@ class AverageMeter:
         self.count = 0.0
         self.avg = 0.0
         self.min = math.inf
-        self.max = 0
+        self.max = 0.0
     def update(self, val, n=1):
         self.sum += float(val) * n
         self.count += n
@@ -268,7 +275,7 @@ def validate(model, loader, device, args):
             end_positions  = batch['end_positions'].to(device, non_blocking=True)
 
             if args.amp and device.type == 'cuda':
-                with torch.amp.autocast(device_type='cuda'):
+                with autocast():
                     out = model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
                                 start_positions=start_positions, end_positions=end_positions, return_dict=True)
                     loss = out.loss
@@ -331,19 +338,18 @@ def validate(model, loader, device, args):
         em = (em_sum / max(1, count)) * 100.0
         f1 = (f1_sum / max(1, count)) * 100.0
 
-    # Handle leftover items not covered by sampler
+    # Handle leftover items not covered by sampler (rare)
     if len(loader.sampler) * args.world_size < len(loader.dataset):
         aux_val_dataset = Subset(loader.dataset, range(len(loader.sampler) * args.world_size, len(loader.dataset)))
         aux_val_loader = DataLoader(aux_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True, collate_fn=_collate_val)
         run_validation(aux_val_loader)
-        # No distributed reduce here (mirrors your DenseNet code behavior)
-        loss_avg = loss_avg  # unchanged
+        # No distributed reduce here
         em = (em_sum / max(1, count)) * 100.0
         f1 = (f1_sum / max(1, count)) * 100.0
 
     return {'loss': float(loss_avg), 'em': float(em), 'f1': float(f1)}
 
-def train_one_epoch(model, dataloader, optimizer, device, scaler, args):
+def train_one_epoch(model, dataloader, optimizer, scheduler, device, scaler, args, epoch):
     model.train()
     losses = AverageMeter()
     step_time = AverageMeter()
@@ -358,30 +364,50 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args):
 
     step_start = time.perf_counter()
     samples_seen = 0.0
+    total_steps = len(dataloader)
 
-    for batch in dataloader:
-        data_time.update(time.perf_counter() - step_start, n=1)
+    for step_idx, batch in enumerate(dataloader):
+        cur = time.perf_counter()
+        data_time.update(cur - step_start, n=1)
         batch = {k: v.to(device, non_blocking=True) for k, v in batch.items()}
         bs = batch['input_ids'].size(0)
         samples_seen += bs
 
         optimizer.zero_grad(set_to_none=True)
         if scaler is not None:
-            with torch.amp.autocast(device_type='cuda'):
+            with autocast():
                 out = model(**batch)
                 loss = out.loss
             scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
             scaler.step(optimizer)
             scaler.update()
+            scheduler.step()
         else:
             out = model(**batch)
             loss = out.loss
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
             optimizer.step()
+            scheduler.step()
 
         losses.update(loss.item(), bs)
-        step_time.update(time.perf_counter() - step_start, n=1)
+        elapsed = time.perf_counter() - step_start
+        step_time.update(elapsed, n=1)
         step_start = time.perf_counter()
+
+        # Per-step progress logging
+        if args.rank == 0 and (step_idx == 0 or (step_idx + 1) % args.log_interval == 0 or (step_idx + 1) == total_steps):
+            inst_tp = bs / max(1e-9, elapsed)
+            print(
+                f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}][Epoch {epoch:03d} Step {step_idx+1:05d}/{total_steps}] "
+                f"loss={loss.item():.4f} avg_loss={losses.avg:.4f} "
+                f"lr={optimizer.param_groups[0]['lr']:.6f} "
+                f"step_time={elapsed:.3f}s data={data_time.avg:.3f}s comp={max(0.0, step_time.avg - data_time.avg):.3f}s "
+                f"ips=~{inst_tp:.1f}",
+                flush=True
+            )
 
     if device.type == 'cuda':
         epoch_end.record(); epoch_end.synchronize()
@@ -422,13 +448,24 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args)
 
     # Model
-    config = AutoConfig.from_pretrained(args.model_name, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data), 
-                                        force_download=args.force_download)
-    model  = AutoModelForQuestionAnswering.from_pretrained(args.model_name, config=config,  cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data), 
-                                                           force_download=args.force_download,).to(device)
+    config = AutoConfig.from_pretrained(
+        args.model_name,
+        cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data),
+        force_download=args.force_download
+    )
+    model  = AutoModelForQuestionAnswering.from_pretrained(
+        args.model_name, config=config,
+        cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data),
+        force_download=args.force_download,
+    ).to(device)
 
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True,
-                find_unused_parameters=False, static_graph=args.static_graph)
+    model = DDP(
+        model,
+        device_ids=[args.local_rank] if device.type == "cuda" else None,
+        gradient_as_bucket_view=True,
+        find_unused_parameters=False,
+        static_graph=args.static_graph
+    )
 
     print(f"Model '{args.model_name}' initialized.", flush=True)
 
@@ -443,19 +480,20 @@ def train(args):
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=True)
     total_steps = len(train_loader) * args.epochs
     warmup_steps = int(args.warmup_ratio * total_steps)
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
-    scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
+    )
+    scaler = GradScaler(enabled=(args.amp and device.type == "cuda"))
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     best_em = 0.0
     best_f1 = 0.0
 
-    # log = {"time": now(), "config": vars(args), "epochs": {}}
     cfg = {k: v for k, v in vars(args).items() if not k.startswith('_')}
     log = {"time": now(), "config": cfg, "epochs": {}}
     save_log(args.json, log)
-    
+
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
         epoch_start = time.time()
@@ -463,9 +501,9 @@ def train(args):
         straggle_sim.reset_stats()
 
         train_loader.sampler.set_epoch(epoch)
-        
+
         # Train for one epoch and get metrics
-        train_metrics = train_one_epoch(model, train_loader, optimizer, device, scaler, args)
+        train_metrics = train_one_epoch(model, train_loader, optimizer, scheduler, device, scaler, args, epoch)
 
         # Validate and get metrics
         val_metrics  = validate(model, val_loader, device, args)
@@ -473,25 +511,27 @@ def train(args):
         # Calculate total epoch time
         epoch_time = time.time() - epoch_start
 
-        # Print epoch summary with learning rate
-        current_lr = scheduler.get_last_lr()[0]
+        # Current LR (after per-step schedule)
+        current_lr = optimizer.param_groups[0]['lr']
 
-        print(f"[{now()}][Epoch {epoch:03d}] "
-                f"train_loss={train_metrics['loss']:.4f} (global={train_metrics['loss_global']:.4f}) "
-                f"val_loss={val_metrics['loss']:.4f} "
-                f"val_em={val_metrics['em']:.2f}% val_f1={val_metrics['f1']:.2f}% "
-                f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
-                f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) tp=~{train_metrics['throughput']:.1f} samples/s", 
-                f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}", flush=True)
-        
+        print(
+            f"[{now()}][Epoch {epoch:03d}] "
+            f"train_loss={train_metrics['loss']:.4f} (global={train_metrics['loss_global']:.4f}) "
+            f"val_loss={val_metrics['loss']:.4f} "
+            f"val_em={val_metrics['em']:.2f}% val_f1={val_metrics['f1']:.2f}% "
+            f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f}s "
+            f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}s) "
+            f"tp=~{train_metrics['throughput']:.1f} samples/s "
+            f"straggle_events={straggle_sim.get_stats().get('num_straggle_events', 0)}",
+            flush=True
+        )
+
         # Log JSON (match DenseNet shape + QA fields)
         epoch_metrics = {
             # Training metrics
             "lr": float(current_lr),
             "train_loss": float(train_metrics['loss']),
             "train_loss_global": float(train_metrics['loss_global']),
-            "train_top1": float(train_metrics['top1']),   # schema parity only
-            "train_top5": float(train_metrics['top5']),
             "steps": int(len(train_loader)),
             "step_time_min": float(train_metrics['step_time_min']),
             "step_time_max": float(train_metrics['step_time_max']),
@@ -501,24 +541,23 @@ def train(args):
             "epoch_time": float(epoch_time),
             "epoch_train_time": float(train_metrics['epoch_time']),
             "epoch_train_throughput": float(train_metrics['throughput']),
-            
+
             # Validation metrics
             "val_loss": float(val_metrics['loss']),
             "val_em": float(val_metrics['em']),
             "val_f1": float(val_metrics['f1']),
-            
+
             # straggle-sim
             "straggle": straggle_sim.get_stats() if straggle_sim.active else {}
         }
-        
+
         log["epochs"][str(epoch)] = epoch_metrics
         save_log(args.json, log)
-        
+
         best_em = max(best_em, val_metrics['em'])
         best_f1 = max(best_f1, val_metrics['f1'])
 
-        # Step the scheduler after evaluation (end of epoch)
-        scheduler.step()
+        # NOTE: scheduler stepped per-batch in train_one_epoch (do not step here)
 
 # ------------------------- Entry / Setup ------------------------
 
@@ -532,8 +571,18 @@ def setup_ddp(args):
     args.master_addr = env_str("MASTER_ADDR", args.master_addr)
     args.master_port = env_int("MASTER_PORT", args.master_port)
     args.iface       = env_str("IFACE", args.iface)
-    args.local_rank  = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
-    if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
+
+    # Respect LOCAL_RANK if present (torchrun)
+    env_local_rank = os.environ.get("LOCAL_RANK")
+    if env_local_rank is not None:
+        args.local_rank = int(env_local_rank)
+    elif torch.cuda.device_count():
+        args.local_rank = (args.rank % torch.cuda.device_count())
+    else:
+        args.local_rank = 0
+
+    if args.device == 'cuda' and torch.cuda.is_available():
+        torch.cuda.set_device(args.local_rank)
 
     # Ensure the variables torch.distributed expects are present.
     os.environ.setdefault("RANK",        str(args.rank))
@@ -599,6 +648,8 @@ def main():
     parser.add_argument("--drop_last_val", action='store_true', help="Drop last from val dataset")
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
+    parser.add_argument('--max_grad_norm', type=float, default=1.0, help="Gradient clipping max norm")
+    parser.add_argument('--log_interval', type=int, default=50, help="Steps between progress prints")
 
     # QA tokenization / decode
     parser.add_argument('--max_seq_len', type=int, default=384)
@@ -640,7 +691,7 @@ def main():
         if args.rank == 0: print("[Info] Disabling AMP because CUDA is not available", flush=True)
     if args.workers < 1:
         if args.rank == 0: print("[Info] Workers requested < 1; using workers=1", flush=True)
-        args.workers = 1 
+        args.workers = 1
 
     try:
         sys.stdout.reconfigure(line_buffering=True)
@@ -655,7 +706,6 @@ def main():
         random.seed(args.seed)
         np.random.seed(args.seed)
 
-    # print(json.dumps(vars(args), indent=2))
     cfg = {k: v for k, v in vars(args).items() if not k.startswith('_')}
     print(json.dumps(cfg, indent=2))
     try:
