@@ -1,0 +1,770 @@
+{
+  "time": "2025-08-26 18:07:45",
+  "config": {
+    "rank": 0,
+    "world_size": 6,
+    "iface": "ens4f0",
+    "master_addr": "42.0.0.1",
+    "master_port": 29500,
+    "backend": "nccl",
+    "device": "cuda",
+    "deterministic": true,
+    "workers": 8,
+    "data": "/home/gks/datasets/imagenet",
+    "epochs": 90,
+    "batch_size": 128,
+    "learning_rate": 0.1,
+    "momentum": 0.9,
+    "weight_decay": 0.0001,
+    "num_classes": 1000,
+    "amp": false,
+    "drop_last": true,
+    "json": "/home/gks/straggle-ml-experiments/models/resnet50.json",
+    "local_rank": 0,
+    "seed": 42
+  },
+  "epochs": {
+    "0": {
+      "train_loss": 5.7376454017918,
+      "val_loss": 4.721273865785599,
+      "top1": 12.74,
+      "top5": 30.631999999942778,
+      "lr": 0.1,
+      "train_time_sec": 986.3820625,
+      "epoch_time_sec": 1000.2251522541046,
+      "train_throughput_ips": 216.47595603960002,
+      "epoch_throughput_ips": 213.4797678823889
+    },
+    "1": {
+      "train_loss": 4.0437545390669065,
+      "val_loss": 3.906945400600433,
+      "top1": 22.543999999771117,
+      "top5": 45.38599999927521,
+      "lr": 0.1,
+      "train_time_sec": 984.7929375,
+      "epoch_time_sec": 998.1680171489716,
+      "train_throughput_ips": 216.82527551635695,
+      "epoch_throughput_ips": 213.9197306113099
+    }
+  }
+}gks@gnode1:~/straggle-ml-experiments$ ls
+README.md  gpu_monitor.sh  hpdc-check.sh  hpdc-launch.sh   logs    nfs-mount.sh  nfs-server-setup.sh  rdma_check.sh            requirements.txt  resnet50_sanity.py   run_resnet50.sh  runners   test_script.sh  venv
+datasets   hosts.txt       hpdc-kill.sh   hpdc-launch2.sh  models  nfs-rsync.sh  nohup.out            requirements-global.txt  resnet50.json     run_lstm_predict.sh  run_vgg.sh       setup.sh  tmux.conf
+gks@gnode1:~/straggle-ml-experiments$ ls -l
+total 104
+-rw-rw-r-- 1 gks gks 1195 Sep  2 13:38 README.md
+drwxrwxr-x 2 gks gks 4096 Sep  2 15:31 datasets
+-rw-rw-r-- 1 gks gks  121 Sep  6 13:32 gpu_monitor.sh
+-rw-rw-r-- 1 gks gks   71 Aug 25 12:30 hosts.txt
+-rwxrwxr-x 1 gks gks 1359 Aug 25 01:29 hpdc-check.sh
+-rwxrwxr-x 1 gks gks 1557 Sep  6 14:25 hpdc-kill.sh
+-rwxrwxr-x 1 gks gks 2919 Aug 25 01:29 hpdc-launch.sh
+-rwxrwxr-x 1 gks gks 1553 Aug 25 01:52 hpdc-launch2.sh
+drwxrwxr-x 3 gks gks 4096 Sep  7 00:57 logs
+drwxrwxr-x 4 gks gks 4096 Sep  7 00:57 models
+-rwxrwxr-x 1 gks gks  725 Aug 24 03:29 nfs-mount.sh
+-rwxrwxr-x 1 gks gks  652 Sep  2 13:38 nfs-rsync.sh
+-rw-rw-r-- 1 gks gks  517 Aug 24 03:29 nfs-server-setup.sh
+-rw------- 1 gks gks 4123 Aug 24 17:49 nohup.out
+-rw-rw-r-- 1 gks gks  728 Aug 26 19:54 rdma_check.sh
+-rw-rw-r-- 1 gks gks    0 Sep  2 15:18 requirements-global.txt
+-rw-rw-r-- 1 gks gks  337 Sep  2 20:06 requirements.txt
+-rw-rw-r-- 1 gks gks  866 Aug 24 21:43 resnet50.json
+-rw-rw-r-- 1 gks gks 2412 Aug 28 13:03 resnet50_sanity.py
+-rw-rw-r-- 1 gks gks 1998 Sep  2 19:26 run_lstm_predict.sh
+-rw-rw-r-- 1 gks gks    0 Aug 28 12:51 run_resnet50.sh
+-rw-rw-r-- 1 gks gks 1823 Aug 27 03:07 run_vgg.sh
+drwxrwxr-x 2 gks gks 4096 Sep  7 00:57 runners
+-rwxrwxr-x 1 gks gks  534 Aug 25 01:55 setup.sh
+-rw-rw-r-- 1 gks gks   20 Aug 25 01:29 test_script.sh
+-rw-rw-r-- 1 gks gks  323 Aug 26 15:31 tmux.conf
+drwxrwxr-x 6 gks gks 4096 Aug 25 01:53 venv
+gks@gnode1:~/straggle-ml-experiments$ cat re
+requirements-global.txt  requirements.txt         resnet50.json            resnet50_sanity.py       
+gks@gnode1:~/straggle-ml-experiments$ cat re
+requirements-global.txt  requirements.txt         resnet50.json            resnet50_sanity.py       
+gks@gnode1:~/straggle-ml-experiments$ cat re
+requirements-global.txt  requirements.txt         resnet50.json            resnet50_sanity.py       
+gks@gnode1:~/straggle-ml-experiments$ cat resnet50.json 
+{
+  "config": {
+    "rank": 0,
+    "world_size": 2,
+    "iface": "ens4f0",
+    "master_addr": "42.0.0.1",
+    "master_port": 29500,
+    "backend": "gloo",
+    "device": "cuda",
+    "deterministic": true,
+    "workers": 16,
+    "data": "/home/gks/datasets/imagenet",
+    "epochs": 90,
+    "batch_size": 128,
+    "learning_rate": 0.1,
+    "momentum": 0.9,
+    "weight_decay": 0.0001,
+    "num_classes": 1000,
+    "amp": false,
+    "drop_last": false,
+    "json": "resnet50.json",
+    "local_rank": 0,
+    "seed": 42
+  },
+  "epochs": {
+    "0": {
+      "train_loss": 5.568629272262771,
+      "val_loss": 11.09987067489624,
+      "top1": 0.13,
+      "top5": 0.558,
+      "lr": 0.1,
+      "train_time_sec": 3011.63475,
+      "epoch_time_sec": 3049.860734939575,
+      "train_throughput_ips": 212.70308426345525,
+      "epoch_throughput_ips": 210.0369674790057
+    }
+  }
+}gks@gnode1:~/straggle-ml-experiments$ ls -l
+total 104
+-rw-rw-r-- 1 gks gks 1195 Sep  2 13:38 README.md
+drwxrwxr-x 2 gks gks 4096 Sep  2 15:31 datasets
+-rw-rw-r-- 1 gks gks  121 Sep  6 13:32 gpu_monitor.sh
+-rw-rw-r-- 1 gks gks   71 Aug 25 12:30 hosts.txt
+-rwxrwxr-x 1 gks gks 1359 Aug 25 01:29 hpdc-check.sh
+-rwxrwxr-x 1 gks gks 1557 Sep  6 14:25 hpdc-kill.sh
+-rwxrwxr-x 1 gks gks 2919 Aug 25 01:29 hpdc-launch.sh
+-rwxrwxr-x 1 gks gks 1553 Aug 25 01:52 hpdc-launch2.sh
+drwxrwxr-x 3 gks gks 4096 Sep  7 00:57 logs
+drwxrwxr-x 4 gks gks 4096 Sep  7 00:57 models
+-rwxrwxr-x 1 gks gks  725 Aug 24 03:29 nfs-mount.sh
+-rwxrwxr-x 1 gks gks  652 Sep  2 13:38 nfs-rsync.sh
+-rw-rw-r-- 1 gks gks  517 Aug 24 03:29 nfs-server-setup.sh
+-rw------- 1 gks gks 4123 Aug 24 17:49 nohup.out
+-rw-rw-r-- 1 gks gks  728 Aug 26 19:54 rdma_check.sh
+-rw-rw-r-- 1 gks gks    0 Sep  2 15:18 requirements-global.txt
+-rw-rw-r-- 1 gks gks  337 Sep  2 20:06 requirements.txt
+-rw-rw-r-- 1 gks gks  866 Aug 24 21:43 resnet50.json
+-rw-rw-r-- 1 gks gks 2412 Aug 28 13:03 resnet50_sanity.py
+-rw-rw-r-- 1 gks gks 1998 Sep  2 19:26 run_lstm_predict.sh
+-rw-rw-r-- 1 gks gks    0 Aug 28 12:51 run_resnet50.sh
+-rw-rw-r-- 1 gks gks 1823 Aug 27 03:07 run_vgg.sh
+drwxrwxr-x 2 gks gks 4096 Sep  7 00:57 runners
+-rwxrwxr-x 1 gks gks  534 Aug 25 01:55 setup.sh
+-rw-rw-r-- 1 gks gks   20 Aug 25 01:29 test_script.sh
+-rw-rw-r-- 1 gks gks  323 Aug 26 15:31 tmux.conf
+drwxrwxr-x 6 gks gks 4096 Aug 25 01:53 venv
+gks@gnode1:~/straggle-ml-experiments$ cd models/
+gks@gnode1:~/straggle-ml-experiments/models$ ls -l
+total 340
+drwxrwxr-x 2 gks gks  4096 Sep  5 21:01 __pycache__
+drwxrwxr-x 2 gks gks  4096 Sep  6 20:48 bak
+-rw-rw-r-- 1 gks gks  4369 Sep  6 13:12 densenet.json
+-rw-rw-r-- 1 gks gks 21436 Sep  6 13:23 densenet.py
+-rw-rw-r-- 1 gks gks  2317 Sep  6 11:28 densenet_straggle.json
+-rw-rw-r-- 1 gks gks  1390 Sep  6 14:02 efficientnet.json
+-rw-rw-r-- 1 gks gks 21564 Aug 31 23:10 efficientnet.py
+-rw-rw-r-- 1 gks gks 23583 Sep  6 13:23 efficientnet_2.py
+-rw-rw-r-- 1 gks gks  9907 Sep  6 20:34 efficientnet_straggle.json
+-rw-rw-r-- 1 gks gks  2254 Sep  6 10:08 gpt2.json
+-rw-rw-r-- 1 gks gks 35728 Sep  6 20:48 gpt2.py
+-rw-rw-r-- 1 gks gks  2198 Sep  3 23:05 gpt2_claude.json
+-rw-rw-r-- 1 gks gks  2692 Sep  4 10:44 gpt2_final.json
+-rw-rw-r-- 1 gks gks 13603 Sep  4 20:17 gpt2_periodic.json
+-rw-rw-r-- 1 gks gks  9187 Sep  7 00:42 lstm.json
+-rw-rw-r-- 1 gks gks 25279 Sep  7 00:54 lstm.py
+-rw-rw-r-- 1 gks gks 24623 Sep  6 22:37 lstm_bak.py
+-rw-rw-r-- 1 gks gks 15896 Sep  2 11:49 lstm_classify.json
+-rw-rw-r-- 1 gks gks  1673 Sep  2 19:53 lstm_predict.json
+-rw-rw-r-- 1 gks gks  1410 Aug 27 03:02 resnet.json
+-rw-rw-r-- 1 gks gks 18854 Sep  7 00:57 resnet.py
+-rw-rw-r-- 1 gks gks  1309 Aug 26 18:41 resnet50.json
+-rw-rw-r-- 1 gks gks     0 Aug 30 01:15 resnet50.py
+-rw-rw-r-- 1 gks gks  8192 Sep  5 21:01 straggle_sim.py
+-rw-rw-r-- 1 gks gks 27221 Aug 28 12:42 vgg.json
+-rw-rw-r-- 1 gks gks 15904 Aug 29 00:38 vgg.py
+gks@gnode1:~/straggle-ml-experiments/models$ cd ..
+gks@gnode1:~/straggle-ml-experiments$ ls -l
+total 104
+-rw-rw-r-- 1 gks gks 1195 Sep  2 13:38 README.md
+drwxrwxr-x 2 gks gks 4096 Sep  2 15:31 datasets
+-rw-rw-r-- 1 gks gks  121 Sep  6 13:32 gpu_monitor.sh
+-rw-rw-r-- 1 gks gks   71 Aug 25 12:30 hosts.txt
+-rwxrwxr-x 1 gks gks 1359 Aug 25 01:29 hpdc-check.sh
+-rwxrwxr-x 1 gks gks 1557 Sep  6 14:25 hpdc-kill.sh
+-rwxrwxr-x 1 gks gks 2919 Aug 25 01:29 hpdc-launch.sh
+-rwxrwxr-x 1 gks gks 1553 Aug 25 01:52 hpdc-launch2.sh
+drwxrwxr-x 3 gks gks 4096 Sep  7 00:57 logs
+drwxrwxr-x 4 gks gks 4096 Sep  7 00:57 models
+-rwxrwxr-x 1 gks gks  725 Aug 24 03:29 nfs-mount.sh
+-rwxrwxr-x 1 gks gks  652 Sep  2 13:38 nfs-rsync.sh
+-rw-rw-r-- 1 gks gks  517 Aug 24 03:29 nfs-server-setup.sh
+-rw------- 1 gks gks 4123 Aug 24 17:49 nohup.out
+-rw-rw-r-- 1 gks gks  728 Aug 26 19:54 rdma_check.sh
+-rw-rw-r-- 1 gks gks    0 Sep  2 15:18 requirements-global.txt
+-rw-rw-r-- 1 gks gks  337 Sep  2 20:06 requirements.txt
+-rw-rw-r-- 1 gks gks  866 Aug 24 21:43 resnet50.json
+-rw-rw-r-- 1 gks gks 2412 Aug 28 13:03 resnet50_sanity.py
+-rw-rw-r-- 1 gks gks 1998 Sep  2 19:26 run_lstm_predict.sh
+-rw-rw-r-- 1 gks gks    0 Aug 28 12:51 run_resnet50.sh
+-rw-rw-r-- 1 gks gks 1823 Aug 27 03:07 run_vgg.sh
+drwxrwxr-x 2 gks gks 4096 Sep  7 00:57 runners
+-rwxrwxr-x 1 gks gks  534 Aug 25 01:55 setup.sh
+-rw-rw-r-- 1 gks gks   20 Aug 25 01:29 test_script.sh
+-rw-rw-r-- 1 gks gks  323 Aug 26 15:31 tmux.conf
+drwxrwxr-x 6 gks gks 4096 Aug 25 01:53 venv
+gks@gnode1:~/straggle-ml-experiments$ cd ..
+gks@gnode1:~$ ls -l
+total 7926564
+-rw-rw-r--  1 gks gks 3355634050 Jul 26  2024 cuda-repo-ubuntu2404-12-6-local_12.6.0-560.28.03-1_amd64.deb
+-rw-rw-r--  1 gks gks 4167038350 Jan 17  2025 cuda-repo-ubuntu2404-12-8-local_12.8.0-570.86.10-1_amd64.deb
+drwxrwsr-x  4 gks gks       4096 Sep  2 12:16 datasets
+-rw-rw-r--  1 gks gks  594054744 May  7 16:09 doca-host_3.0.0-058000-25.04-ubuntu2404_amd64.deb
+-rw-rw-r--  1 gks gks      18708 Sep  7 08:38 resnet50.json
+drwxrwxr-x 14 gks gks       4096 Aug 25 01:44 straggle-ml
+drwxrwxr-x  8 gks gks       4096 Sep  7 00:57 straggle-ml-experiments
+-rw-rw-r--  1 gks gks      22848 Aug 26 15:17 that-pane.log
+gks@gnode1:~$ cat resnet50.json 
+{
+  "time": "2025-09-07 00:57:27",
+  "config": {
+    "rank": 0,
+    "world_size": 6,
+    "iface": "ens4f0",
+    "master_addr": "42.0.0.1",
+    "master_port": 29500,
+    "backend": "gloo",
+    "device": "cuda",
+    "deterministic": true,
+    "workers": 8,
+    "model": "resnet50",
+    "data": "/home/gks/datasets/imagenet",
+    "epochs": 90,
+    "batch_size": 128,
+    "learning_rate": 0.1,
+    "momentum": 0.9,
+    "weight_decay": 0.0001,
+    "num_classes": 1000,
+    "amp": false,
+    "drop_last_train": false,
+    "drop_last_val": true,
+    "static_graph": false,
+    "prefetch_factor": 4,
+    "json": "resnet50.json",
+    "local_rank": 0,
+    "seed": 42
+  },
+  "epochs": {
+    "0": {
+      "lr": 0.1,
+      "train_loss": 5.576519163214679,
+      "train_loss_global": 5.5791770535106835,
+      "train_top1": 6.002023153800631,
+      "train_top5": 16.093908058896258,
+      "steps": 1669,
+      "step_time_min": 0.26269883196800947,
+      "step_time_max": 3.9602954301517457,
+      "step_time": 0.6074088534729197,
+      "data_time": 0.0007283280492264168,
+      "comp_time": 0.6066805254236933,
+      "epoch_time": 1027.4374911785126,
+      "epoch_train_time": 1013.7733125,
+      "epoch_train_throughput": 210.62696893591783,
+      "val_loss": 4.471384700889588,
+      "val_top1": 14.556,
+      "val_top5": 33.577999999771116
+    },
+    "1": {
+      "lr": 0.1,
+      "train_loss": 3.9124887209870085,
+      "train_loss_global": 3.9102528366288576,
+      "train_top1": 22.091716308725236,
+      "train_top5": 44.381533100759455,
+      "steps": 1669,
+      "step_time_min": 0.22559066489338875,
+      "step_time_max": 1.241575599880889,
+      "step_time": 0.6058799021926453,
+      "data_time": 0.0006531260885608507,
+      "comp_time": 0.6052267761040845,
+      "epoch_time": 1024.618005990982,
+      "epoch_train_time": 1011.2215,
+      "epoch_train_throughput": 211.15848505990033,
+      "val_loss": 3.397563363981247,
+      "val_top1": 28.043999999485017,
+      "val_top5": 53.86999999965668
+    },
+    "2": {
+      "lr": 0.1,
+      "train_loss": 3.2143231415184954,
+      "train_loss_global": 3.2164893629783986,
+      "train_top1": 32.74418343261774,
+      "train_top5": 57.39809298986065,
+      "steps": 1669,
+      "step_time_min": 0.223823435138911,
+      "step_time_max": 1.2738082769792527,
+      "step_time": 0.6057289286494008,
+      "data_time": 0.0005767063683857544,
+      "comp_time": 0.605152222281015,
+      "epoch_time": 1024.3429112434387,
+      "epoch_train_time": 1010.967625,
+      "epoch_train_throughput": 211.2115113478535,
+      "val_loss": 3.0642718399333955,
+      "val_top1": 34.043999999752046,
+      "val_top5": 60.17199999908447
+    },
+    "3": {
+      "lr": 0.1,
+      "train_loss": 2.8507764310505572,
+      "train_loss_global": 2.8481138927311602,
+      "train_top1": 38.76540781536848,
+      "train_top5": 63.969128170258536,
+      "steps": 1669,
+      "step_time_min": 0.22033714083954692,
+      "step_time_max": 1.314037345116958,
+      "step_time": 0.606213545230306,
+      "data_time": 0.000650387135969889,
+      "comp_time": 0.6055631580943361,
+      "epoch_time": 1025.1446869373322,
+      "epoch_train_time": 1011.77675,
+      "epoch_train_throughput": 211.04260401318768,
+      "val_loss": 2.5912298030805587,
+      "val_top1": 41.94599999927521,
+      "val_top5": 68.593999997406
+    },
+    "4": {
+      "lr": 0.1,
+      "train_loss": 2.6080330116260826,
+      "train_loss_global": 2.6127320205118867,
+      "train_top1": 43.063204825453724,
+      "train_top5": 68.14235135410328,
+      "steps": 1669,
+      "step_time_min": 0.21998446201905608,
+      "step_time_max": 1.2417820040136576,
+      "step_time": 0.6061752151592967,
+      "data_time": 0.0005889634399213357,
+      "comp_time": 0.6055862517193754,
+      "epoch_time": 1025.0990636348724,
+      "epoch_train_time": 1011.717375,
+      "epoch_train_throughput": 211.0549895419163,
+      "val_loss": 2.412006158823967,
+      "val_top1": 45.583999999752045,
+      "val_top5": 71.91599999961853
+    },
+    "5": {
+      "lr": 0.1,
+      "train_loss": 2.457442326247547,
+      "train_loss_global": 2.455261761919493,
+      "train_top1": 45.850661271303835,
+      "train_top5": 70.59870368231768,
+      "steps": 1669,
+      "step_time_min": 0.22425034083426,
+      "step_time_max": 1.2753902880940586,
+      "step_time": 0.6058394348875488,
+      "data_time": 0.0006516390399747333,
+      "comp_time": 0.605187795847574,
+      "epoch_time": 1024.5244524478912,
+      "epoch_train_time": 1011.1559375,
+      "epoch_train_throughput": 211.1721763983609,
+      "val_loss": 2.284983722100258,
+      "val_top1": 47.36999999961853,
+      "val_top5": 73.80199999923705
+    },
+    "6": {
+      "lr": 0.1,
+      "train_loss": 2.3513755777705665,
+      "train_loss_global": 2.344496997767961,
+      "train_top1": 47.78015061256603,
+      "train_top5": 72.28981679174838,
+      "steps": 1669,
+      "step_time_min": 0.21519514988176525,
+      "step_time_max": 1.2987491660751402,
+      "step_time": 0.6061896128887438,
+      "data_time": 0.0006493459163549473,
+      "comp_time": 0.6055402669723889,
+      "epoch_time": 1025.1004931926727,
+      "epoch_train_time": 1011.7375,
+      "epoch_train_throughput": 211.05079133668565,
+      "val_loss": 2.1123842980241774,
+      "val_top1": 50.617999998970035,
+      "val_top5": 76.64599999900818
+    },
+    "7": {
+      "lr": 0.1,
+      "train_loss": 2.261977196132778,
+      "train_loss_global": 2.260115937038486,
+      "train_top1": 49.3939904833978,
+      "train_top5": 73.74161702446517,
+      "steps": 1669,
+      "step_time_min": 0.2226899960078299,
+      "step_time_max": 1.31763065000996,
+      "step_time": 0.6057236860951252,
+      "data_time": 0.000652149574102364,
+      "comp_time": 0.6050715365210229,
+      "epoch_time": 1024.3492875099182,
+      "epoch_train_time": 1010.960375,
+      "epoch_train_throughput": 211.2130260298283,
+      "val_loss": 2.246864633336067,
+      "val_top1": 48.88199999919891,
+      "val_top5": 74.70199999633789
+    },
+    "8": {
+      "lr": 0.1,
+      "train_loss": 2.196835571590232,
+      "train_loss_global": 2.1931993523230076,
+      "train_top1": 50.701079014969686,
+      "train_top5": 74.72181634258739,
+      "steps": 1669,
+      "step_time_min": 0.21656007505953312,
+      "step_time_max": 1.2500478539150208,
+      "step_time": 0.605535121153875,
+      "data_time": 0.000607179820848938,
+      "comp_time": 0.6049279413330261,
+      "epoch_time": 1024.0369009971619,
+      "epoch_train_time": 1010.646,
+      "epoch_train_throughput": 211.27872667580934,
+      "val_loss": 1.9879575961971283,
+      "val_top1": 53.21199999912262,
+      "val_top5": 78.71399999626159
+    },
+    "9": {
+      "lr": 0.1,
+      "train_loss": 2.139680074330576,
+      "train_loss_global": 2.1392571251687404,
+      "train_top1": 51.81849687146174,
+      "train_top5": 75.78163051158597,
+      "steps": 1669,
+      "step_time_min": 0.23419111385010183,
+      "step_time_max": 1.2806856478564441,
+      "step_time": 0.6060336877687049,
+      "data_time": 0.0006800020083454714,
+      "comp_time": 0.6053536857603594,
+      "epoch_time": 1024.8615398406982,
+      "epoch_train_time": 1011.4783125,
+      "epoch_train_throughput": 211.10487230540596,
+      "val_loss": 2.078061159300804,
+      "val_top1": 51.49999999954223,
+      "val_top5": 77.21599999771118
+    },
+    "10": {
+      "lr": 0.1,
+      "train_loss": 2.1001218139761275,
+      "train_loss_global": 2.095422579839805,
+      "train_top1": 52.41232999859018,
+      "train_top5": 76.34970589308645,
+      "steps": 1669,
+      "step_time_min": 0.23186757392250001,
+      "step_time_max": 1.2879497620742768,
+      "step_time": 0.6057350928797524,
+      "data_time": 0.0006605332541246572,
+      "comp_time": 0.6050745596256277,
+      "epoch_time": 1024.3536155223846,
+      "epoch_train_time": 1010.979875,
+      "epoch_train_throughput": 211.20895210698433,
+      "val_loss": 2.080427404522896,
+      "val_top1": 51.79599999950409,
+      "val_top5": 77.1859999962616
+    },
+    "11": {
+      "lr": 0.1,
+      "train_loss": 2.0522774899958547,
+      "train_loss_global": 2.0561839662780814,
+      "train_top1": 53.49883855967125,
+      "train_top5": 77.05874639334387,
+      "steps": 1669,
+      "step_time_min": 0.2252905648201704,
+      "step_time_max": 1.277916006045416,
+      "step_time": 0.6061937871167002,
+      "data_time": 0.0006185224777229305,
+      "comp_time": 0.6055752646389773,
+      "epoch_time": 1025.113231420517,
+      "epoch_train_time": 1011.7454375,
+      "epoch_train_throughput": 211.04913556874826,
+      "val_loss": 2.121173991584778,
+      "val_top1": 51.20599999891281,
+      "val_top5": 76.4319999962616
+    },
+    "12": {
+      "lr": 0.1,
+      "train_loss": 2.024256076913146,
+      "train_loss_global": 2.021479782558629,
+      "train_top1": 54.0650406504065,
+      "train_top5": 77.42918961419095,
+      "steps": 1669,
+      "step_time_min": 0.22672795597463846,
+      "step_time_max": 1.2849876910913736,
+      "step_time": 0.6060523942598114,
+      "data_time": 0.0006353097166776782,
+      "comp_time": 0.6054170845431337,
+      "epoch_time": 1024.8879780769348,
+      "epoch_train_time": 1011.509125,
+      "epoch_train_throughput": 211.09844164777058,
+      "val_loss": 1.8721615460205079,
+      "val_top1": 55.67999999858856,
+      "val_top5": 80.40799999473572
+    },
+    "13": {
+      "lr": 0.1,
+      "train_loss": 1.996577554374184,
+      "train_loss_global": 1.9948795969038746,
+      "train_top1": 54.582068862163275,
+      "train_top5": 77.99305009179125,
+      "steps": 1669,
+      "step_time_min": 0.2329511020798236,
+      "step_time_max": 1.213322568917647,
+      "step_time": 0.6058237898889471,
+      "data_time": 0.000625120409066276,
+      "comp_time": 0.6051986694798809,
+      "epoch_time": 1024.5034050941467,
+      "epoch_train_time": 1011.127625,
+      "epoch_train_throughput": 211.17808941279793,
+      "val_loss": 1.8543383395195008,
+      "val_top1": 56.202000000133516,
+      "val_top5": 80.70799999626159
+    },
+    "14": {
+      "lr": 0.1,
+      "train_loss": 1.9718757843293273,
+      "train_loss_global": 1.9681505330422702,
+      "train_top1": 55.06959274661871,
+      "train_top5": 78.21924993400607,
+      "steps": 1669,
+      "step_time_min": 0.2298348129261285,
+      "step_time_max": 1.1989052321296185,
+      "step_time": 0.6061315503383782,
+      "data_time": 0.0006004858000618012,
+      "comp_time": 0.6055310645383164,
+      "epoch_time": 1025.04003572464,
+      "epoch_train_time": 1011.64175,
+      "epoch_train_throughput": 211.07076689944836,
+      "val_loss": 1.833090048379898,
+      "val_top1": 56.32999999988556,
+      "val_top5": 80.98199999694825
+    },
+    "15": {
+      "lr": 0.1,
+      "train_loss": 1.9530705156155146,
+      "train_loss_global": 1.9469447700916256,
+      "train_top1": 55.27846465072012,
+      "train_top5": 78.58454160521303,
+      "steps": 1669,
+      "step_time_min": 0.23059388692490757,
+      "step_time_max": 1.1561485049314797,
+      "step_time": 0.6058204452199734,
+      "data_time": 0.0005970620303294789,
+      "comp_time": 0.6052233831896439,
+      "epoch_time": 1024.5079321861267,
+      "epoch_train_time": 1011.1223125,
+      "epoch_train_throughput": 211.17919895571487,
+      "val_loss": 1.775634415397644,
+      "val_top1": 57.55399999885559,
+      "val_top5": 81.82799999557496
+    },
+    "16": {
+      "lr": 0.1,
+      "train_loss": 1.92277728169146,
+      "train_loss_global": 1.9264085469300936,
+      "train_top1": 56.040425611343544,
+      "train_top5": 78.93906185605636,
+      "steps": 1669,
+      "step_time_min": 0.2400277580600232,
+      "step_time_max": 1.2946745250374079,
+      "step_time": 0.6061423668250612,
+      "data_time": 0.0006070183592844574,
+      "comp_time": 0.6055353484657767,
+      "epoch_time": 1025.032241821289,
+      "epoch_train_time": 1011.6593125,
+      "epoch_train_throughput": 211.06710269125307,
+      "val_loss": 1.8296017872953414,
+      "val_top1": 56.46999999908447,
+      "val_top5": 80.95999999534607
+    },
+    "17": {
+      "lr": 0.1,
+      "train_loss": 1.914159890782779,
+      "train_loss_global": 1.9068996472069468,
+      "train_top1": 56.238526094795446,
+      "train_top5": 79.17369150592863,
+      "steps": 1669,
+      "step_time_min": 0.22150454600341618,
+      "step_time_max": 1.2452067318372428,
+      "step_time": 0.6060701101610171,
+      "data_time": 0.0006205386907942571,
+      "comp_time": 0.6054495714702228,
+      "epoch_time": 1024.9123935699463,
+      "epoch_train_time": 1011.538875,
+      "epoch_train_throughput": 211.092233108688,
+      "val_loss": 1.8347743019342422,
+      "val_top1": 56.78399999998093,
+      "val_top5": 81.01799999565125
+    },
+    "18": {
+      "lr": 0.1,
+      "train_loss": 1.8794143924796742,
+      "train_loss_global": 1.8890026025949078,
+      "train_top1": 56.69092578008262,
+      "train_top5": 79.70851597859732,
+      "steps": 1669,
+      "step_time_min": 0.22858780017122626,
+      "step_time_max": 1.2861652069259435,
+      "step_time": 0.6061375588785473,
+      "data_time": 0.0006123066969369881,
+      "comp_time": 0.6055252521816102,
+      "epoch_time": 1025.0297176837921,
+      "epoch_train_time": 1011.651375,
+      "epoch_train_throughput": 211.06875874112265,
+      "val_loss": 1.7286766131997109,
+      "val_top1": 58.76599999954224,
+      "val_top5": 82.50999999557496
+    },
+    "19": {
+      "lr": 0.1,
+      "train_loss": 1.8698586130913983,
+      "train_loss_global": 1.8704115176409888,
+      "train_top1": 57.10773294340304,
+      "train_top5": 79.89163013749953,
+      "steps": 1669,
+      "step_time_min": 0.22446972294710577,
+      "step_time_max": 1.2549342499114573,
+      "step_time": 0.6059071448654743,
+      "data_time": 0.0006505853030272609,
+      "comp_time": 0.605256559562447,
+      "epoch_time": 1024.6123733520508,
+      "epoch_train_time": 1011.267,
+      "epoch_train_throughput": 211.1489843928458,
+      "val_loss": 1.7585252266979217,
+      "val_top1": 58.04599999885559,
+      "val_top5": 82.00399999542236
+    },
+    "20": {
+      "lr": 0.1,
+      "train_loss": 1.865051803844874,
+      "train_loss_global": 1.8599737549698154,
+      "train_top1": 57.08103855203517,
+      "train_top5": 79.86540406850139,
+      "steps": 1669,
+      "step_time_min": 0.23478847090154886,
+      "step_time_max": 1.2879985810723156,
+      "step_time": 0.6060238787769063,
+      "data_time": 0.0005487243800020597,
+      "comp_time": 0.6054751543969042,
+      "epoch_time": 1024.820416212082,
+      "epoch_train_time": 1011.4616875,
+      "epoch_train_throughput": 211.10834215359245,
+      "val_loss": 1.7217864152812958,
+      "val_top1": 58.92999999897003,
+      "val_top5": 82.61999999778747
+    },
+    "21": {
+      "lr": 0.1,
+      "train_loss": 1.8549229041289597,
+      "train_loss_global": 1.848844845529908,
+      "train_top1": 57.38544827801716,
+      "train_top5": 80.10237533222325,
+      "steps": 1669,
+      "step_time_min": 0.22157998313196003,
+      "step_time_max": 1.2793958759866655,
+      "step_time": 0.6059506139296696,
+      "data_time": 0.0005628630753836459,
+      "comp_time": 0.605387750854286,
+      "epoch_time": 1024.7106997966766,
+      "epoch_train_time": 1011.33925,
+      "epoch_train_throughput": 211.13389992527235,
+      "val_loss": 1.6888920307159423,
+      "val_top1": 59.53799999881744,
+      "val_top5": 83.09599999473572
+    },
+    "22": {
+      "lr": 0.1,
+      "train_loss": 1.8494122549386225,
+      "train_loss_global": 1.8378808423587385,
+      "train_top1": 57.42993893058279,
+      "train_top5": 80.10565359081228,
+      "steps": 1669,
+      "step_time_min": 0.23092983500100672,
+      "step_time_max": 1.2615374999586493,
+      "step_time": 0.6059971262216501,
+      "data_time": 0.0006503904060616313,
+      "comp_time": 0.6053467358155885,
+      "epoch_time": 1024.7847819328308,
+      "epoch_train_time": 1011.414125,
+      "epoch_train_throughput": 211.11826968008776,
+      "val_loss": 1.7719725084400177,
+      "val_top1": 57.983999999542235,
+      "val_top5": 81.84799999778748
+    },
+    "23": {
+      "lr": 0.1,
+      "train_loss": 1.822237088441679,
+      "train_loss_global": 1.8271652065934798,
+      "train_top1": 57.95727024033349,
+      "train_top5": 80.55524334045184,
+      "steps": 1669,
+      "step_time_min": 0.22747783293016255,
+      "step_time_max": 1.2397617688402534,
+      "step_time": 0.6059272168230694,
+      "data_time": 0.0006453949462013054,
+      "comp_time": 0.6052818218768681,
+      "epoch_time": 1024.6764781475067,
+      "epoch_train_time": 1011.298,
+      "epoch_train_throughput": 211.14251190054762,
+      "val_loss": 1.7905307581663132,
+      "val_top1": 57.39599999912262,
+      "val_top5": 81.59999999687194
+    },
+    "24": {
+      "lr": 0.1,
+      "train_loss": 1.81785784665957,
+      "train_loss_global": 1.8154693957387358,
+      "train_top1": 58.16099059593815,
+      "train_top5": 80.49904462149678,
+      "steps": 1669,
+      "step_time_min": 0.23267068108543754,
+      "step_time_max": 1.2734550130553544,
+      "step_time": 0.6056631812768603,
+      "data_time": 0.0005897888054411664,
+      "comp_time": 0.6050733924714191,
+      "epoch_time": 1024.2241823673248,
+      "epoch_train_time": 1010.863375,
+      "epoch_train_throughput": 211.2332935200071,
+      "val_loss": 1.8234334209752083,
+      "val_top1": 56.925999999694824,
+      "val_top5": 81.14599999443054
+    },
+    "25": {
+      "lr": 0.1,
+      "train_loss": 1.8133000835822666,
+      "train_loss_global": 1.8099744404052909,
+      "train_top1": 58.246693642051625,
+      "train_top5": 80.46813532594287,
+      "steps": 1669,
+      "step_time_min": 0.22015202604234219,
+      "step_time_max": 1.2931453029159456,
+      "step_time": 0.6055908254333792,
+      "data_time": 0.0006374238797453991,
+      "comp_time": 0.6049534015536338,
+      "epoch_time": 1024.1117987632751,
+      "epoch_train_time": 1010.741125,
+      "epoch_train_throughput": 211.25884236678309,
+      "val_loss": 1.7041316925668717,
+      "val_top1": 59.05800000034332,
+      "val_top5": 82.98799999549865
+    },
+    "26": {
+      "lr": 0.1,
+      "train_loss": 1.7955058972094406,
+      "train_loss_global": 1.7996818508323902,
+      "train_top1": 58.58341763126842,
+      "train_top5": 80.83342699757861,
+      "steps": 1669,
+      "step_time_min": 0.23807622003369033,
+      "step_time_max": 1.227664123987779,
+      "step_time": 0.6058539540997672,
+      "data_time": 0.0006373966894787165,
+      "comp_time": 0.6052165574102885,
+      "epoch_time": 1024.56112241745,
+      "epoch_train_time": 1011.1780625,
+      "epoch_train_throughput": 211.16755586259566,
+      "val_loss": 1.7644544996929168,
+      "val_top1": 57.66199999921799,
+      "val_top5": 82.06799999717713
+    }
+  }
+}

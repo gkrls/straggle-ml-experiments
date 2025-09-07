@@ -442,7 +442,7 @@ def main():
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
 
-    parser.add_argument("--json", type=str, default="resnet50.json", help="Path to JSON run log")
+    parser.add_argument("--json", type=str, default="resnet.json", help="Path to JSON run log")
     args = parser.parse_args()
 
     if args.deterministic:
