@@ -19,7 +19,7 @@ from typing import List, Dict
 from straggle_sim import SlowWorkerPattern
 
 # HF
-from datasets import load_dataset
+from datasets import load_dataset, DownloadMode
 from transformers import (
     AutoTokenizer,
     AutoConfig,
@@ -165,9 +165,10 @@ def get_dataloaders(args):
     name = 'squad_v2' if args.squad_version == 'v2' else 'squad'
     if args.rank == 0:
         print(f"[Data] Loading '{name}' under {args.data} (first run downloads; then reuses)")
-    raw = load_dataset(name, cache_dir=os.environ.get('HF_DATASETS_CACHE', args.data))
+    dl_mode = DownloadMode.FORCE_REDOWNLOAD if args.force_download else DownloadMode.REUSE_DATASET_IF_EXISTS
+    raw = load_dataset(name, cache_dir=os.environ.get('HF_DATASETS_CACHE', args.data), download_mode=dl_mode)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data))
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data, force_download=args.force_download))
 
     train_features, val_features = _prepare_features(args, raw, tokenizer)
 
@@ -420,8 +421,9 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args)
 
     # Model
-    config = AutoConfig.from_pretrained(args.model_name, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data))
-    model  = AutoModelForQuestionAnswering.from_pretrained(args.model_name, config=config, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data)).to(device)
+    config = AutoConfig.from_pretrained(args.model_name, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data, force_download=args.force_download))
+    model  = AutoModelForQuestionAnswering.from_pretrained(args.model_name, config=config, 
+                                                           cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data, force_download=args.force_download,)).to(device)
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True,
                 find_unused_parameters=False, static_graph=args.static_graph)
@@ -447,7 +449,9 @@ def train(args):
     best_em = 0.0
     best_f1 = 0.0
 
-    log = {"time": now(), "config": vars(args), "epochs": {}}
+    # log = {"time": now(), "config": vars(args), "epochs": {}}
+    cfg = {k: v for k, v in vars(args).items() if not k.startswith('_')}
+    log = {"time": now(), "config": cfg, "epochs": {}}
     save_log(args.json, log)
     
     for epoch in range(args.epochs):
@@ -580,6 +584,8 @@ def main():
     # Training/model
     parser.add_argument('--model_name', type=str, default='bert-base-uncased', help="HF model for QA")
     parser.add_argument('--data', type=str, required=True, help='Single directory (created if missing). Everything stays under it.')
+    parser.add_argument('--force_download', action='store_true', help='Force re-download of the SQuAD dataset into the --data cache')
+
     parser.add_argument('--squad_version', type=str, choices=['v1','v2'], default='v1')
     parser.add_argument('--epochs', type=int, default=3)
     parser.add_argument('--batch_size', type=int, default=16)
@@ -647,7 +653,9 @@ def main():
         random.seed(args.seed)
         np.random.seed(args.seed)
 
-    print(json.dumps(vars(args), indent=2))
+    # print(json.dumps(vars(args), indent=2))
+    cfg = {k: v for k, v in vars(args).items() if not k.startswith('_')}
+    print(json.dumps(cfg, indent=2))
     try:
         train(args)
     finally:
