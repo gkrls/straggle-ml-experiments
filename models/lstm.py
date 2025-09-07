@@ -381,13 +381,14 @@ def train(args):
     print(f"Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.6)", flush=True)
 
     # Straggle sim
-    straggle_sim = None
-    if SlowWorkerPattern is not None and args.straggle_points > 0:
-        straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                        ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
-                                        verbose=args.straggle_verbose)
-        if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
-        else: straggle_sim = None
+    # straggle_sim = None
+    # if SlowWorkerPattern is not None and args.straggle_points > 0:
+    straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
+                                    ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
+                                    verbose=args.straggle_verbose)
+    if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
+    else: print(f"Straggle sim not initialized")
+    # else: straggle_sim = None
 
     # Loss / Optim / Scheduler / AMP
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
@@ -411,6 +412,7 @@ def train(args):
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
 
+        straggle_sim.reset_stats()
         train_loader.sampler.set_epoch(epoch)
         epoch_start = time.time()
 
@@ -450,7 +452,7 @@ def train(args):
             "val_loss": float(val_metrics['loss']),
             "val_top1": float(val_metrics['top1']),
             "val_top5": float(val_metrics['top5']),
-            "straggle": straggle_sim.get_stats() if straggle_sim else {}
+            "straggle": straggle_sim.get_stats()
         }
         log["epochs"][str(epoch)] = epoch_metrics
         save_log(args.json, log)
