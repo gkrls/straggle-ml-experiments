@@ -375,7 +375,7 @@ def train_one_epoch(model, dataloader, optimizer, scheduler, device, scaler, arg
 
         optimizer.zero_grad(set_to_none=True)
         if scaler is not None:
-            with autocast():
+            with torch.amp.autocast('cuda'):
                 out = model(**batch)
                 loss = out.loss
             scaler.scale(loss).backward()
