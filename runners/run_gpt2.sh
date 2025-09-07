@@ -26,7 +26,8 @@ else
   git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
 fi
 
-source $HOME/straggle-ml/venv/bin/activate
+source $HOME/straggle-ml-experiments/venv/bin/activate
+
 python -m pip install --upgrade pip 
 python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
 
