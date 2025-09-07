@@ -18,7 +18,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import Dataset, DataLoader, DistributedSampler, Subset
 from datasets import load_dataset  # Hugging Face
 
-# -------- optional straggle sim (same API as your DenseNet script) --------
+# -------- optional straggle sim --------
 try:
     from straggle_sim import SlowWorkerPattern
 except Exception:
@@ -223,7 +223,7 @@ def validate(model, loader, device, args, num_classes: int):
     run_validation(loader)
     top1.all_reduce(); top5.all_reduce(); losses.all_reduce()
 
-    # Leftover handling (AFTER all_reduce — matches your DenseNet script)
+    # Leftover handling (AFTER all_reduce 
     if hasattr(loader, "sampler") and len(loader.sampler) * args.world_size < len(loader.dataset):
         start = len(loader.sampler) * args.world_size
         aux = Subset(loader.dataset, range(start, len(loader.dataset)))
@@ -450,7 +450,7 @@ def train(args):
 # ------------------------- DDP Setup / Main ------------------------------
 
 def setup_ddp(args):
-    # Prefer ENV vars; fall back to provided defaults (mirror your DenseNet)
+    # Prefer ENV vars; fall back to provided defaults
     def env_int(k, d): return d if os.environ.get(k) in (None,"") else int(os.environ.get(k))
     def env_str(k, d): return d if os.environ.get(k) in (None,"") else os.environ.get(k)
 
@@ -500,7 +500,7 @@ def cleanup():
 def main():
     parser = argparse.ArgumentParser()
 
-    # DDP/System (mirrors your DenseNet CLI)
+    # DDP/System
     parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--iface', type=str, default="ens4f0")

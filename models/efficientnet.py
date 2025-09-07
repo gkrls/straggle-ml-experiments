@@ -29,7 +29,7 @@ def get_dataloaders(args):
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize,
-        transforms.RandomErasing(p=0.2, inplace=True),  # optional, cheap (kept from your EfficientNet code)
+        transforms.RandomErasing(p=0.2, inplace=True),
     ])
     val_transform = transforms.Compose([
         transforms.Resize(256),
@@ -422,7 +422,6 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")
     os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
 
-    # Start the process group with your chosen backend
     dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
     if args.rank == 0:

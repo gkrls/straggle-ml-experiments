@@ -34,7 +34,6 @@ source $HOME/straggle-ml-experiments/venv/bin/activate
 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
 NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
-# Run your script; pass through any extra CLI args (e.g. --data, --epochs, ...)
 set -x
 exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --rank "$RANK" \

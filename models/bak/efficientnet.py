@@ -374,14 +374,14 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_DEBUG", "WARN")
     os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
     os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
-    os.environ.setdefault("NCCL_P2P_DISABLE", "1")         # keep your original NCCL envs
+    os.environ.setdefault("NCCL_P2P_DISABLE", "1")
     os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")
     os.environ.setdefault("NCCL_IB_DISABLE", "0")
     os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
     os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")
     os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
 
-    # Start the process group with your chosen backend
+
     dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
     if args.rank == 0:
