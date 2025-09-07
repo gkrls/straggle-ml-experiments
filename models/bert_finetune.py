@@ -168,7 +168,8 @@ def get_dataloaders(args):
     dl_mode = DownloadMode.FORCE_REDOWNLOAD if args.force_download else DownloadMode.REUSE_DATASET_IF_EXISTS
     raw = load_dataset(name, cache_dir=os.environ.get('HF_DATASETS_CACHE', args.data), download_mode=dl_mode)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data, force_download=args.force_download))
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data), 
+                                              force_download=args.force_download)
 
     train_features, val_features = _prepare_features(args, raw, tokenizer)
 
@@ -421,9 +422,10 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args)
 
     # Model
-    config = AutoConfig.from_pretrained(args.model_name, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data, force_download=args.force_download))
-    model  = AutoModelForQuestionAnswering.from_pretrained(args.model_name, config=config, 
-                                                           cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data, force_download=args.force_download,)).to(device)
+    config = AutoConfig.from_pretrained(args.model_name, cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data), 
+                                        force_download=args.force_download)
+    model  = AutoModelForQuestionAnswering.from_pretrained(args.model_name, config=config,  cache_dir=os.environ.get('TRANSFORMERS_CACHE', args.data), 
+                                                           force_download=args.force_download,).to(device)
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True,
                 find_unused_parameters=False, static_graph=args.static_graph)
