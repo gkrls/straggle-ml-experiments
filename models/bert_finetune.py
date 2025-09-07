@@ -674,6 +674,7 @@ def main():
     parser.add_argument("--json", type=str, default="bert_squad.json", help="Path to JSON run log")
     args = parser.parse_args()
 
+    os.environ["TOKENIZERS_PARALLELISM"] = False
     if args.deterministic:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True, warn_only=True)
