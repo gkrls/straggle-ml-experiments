@@ -102,7 +102,7 @@ class SlowWorkerPattern:
             "total_straggle_time": AtomicCounter()
         }
 
-    def _reset_stats(self):
+    def reset_stats(self):
         for counter in self.stats.values():
             counter.set(0)
 
@@ -120,7 +120,7 @@ class SlowWorkerPattern:
 
         """Attach hooks to the root model. With DDP, use ddp.module."""
         self.detach()  # idempotent
-        self._reset_stats()
+        self.reset_stats()
 
         if dist.is_available() and dist.is_initialized():
             self._rank = self._get_rank_safe()
@@ -205,6 +205,7 @@ class SlowWorkerPattern:
             "total_straggle_time": self.stats["total_straggle_time"].get(),
             "avg_straggle_time": self.stats["total_straggle_time"].get() / max(1, self.stats["num_straggle_events"].get())
         }
+
 
     def print_stats(self):
         """Print current statistics."""

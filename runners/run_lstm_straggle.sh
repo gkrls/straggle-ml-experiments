@@ -54,7 +54,7 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --straggle_amount 0.12 \
   --straggle_multiply 0.5 2 \
   --straggle_verbose \
-  --json $HOME/straggle-ml-experiments/models/lstm.json \
+  --json $HOME/straggle-ml-experiments/models/lstm_straggle.json \
   "$@"
 
 
