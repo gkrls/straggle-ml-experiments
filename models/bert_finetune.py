@@ -483,7 +483,7 @@ def train(args):
     scheduler = get_linear_schedule_with_warmup(
         optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
     )
-    scaler = GradScaler(enabled=(args.amp and device.type == "cuda"))
+    scaler = torch.amp.GradScaler('cuda', enabled=(args.amp and device.type == "cuda"))
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
