@@ -641,7 +641,7 @@ def main():
     parser.add_argument('--epochs', type=int, default=3)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--learning_rate', type=float, default=3e-5)
-    parser.add_argument('--weight_decay', type=float, default=0.0)
+    parser.add_argument('--weight_decay', type=float, default=0.01)
     parser.add_argument('--warmup_ratio', type=float, default=0.1)
     parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
     parser.add_argument("--drop_last_train", action='store_true', help="Drop last from train dataset")
