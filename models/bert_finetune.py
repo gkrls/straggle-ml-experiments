@@ -398,14 +398,14 @@ def train_one_epoch(model, dataloader, optimizer, scheduler, device, scaler, arg
         step_start = time.perf_counter()
 
         # Per-step progress logging
-        if args.rank == 0 and (step_idx == 0 or (step_idx + 1) % args.log_interval == 0 or (step_idx + 1) == total_steps):
+        if args.log_interval and args.rank == 0 and (step_idx == 0 or (step_idx + 1) % args.log_interval == 0 or (step_idx + 1) == total_steps):
             inst_tp = bs / max(1e-9, elapsed)
             print(
                 f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}][Epoch {epoch:03d} Step {step_idx+1:05d}/{total_steps}] "
                 f"loss={loss.item():.4f} avg_loss={losses.avg:.4f} "
                 f"lr={optimizer.param_groups[0]['lr']:.6f} "
                 f"step_time={elapsed:.3f}s data={data_time.avg:.3f}s comp={max(0.0, step_time.avg - data_time.avg):.3f}s "
-                f"ips=~{inst_tp:.1f}",
+                f"tp=~{inst_tp:.1f} samples/sec",
                 flush=True
             )
 
@@ -649,7 +649,7 @@ def main():
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
     parser.add_argument('--max_grad_norm', type=float, default=1.0, help="Gradient clipping max norm")
-    parser.add_argument('--log_interval', type=int, default=50, help="Steps between progress prints")
+    parser.add_argument('--log_interval', type=int, default=0, help="Steps between progress prints")
 
     # QA tokenization / decode
     parser.add_argument('--max_seq_len', type=int, default=384)

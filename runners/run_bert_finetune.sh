@@ -47,7 +47,7 @@ exec python -u $HOME/straggle-ml-experiments/models/bert_finetune.py \
   --backend gloo \
   --data ~/datasets/squad_v2 \
   --epochs 5 \
-  --batch_size 16 \
+  --batch_size 32 \
   --learning_rate 3e-5 \
   --warmup_ratio 0.1 \
   --deterministic \
