@@ -697,6 +697,8 @@ def setup_ddp(args):
 def main():
     parser = argparse.ArgumentParser(description='GPT-2 DDP on OpenWebText (with periodic update logging)')
 
+    parser.add_argument("--slurm_setup", action='store_true', help="Use SLURM env vars to setup DDP")
+
     # DDP/System
     parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=6)
@@ -783,7 +785,11 @@ def main():
 
     sys.stdout.reconfigure(line_buffering=True)
 
-    setup_ddp(args)
+    if args.slurm_setup:
+        args.rank, args.local_rank, args.world_size = setup_ddp_slurm_style()
+    else:
+        setup_ddp(args)
+        
     print(f"[{now()}] Configuration:\n{json.dumps(vars(args), indent=2)}")
 
     try:

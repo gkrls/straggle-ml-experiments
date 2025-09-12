@@ -391,12 +391,34 @@ def setup_ddp(args):
         print(f"[DDP] backend={args.backend} world_size={args.world_size} "
               f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
+def setup_ddp_slurm_style():
+    # Get SLURM environment variables with defaults
+    rank = int(os.environ.get('SLURM_PROCID', '0'))
+    local_rank = int(os.environ.get('SLURM_LOCALID', '0'))
+    world_size = int(os.environ.get('SLURM_NTASKS', '1'))
+    master_addr = os.environ.get('MASTER_ADDR', 'localhost')
+    master_port = os.environ.get('MASTER_PORT', '29500')
+
+    # Explicitly set environment variables for PyTorch
+    os.environ['RANK'] = str(rank)
+    os.environ['WORLD_SIZE'] = str(world_size)
+    os.environ['MASTER_ADDR'] = master_addr
+    os.environ['MASTER_PORT'] = master_port
+
+    # Initialize the process group
+    dist.init_process_group(backend='gloo', init_method='env://')
+    torch.cuda.set_device(local_rank)
+    print(f"Rank {rank}/{world_size} initialized")
+    return rank, local_rank, world_size
+
 def cleanup():
     if dist.is_available() and dist.is_initialized():
         dist.destroy_process_group()
 
 def main():
     parser = argparse.ArgumentParser()
+
+    parser.add_argument("--slurm_setup", action='store_true', help="Use SLURM env vars to setup DDP")
 
     # DDP/System
     parser.add_argument('--rank', type=int, default=0)
@@ -459,7 +481,10 @@ def main():
 
     sys.stdout.reconfigure(line_buffering=True)
 
-    setup_ddp(args)
+    if args.slurm_setup:
+        args.rank, args.local_rank, args.world_size = setup_ddp_slurm_style()
+    else:
+        setup_ddp(args)
 
     if args.deterministic:
         args.seed = 42 + args.rank
