@@ -693,6 +693,31 @@ def setup_ddp(args):
     print(f"[{now()}][DDP] backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
+def setup_ddp_slurm_style():
+    # Get SLURM environment variables with defaults
+    rank = int(os.environ.get('SLURM_PROCID', '0'))
+    local_rank = int(os.environ.get('SLURM_LOCALID', '0'))
+    world_size = int(os.environ.get('SLURM_NTASKS', '1'))
+    master_addr = os.environ.get('MASTER_ADDR', 'localhost')
+    master_port = os.environ.get('MASTER_PORT', '29500')
+
+    # Explicitly set environment variables for PyTorch
+    os.environ['RANK'] = str(rank)
+    os.environ['WORLD_SIZE'] = str(world_size)
+    os.environ['MASTER_ADDR'] = master_addr
+    os.environ['MASTER_PORT'] = master_port
+
+    os.environ.setdefault("GLOO_SOCKET_IFNAME", 'ib1')
+    os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
+    os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
+    os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
+
+    # Initialize the process group
+    dist.init_process_group(backend='gloo', init_method='env://')
+    torch.cuda.set_device(local_rank)
+    print(f"Rank {rank}/{world_size} initialized")
+    return rank, local_rank, world_size
+
 # ------------------------- main -------------------------
 def main():
     parser = argparse.ArgumentParser(description='GPT-2 DDP on OpenWebText (with periodic update logging)')

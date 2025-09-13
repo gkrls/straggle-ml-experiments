@@ -23,7 +23,7 @@ IFACE="${IFACE:-enp226s0f0}"                 # network interface to read IP from
 BACKEND="${BACKEND:-gloo}"
 
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-export MASTER_PORT="${MASTER_PORT:-29500}"
+export MASTER_PORT="${MASTER_PORT:-29730}"
 
 export GLOO_SOCKET_IFNAME=$IFACE
 export GLOO_LOG_LEVEL=DEBUG
@@ -33,16 +33,16 @@ NCCL_DEBUG_SUBSYS=INIT,NET
 NCCL_SOCKET_IFNAME="$IFACE" 
 NCCL_IB_HCA=mlx5_0,mlx5_1
 
-srun python -u $HOME/straggle-ml-experiments/models/vgg.py \
-  --slurm_setup \
+srun python -u ../models/vgg.py \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --backend gloo \
-  --data /scratch/hpc-prf-fessllm/laxmanvj/ddp_experiments/src/data/imagenet/imagenet \
+  --data /scratch/hpc-prf-fessllm/laxmanvj/imagenet/imagenet/imagenet \
   --model vgg11 \
   --batch_size 128 \
   --workers 8 \
   --deterministic \
   --drop_last_val \
   --prefetch_factor 4 \
-  --json $HOME/straggle-ml-experiments/models/vgg11.json
+  --json ../models/vgg11.json \
+  --slurm_setup

@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 import sys
 import re
 import json
@@ -321,10 +322,9 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
 # ------------------------- Logging ------------------------------
 
 def save_log(path, log):
-    tmp = f"{path}.tmp"
-    with open(tmp, "w") as f:
-        json.dump(log, f, indent=2); f.flush(); os.fsync(f.fileno())
-    os.replace(tmp, path)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(log, f, indent=2)
 
 # ------------------------- Dataloaders ------------------------------
 
@@ -515,6 +515,11 @@ def setup_ddp_slurm_style():
     os.environ['WORLD_SIZE'] = str(world_size)
     os.environ['MASTER_ADDR'] = master_addr
     os.environ['MASTER_PORT'] = master_port
+
+    os.environ.setdefault("GLOO_SOCKET_IFNAME", 'ib1')
+    os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
+    os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
+    os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
 
     # Initialize the process group
     dist.init_process_group(backend='gloo', init_method='env://')

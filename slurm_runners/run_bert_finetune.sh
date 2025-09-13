@@ -23,7 +23,7 @@ IFACE="${IFACE:-enp226s0f0}"                 # network interface to read IP from
 BACKEND="${BACKEND:-gloo}"
 
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-export MASTER_PORT="${MASTER_PORT:-29500}"
+export MASTER_PORT="${MASTER_PORT:-29600}"
 
 export GLOO_SOCKET_IFNAME=$IFACE
 export GLOO_LOG_LEVEL=DEBUG
@@ -33,12 +33,11 @@ NCCL_DEBUG_SUBSYS=INIT,NET
 NCCL_SOCKET_IFNAME="$IFACE" 
 NCCL_IB_HCA=mlx5_0,mlx5_1
 
-srun python -u $HOME/straggle-ml-experiments/models/bert_finetune.py \
-  --slurm_setup \
+srun python -u ../models/bert_finetune.py \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --backend gloo \
-  --data ~/datasets/squad_v1 \
+  --data /scratch/hpc-prf-fessllm/laxmanvj/squad/squad \
   --squad_version v1 \
   --epochs 5 \
   --batch_size 32 \
@@ -47,4 +46,5 @@ srun python -u $HOME/straggle-ml-experiments/models/bert_finetune.py \
   --deterministic \
   --workers 8 \
   --prefetch_factor 4 \
-  --json $HOME/straggle-ml-experiments/models/bert_finetune.json
+  --json ../models/bert_finetune.json \
+  --slurm_setup

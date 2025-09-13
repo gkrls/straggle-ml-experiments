@@ -23,7 +23,7 @@ IFACE="${IFACE:-enp226s0f0}"                 # network interface to read IP from
 BACKEND="${BACKEND:-gloo}"
 
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-export MASTER_PORT="${MASTER_PORT:-29500}"
+export MASTER_PORT="${MASTER_PORT:-29650}"
 
 export GLOO_SOCKET_IFNAME=$IFACE
 export GLOO_LOG_LEVEL=DEBUG
@@ -33,12 +33,11 @@ NCCL_DEBUG_SUBSYS=INIT,NET
 NCCL_SOCKET_IFNAME="$IFACE" 
 NCCL_IB_HCA=mlx5_0,mlx5_1
 
-srun python -u $HOME/straggle-ml-experiments/models/efficientnet_2.py \
-  --slurm_setup \
+srun python -u ../models/efficientnet.py \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --backend gloo \
-  --data /scratch/hpc-prf-fessllm/laxmanvj/ddp_experiments/src/data/imagenet/imagenet \
+  --data /scratch/hpc-prf-fessllm/laxmanvj/imagenet/imagenet/imagenet \
   --model efficientnet_b0 \
   --epochs 90 \
   --batch_size 128 \
@@ -46,4 +45,5 @@ srun python -u $HOME/straggle-ml-experiments/models/efficientnet_2.py \
   --drop_last_val \
   --prefetch_factor 6 \
   --workers 8 \
-  --json $HOME/straggle-ml-experiments/models/efficientnet.json
+  --json ../models/efficientnet.json \
+  --slurm_setup
