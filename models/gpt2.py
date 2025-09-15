@@ -416,6 +416,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         "epoch_time":          float(time_epoch_s),
 
         "throughput":    float(tok_per_s),
+        "tok_per_s":     float(tok_per_s),  # alias for backward compatibility
     }
 
 
@@ -622,8 +623,9 @@ def train(args):
                 f"step_time={train_metrics['step_time']:.3f}s "
                 f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
                 f"epoch_time={epoch_time:.3f}s "
-                f"tp={train_metrics['tok_per_s']:.0f} tok/s"
-                f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}", flush=True
+                f"tp={train_metrics['throughput']:.0f} tok/s "
+                f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}",
+                flush=True
             )
 
             # JSON epoch log
