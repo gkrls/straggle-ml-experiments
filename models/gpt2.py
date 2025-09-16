@@ -188,7 +188,7 @@ def validate(model, loader, device, args, max_batches=200):
     losses.all_reduce()
     val_loss = losses.avg
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
-    return {'loss': val_loss, 'ppl': val_ppl, 'time': time.perf_counter() - step_start}
+    return {'loss': val_loss, 'val_ppl': val_ppl, 'time': time.perf_counter() - step_start}
 
 
 # ------------------------- train (enhanced with periodic logging) -------------------------
@@ -365,7 +365,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 if args.rank == 0:
                     print(
                         f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
-                        f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
+                        f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['val_ppl']:.2f} val_time={val_metrics['time']:.2f}s",
                         flush=True
                     )
                     if args.json:
@@ -377,7 +377,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                                 epm[f"{step_count:04d}"] = {
                                     "global_step": int(global_step),
                                     "mini_val_loss": float(val_metrics['loss']),
-                                    "mini_val_ppl":  float(val_metrics['ppl']),
+                                    "mini_val_ppl":  float(val_metrics['val_ppl']),
                                     "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
                                 }
                             save_log(args.json, log)
@@ -616,7 +616,7 @@ def train(args):
                 f"global_step={global_step} ",
                 f"train_loss={train_metrics['loss']:.4f} "
                 f"train_ppl={train_metrics['ppl']:.2f} "
-                f"val_ppl={val_metrics['ppl']:.2f} "
+                f"val_ppl={val_metrics['val_ppl']:.2f} "
                 f"micro_steps={train_metrics['micro_steps']} "
                 f"micro_time={train_metrics['micro_step_time']:.3f}s "
                 f"steps={train_metrics['steps']} "
@@ -633,7 +633,7 @@ def train(args):
                 "train_loss": float(train_metrics['loss']),
                 "train_ppl":  float(train_metrics['ppl']),
                 "val_loss":   float(val_metrics['loss']),
-                "val_ppl":    float(val_metrics['ppl']),
+                "val_ppl":    float(val_metrics['val_ppl']),
                 "lr":         float(current_lr),
 
                 "micro_steps": int(train_metrics['micro_steps']),
