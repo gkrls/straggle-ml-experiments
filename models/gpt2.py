@@ -809,6 +809,9 @@ def main():
 
     args.workers = max(args.workers, 0)
 
+    args.straggle = True if args.straggle_points > 0 else False
+    args.model = "gpt2"
+
 
     sys.stdout.reconfigure(line_buffering=True)
 

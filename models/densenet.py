@@ -481,6 +481,8 @@ def main():
         if args.rank == 0: print("[Info] Workers requested < 1; using workers=1", flush=True)
         args.workers = 1 
 
+    args.straggle = True if args.straggle_points > 0 else False
+
     sys.stdout.reconfigure(line_buffering=True)
 
     if args.slurm_setup:

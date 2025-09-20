@@ -735,6 +735,10 @@ def main():
         np.random.seed(args.seed)
 
     cfg = {k: v for k, v in vars(args).items() if not k.startswith('_')}
+
+    cfg['straggle'] = True if args.straggle_points > 0 else False
+    cfg['model'] = args.model_name
+
     print(json.dumps(cfg, indent=2))
     try:
         train(args)

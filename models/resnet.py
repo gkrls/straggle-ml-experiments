@@ -506,6 +506,8 @@ def main():
 
     sys.stdout.reconfigure(line_buffering=True)
 
+    args.straggle = True if args.straggle_points > 0 else False
+
     if args.slurm_setup:
         args.rank, args.local_rank, args.world_size = setup_ddp_slurm_style()
     else:
