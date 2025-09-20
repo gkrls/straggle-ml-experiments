@@ -1,4 +1,10 @@
-# Sync the repo
+# Sync the repos
+if [ ! -d "$HOME/straggle-ml/.git" ]; then
+  git clone https://github.com/gkrls/straggle-ml.git "$HOME/straggle-ml"
+else
+  git -C "$HOME/straggle-ml" reset --hard >/dev/null 2>&1 || true
+  git -C "$HOME/straggle-ml" pull --ff-only || true
+fi
 if [ ! -d "$HOME/straggle-ml-experiments/.git" ]; then
   git clone https://github.com/gkrls/straggle-ml-experiments.git "$HOME/straggle-ml-experiments"
 else
@@ -33,7 +39,7 @@ PROG=experiments/allreduce/allreduce-benchmark.py
 CONF=experiments/allreduce/config.json
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_qnt --dpa_pipes 4 -b dpa_sock -d cuda -t float32 -s 10000000 -w 3 -i 15 -v "$@"
+  --dpa_conf $CONF --dpa_qnt --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 10000000 -w 3 -i 15 -v "$@"
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
 #   --d_conf configs/config-edgecore.json -b nccl -d cuda -t float32 -s 1000 -i 5 -w 3 -v "$@"
