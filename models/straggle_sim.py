@@ -213,8 +213,8 @@ class SlowWorkerPattern:
         print(f"[straggle_sim] Stats for rank {self._rank}:")
         print(f"  Straggle steps: {stats['num_straggle_steps']}")
         print(f"  Straggle events: {stats['num_straggle_events']}")
-        print(f"  Total straggle time: {stats['total_straggle_time']:.1f}ms")
-        print(f"  Avg straggle time: {stats['avg_straggle_time']:.1f}ms")
+        print(f"  Total straggle time: {stats['total_straggle_time']:.1f}s")
+        print(f"  Avg straggle time: {stats['avg_straggle_time']:.1f}s")
 
     def __repr__(self) -> str:
             """Pretty print configuration in one line."""
