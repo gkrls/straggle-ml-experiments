@@ -92,6 +92,8 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Creating tensors...")
     dtype = torch.float32 if args.type == "float32" else torch.int32
     tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) for _ in range(args.warmup + args.iters)]
+
+    dist.barrier()
     
     # DPA context options
     dpa_ctx = {"quantization": int(args.dpa_qnt), "averaging": args.dpa_avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes}
