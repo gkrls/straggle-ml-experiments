@@ -1,10 +1,17 @@
+# Sync the repo
+if [ ! -d "$HOME/straggle-ml-experiments/.git" ]; then
+  git clone https://github.com/gkrls/straggle-ml-experiments.git "$HOME/straggle-ml-experiments"
+else
+  git -C "$HOME/straggle-ml-experiments" reset --hard >/dev/null 2>&1 || true
+  git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
+fi
+
 # Make sure we have up to date DPA
 cd $HOME/straggle-ml/build
 make -j4 install
 
-source $HOME/straggle-ml-experiments/venv/bin/activate
-
 # Install the plugin
+source $HOME/straggle-ml-experiments/venv/bin/activate
 export PKG_CONFIG_PATH=/opt/mellanox/dpdk/lib/x86_64-linux-gnu/pkgconfig
 python $HOME/straggle-ml/build/install/lib/dpa_plugin_pytorch/setup.py develop
 
