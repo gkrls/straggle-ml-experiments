@@ -22,8 +22,8 @@ WORLD=6
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
-PROG=experiments/allreduce-bench/allreduce-benchmark.py
-CONF=experiments/allreduce-bench/config.json
+PROG=experiments/allreduce/allreduce-benchmark.py
+CONF=experiments/allreduce/config.json
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_qnt --dpa_pipes 4 -b dpa_sock -d cuda -t float32 -s 10000 -w 3 -i 5 -v "$@"
