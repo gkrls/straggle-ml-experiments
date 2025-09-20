@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 import re
 import torch
 import torch.distributed as dist
@@ -227,13 +228,9 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     }
 
 def save_log(path, log):
-    """Atomically write log dict to JSON file."""
-    tmp = f"{path}.tmp"
-    with open(tmp, "w") as f:
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
         json.dump(log, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
 
 def train(args):
     device = torch.device(args.device)
@@ -428,12 +425,39 @@ def setup_ddp(args):
         print(f"[DDP] backend={args.backend} world_size={args.world_size} "
               f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
+def setup_ddp_slurm_style():
+    # Get SLURM environment variables with defaults
+    rank = int(os.environ.get('SLURM_PROCID', '0'))
+    local_rank = int(os.environ.get('SLURM_LOCALID', '0'))
+    world_size = int(os.environ.get('SLURM_NTASKS', '1'))
+    master_addr = os.environ.get('MASTER_ADDR', 'localhost')
+    master_port = os.environ.get('MASTER_PORT', '29500')
+
+    # Explicitly set environment variables for PyTorch
+    os.environ['RANK'] = str(rank)
+    os.environ['WORLD_SIZE'] = str(world_size)
+    os.environ['MASTER_ADDR'] = master_addr
+    os.environ['MASTER_PORT'] = master_port
+
+    os.environ.setdefault("GLOO_SOCKET_IFNAME", 'ib1')
+    os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
+    os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
+    os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
+
+    # Initialize the process group
+    dist.init_process_group(backend='gloo', init_method='env://')
+    torch.cuda.set_device(local_rank)
+    print(f"Rank {rank}/{world_size} initialized")
+    return rank, local_rank, world_size
+
 def cleanup():
     if dist.is_available() and dist.is_initialized():
         dist.destroy_process_group()
 
 def main():
     parser = argparse.ArgumentParser()
+
+    parser.add_argument("--slurm_setup", action='store_true', help="Use SLURM env vars to setup DDP")
 
     # DDP/System (match DenseNet)
     parser.add_argument('--rank', type=int, default=0)
@@ -504,7 +528,12 @@ def main():
 
     sys.stdout.reconfigure(line_buffering=True)
 
-    setup_ddp(args)
+    args.straggle = True if args.straggle_points > 0 else False
+
+    if args.slurm_setup:
+        args.rank, args.local_rank, args.world_size = setup_ddp_slurm_style()
+    else:
+        setup_ddp(args)
 
     if args.deterministic:
         args.seed = 42 + args.rank

@@ -188,7 +188,7 @@ def validate(model, loader, device, args, max_batches=200):
     losses.all_reduce()
     val_loss = losses.avg
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
-    return {'loss': val_loss, 'ppl': val_ppl, 'time': time.perf_counter() - step_start}
+    return {'loss': val_loss, 'val_ppl': val_ppl, 'time': time.perf_counter() - step_start}
 
 
 # ------------------------- train (enhanced with periodic logging) -------------------------
@@ -365,7 +365,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 if args.rank == 0:
                     print(
                         f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
-                        f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
+                        f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['val_ppl']:.2f} val_time={val_metrics['time']:.2f}s",
                         flush=True
                     )
                     if args.json:
@@ -377,7 +377,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                                 epm[f"{step_count:04d}"] = {
                                     "global_step": int(global_step),
                                     "mini_val_loss": float(val_metrics['loss']),
-                                    "mini_val_ppl":  float(val_metrics['ppl']),
+                                    "mini_val_ppl":  float(val_metrics['val_ppl']),
                                     "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
                                 }
                             save_log(args.json, log)
@@ -416,6 +416,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         "epoch_time":          float(time_epoch_s),
 
         "throughput":    float(tok_per_s),
+        "tok_per_s":     float(tok_per_s),  # alias for backward compatibility
     }
 
 
@@ -615,15 +616,16 @@ def train(args):
                 f"global_step={global_step} ",
                 f"train_loss={train_metrics['loss']:.4f} "
                 f"train_ppl={train_metrics['ppl']:.2f} "
-                f"val_ppl={val_metrics['ppl']:.2f} "
+                f"val_ppl={val_metrics['val_ppl']:.2f} "
                 f"micro_steps={train_metrics['micro_steps']} "
                 f"micro_time={train_metrics['micro_step_time']:.3f}s "
                 f"steps={train_metrics['steps']} "
                 f"step_time={train_metrics['step_time']:.3f}s "
                 f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
                 f"epoch_time={epoch_time:.3f}s "
-                f"tp={train_metrics['tok_per_s']:.0f} tok/s"
-                f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}", flush=True
+                f"tp={train_metrics['throughput']:.0f} tok/s "
+                f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}",
+                flush=True
             )
 
             # JSON epoch log
@@ -631,7 +633,7 @@ def train(args):
                 "train_loss": float(train_metrics['loss']),
                 "train_ppl":  float(train_metrics['ppl']),
                 "val_loss":   float(val_metrics['loss']),
-                "val_ppl":    float(val_metrics['ppl']),
+                "val_ppl":    float(val_metrics['val_ppl']),
                 "lr":         float(current_lr),
 
                 "micro_steps": int(train_metrics['micro_steps']),
@@ -693,9 +695,36 @@ def setup_ddp(args):
     print(f"[{now()}][DDP] backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
+def setup_ddp_slurm_style():
+    # Get SLURM environment variables with defaults
+    rank = int(os.environ.get('SLURM_PROCID', '0'))
+    local_rank = int(os.environ.get('SLURM_LOCALID', '0'))
+    world_size = int(os.environ.get('SLURM_NTASKS', '1'))
+    master_addr = os.environ.get('MASTER_ADDR', 'localhost')
+    master_port = os.environ.get('MASTER_PORT', '29500')
+
+    # Explicitly set environment variables for PyTorch
+    os.environ['RANK'] = str(rank)
+    os.environ['WORLD_SIZE'] = str(world_size)
+    os.environ['MASTER_ADDR'] = master_addr
+    os.environ['MASTER_PORT'] = master_port
+
+    os.environ.setdefault("GLOO_SOCKET_IFNAME", 'ib1')
+    os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
+    os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
+    os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
+
+    # Initialize the process group
+    dist.init_process_group(backend='gloo', init_method='env://')
+    torch.cuda.set_device(local_rank)
+    print(f"Rank {rank}/{world_size} initialized")
+    return rank, local_rank, world_size
+
 # ------------------------- main -------------------------
 def main():
     parser = argparse.ArgumentParser(description='GPT-2 DDP on OpenWebText (with periodic update logging)')
+
+    parser.add_argument("--slurm_setup", action='store_true', help="Use SLURM env vars to setup DDP")
 
     # DDP/System
     parser.add_argument('--rank', type=int, default=0)
@@ -780,10 +809,17 @@ def main():
 
     args.workers = max(args.workers, 0)
 
+    args.straggle = True if args.straggle_points > 0 else False
+    args.model = "gpt2"
+
 
     sys.stdout.reconfigure(line_buffering=True)
 
-    setup_ddp(args)
+    if args.slurm_setup:
+        args.rank, args.local_rank, args.world_size = setup_ddp_slurm_style()
+    else:
+        setup_ddp(args)
+        
     print(f"[{now()}] Configuration:\n{json.dumps(vars(args), indent=2)}")
 
     try:

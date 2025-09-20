@@ -27,3 +27,12 @@
 ./hpdc-launch.sh --keep openwebtext -f hosts.txt -S nfs-rsync.sh /nfs0/datasets/openwebtext /home/gks/datasets
 ./hpdc-launch.sh --keep openwebtext -f hosts.txt -- tar -xvf /home/gks/datasets/openwebtext/openwebtext.tar.xz -C /home/gks/datasets/openwebtext 
 ```
+
+#### Setup pyenv:
+
+Pyenv can be setup for easier python version control. It can be done by running:
+
+```bash
+./setup_pyenv.sh
+source "$HOME/.bashrc"
+```

@@ -5,6 +5,9 @@ else
   git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
 fi
 
+pyenv install 3.12.7
+pyenv global 3.12.7
+
 
 cd $HOME/straggle-ml-experiments
 python3 -m venv venv
