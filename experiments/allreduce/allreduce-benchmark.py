@@ -178,7 +178,7 @@ def benchmark(args):
         print(f"Avg time: {avg_time*1000:.4f} ms")
         print(f"Bandwidth: {mb*8/avg_time:.3f} Mb/s (per rank)")
         print(f"Throughput: {mb/avg_time:.3f} MB/s (per rank)")
-        print(f"Elements/s: {args.size/avg_time:.3e}")
+        print(f"Elements/s: {args.size/avg_time:.3} (per rank)")
         
         # Calculate aggregate bandwidth for all-reduce
         # In all-reduce, each rank sends and receives (N-1)/N of the data
