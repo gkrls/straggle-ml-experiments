@@ -96,7 +96,7 @@ def benchmark(args):
     dist.barrier()
     
     # DPA context options
-    dpa_ctx = {"quantization": int(args.dpa_qnt), "averaging": args.dpa_avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes}
+    dpa_ctx = {"quantization": int(args.dpa_qnt), "averaging": args.dpa_avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, "straggle_k": args.world_size}
 
     def run_allreduce(t):
         if args.backend.startswith("dpa"):
