@@ -67,8 +67,8 @@
     "timeout_us": 1200,
     "tx_interval_us": 10,
     "rx_interval_us": 0,
-    "tx_burst": 128,
-    "rx_burst": 64,
+    "tx_burst": 64,
+    "rx_burst": 32,
     "debug_trace_packet": true,
     "debug_trace_packet_rtx": false
   },
