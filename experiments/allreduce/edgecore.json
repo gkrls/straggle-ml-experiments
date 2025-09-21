@@ -65,10 +65,10 @@
     "pinned": true,
     "window": 128,
     "timeout_us": 1200,
-    "tx_interval_us": 10,
+    "tx_interval_us": 30,
     "rx_interval_us": 0,
-    "tx_burst": 72,
-    "rx_burst": 32,
+    "tx_burst": 64,
+    "rx_burst": 64,
     "debug_trace_packet": true,
     "debug_trace_packet_rtx": false
   },
