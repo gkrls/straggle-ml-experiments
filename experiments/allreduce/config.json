@@ -77,7 +77,7 @@
     "iface": "ens4f1",
     "port" : 4242,
     "async": true,
-    "timeout_us": 1000,
+    "timeout_us": 10000,
     "threads": 8,
     "window": 32,
     "tx_burst": 64,
@@ -90,7 +90,7 @@
     "rx_interval_us": 0,
     "eal_port": "0000:41:00.1",
     "debug_trace_packet": true,
-    "debug_trace_packet_rtx": true,
+    "debug_trace_packet_rtx": false,
     "eal_extra_args": ["--proc-type=primary"]
   }
 }

@@ -40,7 +40,7 @@ PROG=experiments/allreduce/allreduce-benchmark.py
 CONF=experiments/allreduce/config.json
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_qnt --dpa_pipes 4 -b dpa_dpdk -d cpu -t float32 -s 1000 -w 0 -i 1 -v --batch "$@"
+  --dpa_conf $CONF --dpa_qnt --dpa_pipes 4 -b dpa_dpdk -d cpu -t float32 -s 1000000 -w 0 -i 1 -v --batch "$@"
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
 #   --d_conf configs/config-edgecore.json -b nccl -d cuda -t float32 -s 1000 -i 5 -w 3 -v "$@"
