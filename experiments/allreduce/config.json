@@ -70,7 +70,7 @@
     "tx_burst": 64,
     "rx_burst": 64,
     "debug_trace_packet": true,
-    "debug_trace_packet_rtx": true
+    "debug_trace_packet_rtx": false
   },
 
   "dpdk": {
