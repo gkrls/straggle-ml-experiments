@@ -122,7 +122,7 @@ def benchmark(args):
     if args.batch:
         works = []
         if args.device == "cuda":
-            torch.cuda.synchronize()
+            # torch.cuda.synchronize()
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
