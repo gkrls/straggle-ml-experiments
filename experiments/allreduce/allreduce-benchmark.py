@@ -182,7 +182,7 @@ def benchmark(args):
         print(f"Size: {args.size} elements ({mb:.2f} MB)")
         print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
         if args.backend.startswith("dpa"):
-            print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}")
+            print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
         print(f"{'='*50}")
         print(f"Avg time: {avg_time*1000:.4f} ms")
         print(f"Bandwidth: {mb*8/avg_time:.3f} Mb/s (per rank)")
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     parser.add_argument("--dpa_qnt", action="store_true", help="Quantization (single exponent)")
     parser.add_argument("--dpa_avg", action="store_true", help="Averaging")
     parser.add_argument("--dpa_pre", action="store_true", help="Prescaling")
-    parser.add_argument("--dpa_pipes", type=int, default=4, help="Number of pipes")
+    parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
     
     args = parser.parse_args()
 
