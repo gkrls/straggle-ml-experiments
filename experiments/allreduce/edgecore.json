@@ -66,7 +66,7 @@
     "window": 64,
     "timeout_us": 1200,
     "tx_interval_us": 10,
-    "rx_interval_us": 10,
+    "rx_interval_us": 250,
     "tx_burst": 64,
     "rx_burst": 64,
     "debug_trace_packet": true,
