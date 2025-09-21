@@ -1,0 +1,96 @@
+{
+  "hosts": {
+    "gnode1": { "mac": "10:70:fd:df:a5:aa", "ip": "42.0.0.1", "iface": "ens4f0" },
+    "gnode2": { "mac": "10:70:fd:df:a4:26", "ip": "42.0.0.2", "iface": "ens4f0" },
+    "gnode3": { "mac": "94:6d:ae:8c:ad:74", "ip": "42.0.0.3", "iface": "ens4f0" },
+    "gnode4": { "mac": "94:6d:ae:8c:e4:7c", "ip": "42.0.0.4", "iface": "ens4f0" },
+    "gnode5": { "mac": "94:6d:ae:8c:e4:8c", "ip": "42.0.0.5", "iface": "ens4f0" },
+    "gnode6": { "mac": "94:6d:ae:8c:e7:4c", "ip": "42.0.0.6", "iface": "ens4f0" }
+  },
+
+  "switch": {
+    "name": "netberg-aurora-710",
+    "tofino": 1,
+    "asic": true,
+    "mac": "42:00:00:00:00:00",
+    "ip": "42.0.0.0",
+    "port": 4242,
+    "flood_mgid": 1,
+    "pipes": [1, 0],
+    "program": {
+      "main": "lib/dpa_switch/tna/main.p4",
+      "straggle_aware": true,
+      "config": {
+        "dpa_comm": 1,
+        "dpa_udp_port": 4242,
+        "dpa_pipes": 2,
+        "dpa_exponents": 1,
+        "dpa_reducers": 32,
+        "dpa_reducer_mode": 2,
+        "dpa_slots": 16384,
+        "dpa_sessions": 1,
+        "net_arp_table_size": 512,
+        "net_icmp_table_size": 512,
+        "net_forwarding_table_size": 512
+      }
+    },
+    "ports": {
+      "1/0": { "host": "gnode1", "speed": "100", "enable": true, "auto-negotiation": false },
+      "2/0": { "host": "gnode2", "speed": "100", "enable": true, "auto-negotiation": false },
+      "3/0": { "host": "gnode3", "speed": "100", "enable": true, "auto-negotiation": false },
+      "4/0": { "host": "gnode4", "speed": "100", "enable": true, "auto-negotiation": false },
+      "5/0": { "host": "gnode5", "speed": "100", "enable": true, "auto-negotiation": false },
+      "6/0": { "host": "gnode6", "speed": "100", "enable": true, "auto-negotiation": false }
+    },
+    "sessions": {
+      "main": {
+        "id": 1,
+        "ports": ["1/0", "2/0", "3/0", "4/0", "5/0", "6/0"],
+        "pool_base": 0,
+        "pool_size": 4096,
+        "straggle_timeout_ms": 1000,
+        "mgid": 2,
+        "dropsim": {
+          "ingress": 0.0,
+          "egress": 0.0
+        }
+      }
+    }
+  },
+
+  "sock": {
+    "iface": "ens4f0",
+    "port" : 4242,
+    "threads": 8,
+    "pinned": true,
+    "window": 32,
+    "timeout_us": 1000000,
+    "tx_interval_us": 1000,
+    "rx_interval_us": 500,
+    "tx_burst": 32,
+    "rx_burst": 32,
+    "debug_trace_packet": true,
+    "debug_trace_packet_rtx": true
+  },
+
+  "dpdk": {
+    "iface": "ens4f0",
+    "port" : 4242,
+    "async": false,
+    "timeout_us": 1000000,
+    "threads": 1,
+    "window": 2,
+    "tx_burst": 1,
+    "rx_burst": 1,
+    "rx_pool_size": 2048,
+    "rx_pool_cache": 512,
+    "tx_pool_size": 1024,
+    "tx_pool_cache": 256,
+    "tx_interval_us": 1000,
+    "rx_interval_us": 500,
+    "eal_port": "0000:41:00.0",
+    "debug_trace_packet": true,
+    "debug_trace_packet_rtx": true,
+    "eal_extra_args": ["--no-telemetry"]
+  }
+}
