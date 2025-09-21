@@ -92,7 +92,7 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Creating tensors...")
     dtype = torch.float32 if args.type == "float32" else torch.int32
     tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) for _ in range(args.warmup + args.iters)]
-    for i in range(args.iters): print(tensors[args.warmup + i])
+    # for i in range(args.iters): print(tensors[args.warmup + i])
 
     dist.barrier()
     
@@ -229,6 +229,9 @@ if __name__ == "__main__":
     parser.add_argument("--dpa_pipes", type=int, default=4, help="Number of pipes")
     
     args = parser.parse_args()
+
+    # ignore user. just enable quant if floats or disable if not
+    dpa_qnt = args.type == "float32"
     
     # Validation
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
