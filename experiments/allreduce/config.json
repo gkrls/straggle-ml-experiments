@@ -19,7 +19,7 @@
     "pipes": [1, 2, 3, 0],
     "program": {
       "main": "lib/dpa_switch/tna/main.p4",
-      "straggle_aware": true,
+      "straggle_aware": false,
       "config": {
         "dpa_comm": 1,
         "dpa_udp_port": 4242,
