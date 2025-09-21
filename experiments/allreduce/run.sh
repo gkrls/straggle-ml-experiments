@@ -32,7 +32,7 @@ fi
 
 cd $HOME/straggle-ml-experiments
 
-IFACE=ens4f0
+IFACE=ens4f1
 # Derive IP on IFACE, rank = last octet - 1
 IP=$(ip -4 -o addr show dev "$IFACE" | awk '{print $4}' | cut -d/ -f1 || true)
 if [[ -z "${IP}" ]]; then
@@ -41,7 +41,7 @@ if [[ -z "${IP}" ]]; then
 fi
 RANK=$(( ${IP##*.} - 1 ))
 WORLD=6
-MASTER_ADDR=42.0.0.1
+MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
 PROG=experiments/allreduce/allreduce-benchmark.py
