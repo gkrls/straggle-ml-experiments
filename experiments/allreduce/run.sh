@@ -45,10 +45,10 @@ MASTER_ADDR=42.0.0.1
 MASTER_PORT=29500
 
 PROG=experiments/allreduce/allreduce-benchmark.py
-CONF=experiments/allreduce/netberg.json
+CONF=experiments/allreduce/edgecore.json
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 2 -b dpa_sock -d cpu -t float32 -s 1001 -w 0 -i 15 -v
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_sock -d cpu -t float32 -s 1001 -w 0 -i 15 -v
 #"$@"
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
