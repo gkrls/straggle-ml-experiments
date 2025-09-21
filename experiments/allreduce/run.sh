@@ -14,6 +14,7 @@ fi
 
 # Make sure we have up to date DPA
 cd $HOME/straggle-ml/build
+cmake -DCMAKE_BUILD_TYPE=Debug -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_AVX_512=ON -DDPA_SWITCH=OFF ..
 make -j4 install
 
 # Install the plugin
