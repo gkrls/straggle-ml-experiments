@@ -95,7 +95,7 @@ def benchmark(args):
     # tensors = [torch.full((args.size,), args.rank + 1, dtype=dtype, device=device) for _ in range(args.warmup + args.iters)]
 
     for i in range(args.iters):
-        t = tensors[i]
+        t = tensors[args.warmup + i]
         print(f"[Rank {args.rank}] Tensor {i}: contiguous={t.is_contiguous()}, last 10 values={t[-10:].tolist()}")
         # print(tensors[args.warmup + i])
 
@@ -115,7 +115,7 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
     for i in range(args.warmup): run_allreduce(tensors[i])
   
-    # if args.device == "cuda": torch.cuda.synchronize()
+    if args.device == "cuda": torch.cuda.synchronize()
     
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.iters} jobs...")
@@ -164,7 +164,7 @@ def benchmark(args):
             if args.rank == 0 and args.verbose: print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     
     for i in range(args.iters):
-        print(tensors[args.warmup + i])
+        print("OUTPUT TENSOR", i, tensors[args.warmup + i])
 
     # Results
     if args.rank == 0:
