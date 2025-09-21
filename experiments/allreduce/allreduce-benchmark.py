@@ -92,7 +92,7 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Creating tensors...")
     dtype = torch.float32 if args.type == "float32" else torch.int32
     tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) for _ in range(args.warmup + args.iters)]
-    # for i in range(args.iters): print(tensors[args.warmup + i])
+    for i in range(args.iters): print(tensors[args.warmup + i])
 
     dist.barrier()
     
