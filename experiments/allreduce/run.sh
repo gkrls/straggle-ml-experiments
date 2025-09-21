@@ -18,7 +18,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
 
   # Make sure we have up to date DPA
   cd $HOME/straggle-ml/build
-  cmake -DCMAKE_BUILD_TYPE=Debug -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_AVX_512=ON -DDPA_SWITCH=OFF ..
+  cmake -DCMAKE_BUILD_TYPE=Debug -DDPA_DEVELOP=OFF -DDPA_AVX=OFF -DDPA_SWITCH=OFF ..
   make -j4 install
 
   # Install the plugin
@@ -32,7 +32,7 @@ fi
 
 cd $HOME/straggle-ml-experiments
 
-IFACE=ens4f1
+IFACE=ens4f0
 # Derive IP on IFACE, rank = last octet - 1
 IP=$(ip -4 -o addr show dev "$IFACE" | awk '{print $4}' | cut -d/ -f1 || true)
 if [[ -z "${IP}" ]]; then
@@ -41,14 +41,14 @@ if [[ -z "${IP}" ]]; then
 fi
 RANK=$(( ${IP##*.} - 1 ))
 WORLD=6
-MASTER_ADDR=42.0.1.1
+MASTER_ADDR=42.0.0.1
 MASTER_PORT=29500
 
 PROG=experiments/allreduce/allreduce-benchmark.py
 CONF=experiments/allreduce/config.json
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_sock -d cpu -t float32 -s 1000 -w 0 -i 2 -v
+  --dpa_conf $CONF --dpa_pipes 1 -b dpa_sock -d cpu -t float32 -s 1000 -w 0 -i 1 -v
 #"$@"
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \

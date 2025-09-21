@@ -59,12 +59,12 @@
   },
 
   "sock": {
-    "iface": "ens4f1",
+    "iface": "ens4f0",
     "port" : 4242,
-    "threads": 2,
+    "threads": 1,
     "pinned": true,
-    "window": 64,
-    "timeout_us": 1000,
+    "window": 32,
+    "timeout_us": 10000,
     "tx_interval_us": 10,
     "rx_interval_us": 0,
     "tx_burst": 64,
@@ -74,7 +74,7 @@
   },
 
   "dpdk": {
-    "iface": "ens4f1",
+    "iface": "ens4f0",
     "port" : 4242,
     "async": true,
     "timeout_us": 10000,
