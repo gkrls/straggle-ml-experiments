@@ -231,7 +231,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # ignore user. just enable quant if floats or disable if not
-    dpa_qnt = args.type == "float32"
+    args.dpa_qnt = args.type == "float32"
     
     # Validation
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
