@@ -18,7 +18,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
 
   # Make sure we have up to date DPA
   cd $HOME/straggle-ml/build
-  cmake -DCMAKE_BUILD_TYPE=Release -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_SWITCH=OFF ..
+  cmake -DCMAKE_BUILD_TYPE=Debug -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_SWITCH=OFF ..
   make -j4 install
 
   # Install the plugin
@@ -47,8 +47,8 @@ MASTER_PORT=29500
 PROG=experiments/allreduce/allreduce-benchmark.py
 CONF=experiments/allreduce/edgecore.json
 
-sudo -E valgrind $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_sock -d cuda -t float32 -s 100 -w 1 -i 1 -v --batch
+sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_sock -d cuda -t float32 -s 10000 -w 1 -i 1 -v
 #"$@"
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \

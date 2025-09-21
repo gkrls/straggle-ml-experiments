@@ -115,7 +115,7 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
     for i in range(args.warmup): run_allreduce(tensors[i])
   
-    if args.device == "cuda": torch.cuda.synchronize()
+    # if args.device == "cuda": torch.cuda.synchronize()
     
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.iters} jobs...")
