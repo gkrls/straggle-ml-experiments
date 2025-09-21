@@ -157,6 +157,9 @@ def benchmark(args):
             times.append(elapsed)
             if args.rank == 0 and args.verbose: print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     
+    for i in range(args.iters):
+        print(tensors[args.warmup + i])
+
     # Results
     if args.rank == 0:
         avg_time = sum(times) / len(times)
