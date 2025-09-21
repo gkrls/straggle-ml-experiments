@@ -65,7 +65,7 @@
     "pinned": true,
     "window": 64,
     "timeout_us": 1200,
-    "tx_interval_us": 30,
+    "tx_interval_us": 10,
     "rx_interval_us": 0,
     "tx_burst": 64,
     "rx_burst": 64,
