@@ -92,7 +92,10 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Creating tensors...")
     dtype = torch.float32 if args.type == "float32" else torch.int32
     tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) for _ in range(args.warmup + args.iters)]
-    for i in range(args.iters): print(tensors[args.warmup + i])
+    for i in range(args.iters):
+        t = tensors[i]
+        print(f"[Rank {args.rank}] Tensor {i}: contiguous={t.is_contiguous()}, last 10 values={t[-10:].tolist()}")
+        # print(tensors[args.warmup + i])
 
     dist.barrier()
     
