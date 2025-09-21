@@ -61,14 +61,14 @@
   "sock": {
     "iface": "ens4f1",
     "port" : 4242,
-    "threads": 16,
+    "threads": 32,
     "pinned": true,
     "window": 32,
     "timeout_us": 1200,
     "tx_interval_us": 10,
     "rx_interval_us": 0,
     "tx_burst": 64,
-    "rx_burst": 32,
+    "rx_burst": 64,
     "debug_trace_packet": true,
     "debug_trace_packet_rtx": false
   },
