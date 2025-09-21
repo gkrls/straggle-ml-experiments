@@ -163,8 +163,8 @@ def benchmark(args):
             times.append(elapsed)
             if args.rank == 0 and args.verbose: print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     
-    for i in range(args.iters):
-        print("OUTPUT TENSOR", i, tensors[args.warmup + i])
+    for i in range(args.warmup + args.iters):
+        print("OUTPUT TENSOR", i, tensors[i], "(warmup)" if i < args.warmup else "")
 
     # Results
     if args.rank == 0:
