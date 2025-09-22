@@ -13,7 +13,7 @@ torch.set_printoptions(
     edgeitems=3,    # how many from each end to show
     linewidth=120,  # avoid wrapping
     precision=3,
-    sci_mode=True
+    sci_mode=False
 )
 
 
