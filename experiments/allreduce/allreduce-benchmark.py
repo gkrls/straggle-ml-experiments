@@ -118,7 +118,7 @@ def benchmark(args):
     # if args.device == "cuda": torch.cuda.synchronize()
     
     # Batch mode - fire all, sync once (like DDP)
-    print(f"[Rank {args.rank}] Running {args.iters} jobs...")
+    print(f"[Rank {args.rank}] Running {args.iters} timed jobs...")
     if args.batch:
         works = []
         if args.device == "cuda":
