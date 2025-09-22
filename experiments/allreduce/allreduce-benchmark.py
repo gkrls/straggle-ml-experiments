@@ -8,6 +8,15 @@ import argparse
 
 import dpa
 
+torch.set_printoptions(
+    threshold=10,   # summarize when numel() > 10
+    edgeitems=3,    # how many from each end to show
+    linewidth=120,  # avoid wrapping
+    precision=3,
+    sci_mode=True
+)
+
+
 def benchmark(args):
     # Set env vars for init
     os.environ["MASTER_ADDR"] = args.master_addr
@@ -94,10 +103,13 @@ def benchmark(args):
     tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) * -(i + 1) for i in range(args.warmup + args.iters)]
     # tensors = [torch.full((args.size,), args.rank + 1, dtype=dtype, device=device) for _ in range(args.warmup + args.iters)]
 
-    for i in range(args.iters):
-        t = tensors[args.warmup + i]
-        print(f"[Rank {args.rank}] Tensor {i}: contiguous={t.is_contiguous()}, last 10 values={t[-10:].tolist()}")
-        # print(tensors[args.warmup + i])
+    # Print the inputs
+    for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
+
+    # for i in range(args.iters):
+    #     t = tensors[args.warmup + i]
+    #     print(f"[Rank {args.rank}] Tensor {i}: contiguous={t.is_contiguous()}, last 10 values={t[-10:].tolist()}")
+    #     # print(tensors[args.warmup + i])
 
     dist.barrier()
     
@@ -167,8 +179,8 @@ def benchmark(args):
             times.append(elapsed)
             if args.rank == 0 and args.verbose: print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     
-    for i in range(args.warmup + args.iters):
-        print("OUTPUT TENSOR", i, tensors[i], "(warmup)" if i < args.warmup else "")
+    # Print the results
+    for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
 
     # Results
     if args.rank == 0:
