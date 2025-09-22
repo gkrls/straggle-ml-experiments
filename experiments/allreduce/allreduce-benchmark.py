@@ -213,6 +213,10 @@ def benchmark(args):
     effective_data = mb * 2 #* (args.world_size - 1) / args.world_size
     print(f"Aggregate bandwidth: {effective_data*8/avg_time:.3f} Mb/s")
     print(f"{'='*50}\n")
+
+
+    dist.all_reduce(tensors[0])
+    print(tensors[0])
     
     dist.destroy_process_group()
 
