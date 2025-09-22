@@ -142,10 +142,13 @@ def benchmark(args):
             total_time = time.perf_counter() - start
         
         avg_time = total_time / args.iters
+        # For batch mode, we only have one aggregate measurement
         times = [avg_time]
+        batch_mode = True
     
     # Per-iteration mode (sync each)
     else:
+        batch_mode = False
         times = []
         for i in range(args.iters):
             dist.barrier()
@@ -186,12 +189,23 @@ def benchmark(args):
     
     # Compute all local metrics
     time_mean = np.mean(times_np) * 1000  # ms
-    time_std = np.std(times_np) * 1000
-    time_min = np.min(times_np) * 1000
-    time_max = np.max(times_np) * 1000
-    time_p50 = np.percentile(times_np, 50) * 1000
-    time_p95 = np.percentile(times_np, 95) * 1000
-    time_p99 = np.percentile(times_np, 99) * 1000
+    
+    if batch_mode:
+        # In batch mode, we only have one measurement
+        time_std = 0.0
+        time_min = time_mean
+        time_max = time_mean
+        time_p50 = time_mean
+        time_p95 = time_mean
+        time_p99 = time_mean
+    else:
+        # Per-iteration mode has multiple measurements
+        time_std = np.std(times_np) * 1000
+        time_min = np.min(times_np) * 1000
+        time_max = np.max(times_np) * 1000
+        time_p50 = np.percentile(times_np, 50) * 1000
+        time_p95 = np.percentile(times_np, 95) * 1000
+        time_p99 = np.percentile(times_np, 99) * 1000
     
     throughput = args.size / (time_mean / 1000)  # elements/sec
     bandwidth = network_bytes_received / (time_mean / 1000)  # bytes/sec
@@ -214,12 +228,14 @@ def benchmark(args):
     
     # Local results (always printed)
     print(f"[Rank {args.rank}] Local Results:")
-    print(f"  Time (ms):      mean={time_mean:.4f}, std={time_std:.4f}")
-    print(f"                  min={time_min:.4f}, max={time_max:.4f}")
-    print(f"                  p50={time_p50:.4f}, p95={time_p95:.4f}, p99={time_p99:.4f}")
-    print(f"  Throughput:     {throughput:.3e} elements/sec")
+    if batch_mode:
+        print(f"  Time (ms):      {time_mean:.4f} (batch mode - single aggregate measurement)")
+    else:
+        print(f"  Time (ms):      mean={time_mean:.4f}, std={time_std:.4f}")
+        print(f"                  min={time_min:.4f}, max={time_max:.4f}")
+        print(f"                  p50={time_p50:.4f}, p95={time_p95:.4f}, p99={time_p99:.4f}")
+    print(f"  Throughput:     {throughput:.0f} elements/sec")
     print(f"  Bandwidth:      {bandwidth/1e9:.3f} GB/s ({bandwidth/1e9*8:.3f} Gbps)")
-    print(f"  Network bytes:  {network_bytes_received/1e6:.2f} MB received per allreduce")
     
     # Global statistics if requested
     if args.global_stats:
@@ -233,10 +249,13 @@ def benchmark(args):
         metrics_tensor /= args.world_size
         
         print(f"\nGlobal Results (averaged across {args.world_size} ranks):")
-        print(f"  Time (ms):      mean={metrics_tensor[0]:.4f}, std={metrics_tensor[1]:.4f}")
-        print(f"                  min={metrics_tensor[2]:.4f}, max={metrics_tensor[3]:.4f}")
-        print(f"                  p50={metrics_tensor[4]:.4f}, p95={metrics_tensor[5]:.4f}, p99={metrics_tensor[6]:.4f}")
-        print(f"  Throughput:     {metrics_tensor[7]:.3e} elements/sec")
+        if batch_mode:
+            print(f"  Time (ms):      {metrics_tensor[0]:.4f} (batch mode - single aggregate measurement)")
+        else:
+            print(f"  Time (ms):      mean={metrics_tensor[0]:.4f}, std={metrics_tensor[1]:.4f}")
+            print(f"                  min={metrics_tensor[2]:.4f}, max={metrics_tensor[3]:.4f}")
+            print(f"                  p50={metrics_tensor[4]:.4f}, p95={metrics_tensor[5]:.4f}, p99={metrics_tensor[6]:.4f}")
+        print(f"  Throughput:     {metrics_tensor[7]:.0f} elements/sec")
         print(f"  Bandwidth:      {metrics_tensor[8]/1e9:.3f} GB/s ({metrics_tensor[8]/1e9*8:.3f} Gbps)")
     
     print(f"{'='*50}\n")
