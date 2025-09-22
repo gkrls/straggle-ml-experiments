@@ -172,7 +172,15 @@ def benchmark(args):
 
     # Calculate metrics
     bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
-    mb = args.size * bytes_per_elem / 1e6
+    tensor_bytes = args.size * bytes_per_elem
+    
+    # Network bytes received depends on backend algorithm
+    if args.backend.startswith("dpa"):
+        # DPA: each node receives the full tensor from all other nodes
+        network_bytes_received = tensor_bytes * 2
+    else:
+        # NCCL/Gloo use ring allreduce: each node receives (N-1)/N of the data
+        network_bytes_received = tensor_bytes * (args.world_size - 1) / args.world_size
     
     times_np = np.array(times)
     
@@ -185,10 +193,8 @@ def benchmark(args):
     time_p95 = np.percentile(times_np, 95) * 1000
     time_p99 = np.percentile(times_np, 99) * 1000
     
-    bandwidth = mb * 8 / (time_mean / 1000)  # Mb/s
-    throughput = mb / (time_mean / 1000)  # MB/s
-    elements_per_sec = args.size / (time_mean / 1000)
-    aggregate_bw = mb * 2 * 8 / (time_mean / 1000)  # Mb/s for all-reduce
+    throughput = args.size / (time_mean / 1000)  # elements/sec
+    bandwidth = network_bytes_received / (time_mean / 1000)  # bytes/sec
     
     # Results output
     print(f"\n{'='*50}")
@@ -200,7 +206,7 @@ def benchmark(args):
         print(f"Gloo Interface: {args.gloo_socket_ifname}")
     print(f"Device: {args.device}")
     print(f"Data Type: {args.type}")
-    print(f"Size: {args.size} elements ({mb:.2f} MB)")
+    print(f"Size: {args.size} elements ({tensor_bytes/1e6:.2f} MB)")
     print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
     if args.backend.startswith("dpa"):
         print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
@@ -211,36 +217,27 @@ def benchmark(args):
     print(f"  Time (ms):      mean={time_mean:.4f}, std={time_std:.4f}")
     print(f"                  min={time_min:.4f}, max={time_max:.4f}")
     print(f"                  p50={time_p50:.4f}, p95={time_p95:.4f}, p99={time_p99:.4f}")
-    print(f"  Bandwidth:      {bandwidth:.3f} Mb/s (per rank)")
-    print(f"  Throughput:     {throughput:.3f} MB/s (per rank)")
-    print(f"  Elements/s:     {elements_per_sec:.3f}")
-    print(f"  Aggregate BW:   {aggregate_bw:.3f} Mb/s")
+    print(f"  Throughput:     {throughput:.3e} elements/sec")
+    print(f"  Bandwidth:      {bandwidth/1e9:.3f} GB/s ({bandwidth/1e9*8:.3f} Gbps)")
+    print(f"  Network bytes:  {network_bytes_received/1e6:.2f} MB received per allreduce")
     
     # Global statistics if requested
     if args.global_stats:
-        # Allreduce all metrics
+        # Allreduce all metrics (just average everything)
         metrics_tensor = torch.tensor([
             time_mean, time_std, time_min, time_max, time_p50, time_p95, time_p99,
-            bandwidth, throughput, elements_per_sec, aggregate_bw
+            throughput, bandwidth
         ], dtype=torch.float64)
         
         dist.all_reduce(metrics_tensor, op=dist.ReduceOp.SUM)
         metrics_tensor /= args.world_size
         
-        # Also get true global min/max
-        global_min = torch.tensor([time_min], dtype=torch.float64)
-        global_max = torch.tensor([time_max], dtype=torch.float64)
-        dist.all_reduce(global_min, op=dist.ReduceOp.MIN)
-        dist.all_reduce(global_max, op=dist.ReduceOp.MAX)
-        
         print(f"\nGlobal Results (averaged across {args.world_size} ranks):")
         print(f"  Time (ms):      mean={metrics_tensor[0]:.4f}, std={metrics_tensor[1]:.4f}")
-        print(f"                  min={global_min[0]:.4f}, max={global_max[0]:.4f}")
+        print(f"                  min={metrics_tensor[2]:.4f}, max={metrics_tensor[3]:.4f}")
         print(f"                  p50={metrics_tensor[4]:.4f}, p95={metrics_tensor[5]:.4f}, p99={metrics_tensor[6]:.4f}")
-        print(f"  Bandwidth:      {metrics_tensor[7]:.3f} Mb/s (per rank)")
-        print(f"  Throughput:     {metrics_tensor[8]:.3f} MB/s (per rank)")
-        print(f"  Elements/s:     {metrics_tensor[9]:.3f}")
-        print(f"  Aggregate BW:   {metrics_tensor[10]:.3f} Mb/s")
+        print(f"  Throughput:     {metrics_tensor[7]:.3e} elements/sec")
+        print(f"  Bandwidth:      {metrics_tensor[8]/1e9:.3f} GB/s ({metrics_tensor[8]/1e9*8:.3f} Gbps)")
     
     print(f"{'='*50}\n")
 
