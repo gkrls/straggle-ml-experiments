@@ -104,7 +104,7 @@ def benchmark(args):
     # tensors = [torch.full((args.size,), args.rank + 1, dtype=dtype, device=device) for _ in range(args.warmup + args.iters)]
 
     # Print the inputs
-    for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
+    for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Input {i}{ " (warmup)" if i < args.warmup else ""}:", tensors[i])
 
     # for i in range(args.iters):
     #     t = tensors[args.warmup + i]
@@ -180,7 +180,8 @@ def benchmark(args):
             if args.rank == 0 and args.verbose: print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     
     # Print the results
-    for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
+    # for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
+    for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}{ " (warmup)" if i < args.warmup else ""}:", tensors[i])
 
     # Results
     if args.rank == 0:
