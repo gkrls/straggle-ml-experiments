@@ -206,7 +206,6 @@ class SlowWorkerPattern:
             "avg_straggle_time": self.stats["total_straggle_time"].get() / max(1, self.stats["num_straggle_events"].get())
         }
 
-
     def print_stats(self):
         """Print current statistics."""
         stats = self.get_stats()

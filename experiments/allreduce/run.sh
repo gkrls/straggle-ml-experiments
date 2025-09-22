@@ -49,7 +49,8 @@ CONF=experiments/allreduce/edgecore.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b gloo -d cpu -t int32 -s 100000000 -w 5 -i 20 -v --batch gloo_socket_ifname=$IFACE
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_sock -d cuda -t int32 -s 100000000 -w 5 -i 20 -v --batch \
+  --gloo_socket_ifname=$IFACE
 #"$@"
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
