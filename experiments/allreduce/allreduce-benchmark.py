@@ -122,9 +122,6 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
     for i in range(args.warmup): run_allreduce(tensors[i])
     
-    # Track if we're in batch mode
-    batch_mode = args.batch
-    
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.iters} timed jobs...")
     if args.batch:
@@ -240,7 +237,7 @@ def benchmark(args):
     
     # Global statistics if requested
     if args.global_stats:
-        # Allreduce all metrics (just average everything)
+        # Allreduce all metrics (average everything)
         metrics_tensor = torch.tensor([
             time_mean, time_std, time_min, time_max, time_p50, time_p95, time_p99,
             throughput, bandwidth
@@ -249,15 +246,24 @@ def benchmark(args):
         dist.all_reduce(metrics_tensor, op=dist.ReduceOp.SUM)
         metrics_tensor /= args.world_size
         
+        # Also get global min/max of each worker's mean performance
+        worker_perf = torch.tensor([time_mean, throughput, bandwidth], dtype=torch.float64, device=device)
+        worker_min = worker_perf.clone()
+        worker_max = worker_perf.clone()
+        dist.all_reduce(worker_min, op=dist.ReduceOp.MIN)
+        dist.all_reduce(worker_max, op=dist.ReduceOp.MAX)
+        
         print(f"\nGlobal Results (averaged across {args.world_size} ranks):")
-        if batch_mode:
-            print(f"  Time (ms):      {metrics_tensor[0]:.4f} (batch mode - single aggregate measurement)")
+        if args.batch:
+            print(f"  Time (ms):      {metrics_tensor[0]:.4f} (worker min={worker_min[0]:.4f}, max={worker_max[0]:.4f})")
         else:
             print(f"  Time (ms):      mean={metrics_tensor[0]:.4f}, std={metrics_tensor[1]:.4f}")
             print(f"                  min={metrics_tensor[2]:.4f}, max={metrics_tensor[3]:.4f}")
             print(f"                  p50={metrics_tensor[4]:.4f}, p95={metrics_tensor[5]:.4f}, p99={metrics_tensor[6]:.4f}")
-        print(f"  Throughput:     {metrics_tensor[7]:.0f} elements/sec")
+            print(f"                  worker min={worker_min[0]:.4f}, max={worker_max[0]:.4f}")
+        print(f"  Throughput:     {metrics_tensor[7]:.0f} elements/sec (worker min={worker_min[1]:.0f}, max={worker_max[1]:.0f})")
         print(f"  Bandwidth:      {metrics_tensor[8]/1e9:.3f} GB/s ({metrics_tensor[8]/1e9*8:.3f} Gbps)")
+        print(f"                  worker min={worker_min[2]/1e9:.3f}, max={worker_max[2]/1e9:.3f} GB/s")
     
     print(f"{'='*50}\n")
 
