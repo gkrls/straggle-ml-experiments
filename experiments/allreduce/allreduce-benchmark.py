@@ -115,7 +115,7 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
     for i in range(args.warmup): run_allreduce(tensors[i])
   
-    if args.device == "cuda": torch.cuda.synchronize()
+    # if args.device == "cuda": torch.cuda.synchronize()
     
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.iters} jobs...")
@@ -127,7 +127,7 @@ def benchmark(args):
             end = torch.cuda.Event(enable_timing=True)
             start.record()
             for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i]))
-            # for w in works: w.wait() # Wait for all operations to complete BEFORE recording end time
+            for w in works: w.wait() # Wait for all operations to complete BEFORE recording end time
             end.record()
             # torch.cuda.synchronize() # Make sure all the copies etc are finished
             total_time = start.elapsed_time(end) / 1000.0
