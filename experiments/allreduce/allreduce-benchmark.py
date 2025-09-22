@@ -122,6 +122,9 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
     for i in range(args.warmup): run_allreduce(tensors[i])
     
+    # Track if we're in batch mode
+    batch_mode = args.batch
+    
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.iters} timed jobs...")
     if args.batch:
@@ -144,11 +147,9 @@ def benchmark(args):
         avg_time = total_time / args.iters
         # For batch mode, we only have one aggregate measurement
         times = [avg_time]
-        batch_mode = True
     
     # Per-iteration mode (sync each)
     else:
-        batch_mode = False
         times = []
         for i in range(args.iters):
             dist.barrier()
@@ -190,7 +191,7 @@ def benchmark(args):
     # Compute all local metrics
     time_mean = np.mean(times_np) * 1000  # ms
     
-    if batch_mode:
+    if args.batch:
         # In batch mode, we only have one measurement
         time_std = 0.0
         time_min = time_mean
@@ -228,7 +229,7 @@ def benchmark(args):
     
     # Local results (always printed)
     print(f"[Rank {args.rank}] Local Results:")
-    if batch_mode:
+    if args.batch:
         print(f"  Time (ms):      {time_mean:.4f} (batch mode - single aggregate measurement)")
     else:
         print(f"  Time (ms):      mean={time_mean:.4f}, std={time_std:.4f}")
@@ -243,7 +244,7 @@ def benchmark(args):
         metrics_tensor = torch.tensor([
             time_mean, time_std, time_min, time_max, time_p50, time_p95, time_p99,
             throughput, bandwidth
-        ], dtype=torch.float64)
+        ], dtype=torch.float64, device=device)  # Use same device as the allreduce operations
         
         dist.all_reduce(metrics_tensor, op=dist.ReduceOp.SUM)
         metrics_tensor /= args.world_size
