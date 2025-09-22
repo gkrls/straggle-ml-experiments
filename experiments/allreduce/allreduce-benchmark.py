@@ -18,80 +18,6 @@ torch.set_printoptions(
 )
 
 
-def compute_statistics(times):
-    """Compute detailed statistics from timing measurements."""
-    times_np = np.array(times)
-    stats = {
-        'mean': np.mean(times_np),
-        'std': np.std(times_np),
-        'min': np.min(times_np),
-        'max': np.max(times_np),
-        'median': np.median(times_np),
-        'p25': np.percentile(times_np, 25),
-        'p75': np.percentile(times_np, 75),
-        'p90': np.percentile(times_np, 90),
-        'p95': np.percentile(times_np, 95),
-        'p99': np.percentile(times_np, 99),
-    }
-    return stats
-
-
-def aggregate_statistics(stats, world_size):
-    """Aggregate statistics across all ranks using allreduce."""
-    # Convert stats dict to tensor for allreduce
-    stats_tensor = torch.tensor([
-        stats['mean'],
-        stats['std'],
-        stats['min'],
-        stats['max'],
-        stats['median'],
-        stats['p25'],
-        stats['p75'],
-        stats['p90'],
-        stats['p95'],
-        stats['p99']
-    ], dtype=torch.float64)  # Use float64 for better precision
-    
-    # For min, we want the global minimum
-    min_tensor = torch.tensor([stats['min']], dtype=torch.float64)
-    dist.all_reduce(min_tensor, op=dist.ReduceOp.MIN)
-    
-    # For max, we want the global maximum
-    max_tensor = torch.tensor([stats['max']], dtype=torch.float64)
-    dist.all_reduce(max_tensor, op=dist.ReduceOp.MAX)
-    
-    # For other stats, we compute the mean across ranks
-    mean_stats_tensor = torch.tensor([
-        stats['mean'],
-        stats['std'],
-        stats['median'],
-        stats['p25'],
-        stats['p75'],
-        stats['p90'],
-        stats['p95'],
-        stats['p99']
-    ], dtype=torch.float64)
-    
-    dist.all_reduce(mean_stats_tensor, op=dist.ReduceOp.SUM)
-    mean_stats_tensor /= world_size
-    
-    # Reconstruct the aggregated stats dictionary
-    aggregated_stats = {
-        'mean': mean_stats_tensor[0].item(),
-        'std': mean_stats_tensor[1].item(),
-        'min': min_tensor[0].item(),
-        'max': max_tensor[0].item(),
-        'median': mean_stats_tensor[2].item(),
-        'p25': mean_stats_tensor[3].item(),
-        'p75': mean_stats_tensor[4].item(),
-        'p90': mean_stats_tensor[5].item(),
-        'p95': mean_stats_tensor[6].item(),
-        'p99': mean_stats_tensor[7].item(),
-    }
-    
-    return aggregated_stats
-
-
 def benchmark(args):
     # Set env vars for init
     os.environ["MASTER_ADDR"] = args.master_addr
@@ -244,24 +170,28 @@ def benchmark(args):
     # Print the results
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
 
-    # Compute statistics
-    stats = compute_statistics(times)
-    
-    # Optionally aggregate statistics across ranks
-    if args.global_stats:
-        stats = aggregate_statistics(stats, args.world_size)
-        stats_label = "Global (aggregated)"
-    else:
-        stats_label = f"Rank {args.rank}"
-    
-    # Calculate bandwidth metrics
+    # Calculate metrics
     bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
     mb = args.size * bytes_per_elem / 1e6
     
+    times_np = np.array(times)
+    
+    # Compute all local metrics
+    time_mean = np.mean(times_np) * 1000  # ms
+    time_std = np.std(times_np) * 1000
+    time_min = np.min(times_np) * 1000
+    time_max = np.max(times_np) * 1000
+    time_p50 = np.percentile(times_np, 50) * 1000
+    time_p95 = np.percentile(times_np, 95) * 1000
+    time_p99 = np.percentile(times_np, 99) * 1000
+    
+    bandwidth = mb * 8 / (time_mean / 1000)  # Mb/s
+    throughput = mb / (time_mean / 1000)  # MB/s
+    elements_per_sec = args.size / (time_mean / 1000)
+    aggregate_bw = mb * 2 * 8 / (time_mean / 1000)  # Mb/s for all-reduce
+    
     # Results output
-    print(f"\n{'='*60}")
-    print(f"CONFIGURATION")
-    print(f"{'='*60}")
+    print(f"\n{'='*50}")
     print(f"Backend: {args.backend}")
     if args.backend.startswith("nccl"):
         transport = "RDMA" if args.backend == "nccl_rdma" else "TCP" if args.backend == "nccl_tcp" else "auto"
@@ -272,48 +202,47 @@ def benchmark(args):
     print(f"Data Type: {args.type}")
     print(f"Size: {args.size} elements ({mb:.2f} MB)")
     print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
-    print(f"Iterations: {args.iters} (with {args.warmup} warmup)")
     if args.backend.startswith("dpa"):
         print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
+    print(f"{'='*50}")
     
-    print(f"\n{'='*60}")
-    print(f"TIMING STATISTICS [{stats_label}]")
-    print(f"{'='*60}")
-    print(f"Mean:     {stats['mean']*1000:.4f} ms")
-    print(f"Std Dev:  {stats['std']*1000:.4f} ms")
-    print(f"Min:      {stats['min']*1000:.4f} ms")
-    print(f"Max:      {stats['max']*1000:.4f} ms")
-    print(f"Median:   {stats['median']*1000:.4f} ms")
-    print(f"P25:      {stats['p25']*1000:.4f} ms")
-    print(f"P75:      {stats['p75']*1000:.4f} ms")
-    print(f"P90:      {stats['p90']*1000:.4f} ms")
-    print(f"P95:      {stats['p95']*1000:.4f} ms")
-    print(f"P99:      {stats['p99']*1000:.4f} ms")
+    # Local results (always printed)
+    print(f"[Rank {args.rank}] Local Results:")
+    print(f"  Time (ms):      mean={time_mean:.4f}, std={time_std:.4f}")
+    print(f"                  min={time_min:.4f}, max={time_max:.4f}")
+    print(f"                  p50={time_p50:.4f}, p95={time_p95:.4f}, p99={time_p99:.4f}")
+    print(f"  Bandwidth:      {bandwidth:.3f} Mb/s (per rank)")
+    print(f"  Throughput:     {throughput:.3f} MB/s (per rank)")
+    print(f"  Elements/s:     {elements_per_sec:.3f}")
+    print(f"  Aggregate BW:   {aggregate_bw:.3f} Mb/s")
     
-    print(f"\n{'='*60}")
-    print(f"PERFORMANCE METRICS [{stats_label}]")
-    print(f"{'='*60}")
+    # Global statistics if requested
+    if args.global_stats:
+        # Allreduce all metrics
+        metrics_tensor = torch.tensor([
+            time_mean, time_std, time_min, time_max, time_p50, time_p95, time_p99,
+            bandwidth, throughput, elements_per_sec, aggregate_bw
+        ], dtype=torch.float64)
+        
+        dist.all_reduce(metrics_tensor, op=dist.ReduceOp.SUM)
+        metrics_tensor /= args.world_size
+        
+        # Also get true global min/max
+        global_min = torch.tensor([time_min], dtype=torch.float64)
+        global_max = torch.tensor([time_max], dtype=torch.float64)
+        dist.all_reduce(global_min, op=dist.ReduceOp.MIN)
+        dist.all_reduce(global_max, op=dist.ReduceOp.MAX)
+        
+        print(f"\nGlobal Results (averaged across {args.world_size} ranks):")
+        print(f"  Time (ms):      mean={metrics_tensor[0]:.4f}, std={metrics_tensor[1]:.4f}")
+        print(f"                  min={global_min[0]:.4f}, max={global_max[0]:.4f}")
+        print(f"                  p50={metrics_tensor[4]:.4f}, p95={metrics_tensor[5]:.4f}, p99={metrics_tensor[6]:.4f}")
+        print(f"  Bandwidth:      {metrics_tensor[7]:.3f} Mb/s (per rank)")
+        print(f"  Throughput:     {metrics_tensor[8]:.3f} MB/s (per rank)")
+        print(f"  Elements/s:     {metrics_tensor[9]:.3f}")
+        print(f"  Aggregate BW:   {metrics_tensor[10]:.3f} Mb/s")
     
-    # Use mean time for performance metrics
-    avg_time = stats['mean']
-    print(f"Bandwidth:    {mb*8/avg_time:.3f} Mb/s (per rank)")
-    print(f"Throughput:   {mb/avg_time:.3f} MB/s (per rank)")
-    print(f"Elements/s:   {args.size/avg_time:.3f} (per rank)")
-    
-    # Calculate aggregate bandwidth for all-reduce
-    effective_data = mb * 2
-    print(f"Aggregate BW: {effective_data*8/avg_time:.3f} Mb/s")
-    
-    # Also show min/max performance
-    if not args.batch:  # Only meaningful for per-iteration mode
-        print(f"\nBest case (min time):")
-        print(f"  Bandwidth:  {mb*8/stats['min']:.3f} Mb/s")
-        print(f"  Throughput: {mb/stats['min']:.3f} MB/s")
-        print(f"\nWorst case (max time):")
-        print(f"  Bandwidth:  {mb*8/stats['max']:.3f} Mb/s")
-        print(f"  Throughput: {mb/stats['max']:.3f} MB/s")
-    
-    print(f"{'='*60}\n")
+    print(f"{'='*50}\n")
 
     # Final test allreduce
     dist.all_reduce(tensors[0])
@@ -336,7 +265,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch", action="store_true",  help="Queue all ops, single sync (like DDP)")
     
     # Statistics aggregation
-    parser.add_argument("--global_stats", action="store_true", help="Aggregate statistics across all ranks and report global means")
+    parser.add_argument("--global_stats", action="store_true", help="Also compute and report global statistics across all ranks")
     
     # Distributed arguments
     parser.add_argument("--rank", type=int, default=int(os.environ.get("RANK", 0)), help="Rank of this process")
