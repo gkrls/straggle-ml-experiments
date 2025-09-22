@@ -128,7 +128,7 @@ def benchmark(args):
             start.record()
             for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i]))
             for w in works: w.wait() # Wait for all operations to complete BEFORE recording end time
-            torch.cuda.synchronize()  # Ensure all ops done
+            # torch.cuda.synchronize()  # Ensure all ops done
             end.record()  # Now record the end event
             torch.cuda.synchronize()  # Sync before measuring
             total_time = start.elapsed_time(end) / 1000.0
