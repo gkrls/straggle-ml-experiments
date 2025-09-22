@@ -61,7 +61,7 @@
   "sock": {
     "iface": "ens4f1",
     "port" : 4242,
-    "threads": 24,
+    "threads": 16,
     "pinned": true,
     "window": 64,
     "timeout_us": 1200,
