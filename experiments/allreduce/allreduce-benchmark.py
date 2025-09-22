@@ -184,35 +184,35 @@ def benchmark(args):
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
 
     # Results
-    if args.rank == 0:
-        avg_time = sum(times) / len(times)
-        bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
-        mb = args.size * bytes_per_elem / 1e6
-        
-        print(f"\n{'='*50}")
-        print(f"Backend: {args.backend}")
-        if args.backend.startswith("nccl"):
-            transport = "RDMA" if args.backend == "nccl_rdma" else "TCP" if args.backend == "nccl_tcp" else "auto"
-            print(f"NCCL Transport: {transport}")
-        elif args.backend == "gloo" and args.gloo_socket_ifname:
-            print(f"Gloo Interface: {args.gloo_socket_ifname}")
-        print(f"Device: {args.device}")
-        print(f"Data Type: {args.type}")
-        print(f"Size: {args.size} elements ({mb:.2f} MB)")
-        print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
-        if args.backend.startswith("dpa"):
-            print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
-        print(f"{'='*50}")
-        print(f"Avg time: {avg_time*1000:.4f} ms")
-        print(f"Bandwidth: {mb*8/avg_time:.3f} Mb/s (per rank)")
-        print(f"Throughput: {mb/avg_time:.3f} MB/s (per rank)")
-        print(f"Elements/s: {args.size/avg_time:.3f} (per rank)")
-        
-        # Calculate aggregate bandwidth for all-reduce
-        # In all-reduce, each rank sends and receives (N-1)/N of the data
-        effective_data = mb * 2 * (args.world_size - 1) / args.world_size
-        print(f"Aggregate bandwidth: {effective_data*8/avg_time:.3f} Mb/s")
-        print(f"{'='*50}\n")
+    # if args.rank == 0:
+    avg_time = sum(times) / len(times)
+    bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
+    mb = args.size * bytes_per_elem / 1e6
+    
+    print(f"\n{'='*50}")
+    print(f"Backend: {args.backend}")
+    if args.backend.startswith("nccl"):
+        transport = "RDMA" if args.backend == "nccl_rdma" else "TCP" if args.backend == "nccl_tcp" else "auto"
+        print(f"NCCL Transport: {transport}")
+    elif args.backend == "gloo" and args.gloo_socket_ifname:
+        print(f"Gloo Interface: {args.gloo_socket_ifname}")
+    print(f"Device: {args.device}")
+    print(f"Data Type: {args.type}")
+    print(f"Size: {args.size} elements ({mb:.2f} MB)")
+    print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
+    if args.backend.startswith("dpa"):
+        print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
+    print(f"{'='*50}")
+    print(f"Avg time: {avg_time*1000:.4f} ms")
+    print(f"Bandwidth: {mb*8/avg_time:.3f} Mb/s (per rank)")
+    print(f"Throughput: {mb/avg_time:.3f} MB/s (per rank)")
+    print(f"Elements/s: {args.size/avg_time:.3f} (per rank)")
+    
+    # Calculate aggregate bandwidth for all-reduce
+    # In all-reduce, each rank sends and receives (N-1)/N of the data
+    effective_data = mb * 2 #* (args.world_size - 1) / args.world_size
+    print(f"Aggregate bandwidth: {effective_data*8/avg_time:.3f} Mb/s")
+    print(f"{'='*50}\n")
     
     dist.destroy_process_group()
 
