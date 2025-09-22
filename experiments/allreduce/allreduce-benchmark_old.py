@@ -5,7 +5,6 @@ import time
 import torch
 import torch.distributed as dist
 import argparse
-import numpy as np
 
 import dpa
 
@@ -16,80 +15,6 @@ torch.set_printoptions(
     precision=3,
     sci_mode=False
 )
-
-
-def compute_statistics(times):
-    """Compute detailed statistics from timing measurements."""
-    times_np = np.array(times)
-    stats = {
-        'mean': np.mean(times_np),
-        'std': np.std(times_np),
-        'min': np.min(times_np),
-        'max': np.max(times_np),
-        'median': np.median(times_np),
-        'p25': np.percentile(times_np, 25),
-        'p75': np.percentile(times_np, 75),
-        'p90': np.percentile(times_np, 90),
-        'p95': np.percentile(times_np, 95),
-        'p99': np.percentile(times_np, 99),
-    }
-    return stats
-
-
-def aggregate_statistics(stats, world_size):
-    """Aggregate statistics across all ranks using allreduce."""
-    # Convert stats dict to tensor for allreduce
-    stats_tensor = torch.tensor([
-        stats['mean'],
-        stats['std'],
-        stats['min'],
-        stats['max'],
-        stats['median'],
-        stats['p25'],
-        stats['p75'],
-        stats['p90'],
-        stats['p95'],
-        stats['p99']
-    ], dtype=torch.float64)  # Use float64 for better precision
-    
-    # For min, we want the global minimum
-    min_tensor = torch.tensor([stats['min']], dtype=torch.float64)
-    dist.all_reduce(min_tensor, op=dist.ReduceOp.MIN)
-    
-    # For max, we want the global maximum
-    max_tensor = torch.tensor([stats['max']], dtype=torch.float64)
-    dist.all_reduce(max_tensor, op=dist.ReduceOp.MAX)
-    
-    # For other stats, we compute the mean across ranks
-    mean_stats_tensor = torch.tensor([
-        stats['mean'],
-        stats['std'],
-        stats['median'],
-        stats['p25'],
-        stats['p75'],
-        stats['p90'],
-        stats['p95'],
-        stats['p99']
-    ], dtype=torch.float64)
-    
-    dist.all_reduce(mean_stats_tensor, op=dist.ReduceOp.SUM)
-    mean_stats_tensor /= world_size
-    
-    # Reconstruct the aggregated stats dictionary
-    aggregated_stats = {
-        'mean': mean_stats_tensor[0].item(),
-        'std': mean_stats_tensor[1].item(),
-        'min': min_tensor[0].item(),
-        'max': max_tensor[0].item(),
-        'median': mean_stats_tensor[2].item(),
-        'p25': mean_stats_tensor[3].item(),
-        'p75': mean_stats_tensor[4].item(),
-        'p90': mean_stats_tensor[5].item(),
-        'p95': mean_stats_tensor[6].item(),
-        'p99': mean_stats_tensor[7].item(),
-    }
-    
-    return aggregated_stats
 
 
 def benchmark(args):
@@ -176,9 +101,15 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Creating tensors...")
     dtype = torch.float32 if args.type == "float32" else torch.int32
     tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) * -(i + 1) for i in range(args.warmup + args.iters)]
+    # tensors = [torch.full((args.size,), args.rank + 1, dtype=dtype, device=device) for _ in range(args.warmup + args.iters)]
 
     # Print the inputs
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Input {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
+
+    # for i in range(args.iters):
+    #     t = tensors[args.warmup + i]
+    #     print(f"[Rank {args.rank}] Tensor {i}: contiguous={t.is_contiguous()}, last 10 values={t[-10:].tolist()}")
+    #     # print(tensors[args.warmup + i])
 
     dist.barrier()
     
@@ -195,24 +126,31 @@ def benchmark(args):
     # Warmup
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
     for i in range(args.warmup): run_allreduce(tensors[i])
+  
+    # if args.device == "cuda": torch.cuda.synchronize()
     
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.iters} timed jobs...")
     if args.batch:
         works = []
         if args.device == "cuda":
+            # torch.cuda.synchronize()
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
             for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i]))
-            for w in works: w.wait()
-            end.record()
-            torch.cuda.synchronize()
+            for w in works: w.wait() # Wait for all operations to complete BEFORE recording end time
+            # torch.cuda.synchronize()  # Ensure all ops done
+            end.record()  # Now record the end event
+            torch.cuda.synchronize()  # Sync before measuring
             total_time = start.elapsed_time(end) / 1000.0
+            # end.record()
+            # torch.cuda.synchronize() # Make sure all the copies etc are finished
+            # total_time = start.elapsed_time(end) / 1000.0
         else:
             start = time.perf_counter()
             for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i]))
-            for w in works: w.wait()
+            for w in works: w.wait() # Wait for all operations to complete BEFORE measuring end time
             total_time = time.perf_counter() - start
         
         avg_time = total_time / args.iters
@@ -242,26 +180,16 @@ def benchmark(args):
             if args.rank == 0 and args.verbose: print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     
     # Print the results
+    # for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
 
-    # Compute statistics
-    stats = compute_statistics(times)
-    
-    # Optionally aggregate statistics across ranks
-    if args.global_stats:
-        stats = aggregate_statistics(stats, args.world_size)
-        stats_label = "Global (aggregated)"
-    else:
-        stats_label = f"Rank {args.rank}"
-    
-    # Calculate bandwidth metrics
+    # Results
+    # if args.rank == 0:
+    avg_time = sum(times) / len(times)
     bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
     mb = args.size * bytes_per_elem / 1e6
     
-    # Results output
-    print(f"\n{'='*60}")
-    print(f"CONFIGURATION")
-    print(f"{'='*60}")
+    print(f"\n{'='*50}")
     print(f"Backend: {args.backend}")
     if args.backend.startswith("nccl"):
         transport = "RDMA" if args.backend == "nccl_rdma" else "TCP" if args.backend == "nccl_tcp" else "auto"
@@ -272,55 +200,25 @@ def benchmark(args):
     print(f"Data Type: {args.type}")
     print(f"Size: {args.size} elements ({mb:.2f} MB)")
     print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
-    print(f"Iterations: {args.iters} (with {args.warmup} warmup)")
     if args.backend.startswith("dpa"):
         print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
-    
-    print(f"\n{'='*60}")
-    print(f"TIMING STATISTICS [{stats_label}]")
-    print(f"{'='*60}")
-    print(f"Mean:     {stats['mean']*1000:.4f} ms")
-    print(f"Std Dev:  {stats['std']*1000:.4f} ms")
-    print(f"Min:      {stats['min']*1000:.4f} ms")
-    print(f"Max:      {stats['max']*1000:.4f} ms")
-    print(f"Median:   {stats['median']*1000:.4f} ms")
-    print(f"P25:      {stats['p25']*1000:.4f} ms")
-    print(f"P75:      {stats['p75']*1000:.4f} ms")
-    print(f"P90:      {stats['p90']*1000:.4f} ms")
-    print(f"P95:      {stats['p95']*1000:.4f} ms")
-    print(f"P99:      {stats['p99']*1000:.4f} ms")
-    
-    print(f"\n{'='*60}")
-    print(f"PERFORMANCE METRICS [{stats_label}]")
-    print(f"{'='*60}")
-    
-    # Use mean time for performance metrics
-    avg_time = stats['mean']
-    print(f"Bandwidth:    {mb*8/avg_time:.3f} Mb/s (per rank)")
-    print(f"Throughput:   {mb/avg_time:.3f} MB/s (per rank)")
-    print(f"Elements/s:   {args.size/avg_time:.3f} (per rank)")
+    print(f"{'='*50}")
+    print(f"Avg time: {avg_time*1000:.4f} ms")
+    print(f"Bandwidth: {mb*8/avg_time:.3f} Mb/s (per rank)")
+    print(f"Throughput: {mb/avg_time:.3f} MB/s (per rank)")
+    print(f"Elements/s: {args.size/avg_time:.3f} (per rank)")
     
     # Calculate aggregate bandwidth for all-reduce
-    effective_data = mb * 2
-    print(f"Aggregate BW: {effective_data*8/avg_time:.3f} Mb/s")
-    
-    # Also show min/max performance
-    if not args.batch:  # Only meaningful for per-iteration mode
-        print(f"\nBest case (min time):")
-        print(f"  Bandwidth:  {mb*8/stats['min']:.3f} Mb/s")
-        print(f"  Throughput: {mb/stats['min']:.3f} MB/s")
-        print(f"\nWorst case (max time):")
-        print(f"  Bandwidth:  {mb*8/stats['max']:.3f} Mb/s")
-        print(f"  Throughput: {mb/stats['max']:.3f} MB/s")
-    
-    print(f"{'='*60}\n")
+    # In all-reduce, each rank sends and receives (N-1)/N of the data
+    effective_data = mb * 2 #* (args.world_size - 1) / args.world_size
+    print(f"Aggregate bandwidth: {effective_data*8/avg_time:.3f} Mb/s")
+    print(f"{'='*50}\n")
 
-    # Final test allreduce
+
     dist.all_reduce(tensors[0])
     print(tensors[0])
     
     dist.destroy_process_group()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AllReduce Benchmark")
@@ -334,9 +232,6 @@ if __name__ == "__main__":
     parser.add_argument("-w", "--warmup", type=int, default=5, help="Number of warmup iterations")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--batch", action="store_true",  help="Queue all ops, single sync (like DDP)")
-    
-    # Statistics aggregation
-    parser.add_argument("--global_stats", action="store_true", help="Aggregate statistics across all ranks and report global means")
     
     # Distributed arguments
     parser.add_argument("--rank", type=int, default=int(os.environ.get("RANK", 0)), help="Rank of this process")
