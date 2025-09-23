@@ -63,7 +63,7 @@
     "port" : 4242,
     "threads": 64,
     "pinned": true,
-    "window": 64,
+    "window": 32,
     "timeout_us": 1200,
     "tx_interval_us": 15,
     "rx_interval_us": 5,
