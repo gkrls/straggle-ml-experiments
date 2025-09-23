@@ -64,7 +64,7 @@
     "threads": 24,
     "pinned": true,
     "async": false,
-    "window": 32,
+    "window": 64,
     "timeout_us": 1200,
     "tx_interval_us": 50,
     "rx_interval_us": 0,
