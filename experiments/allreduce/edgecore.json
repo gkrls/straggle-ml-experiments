@@ -63,7 +63,7 @@
     "port" : 4242,
     "threads": 24,
     "pinned": true,
-    "async": true,
+    "async": false,
     "window": 64,
     "timeout_us": 1200,
     "tx_interval_us": 50,
