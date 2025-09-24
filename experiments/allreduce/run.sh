@@ -40,7 +40,7 @@ if [[ -z "${IP}" ]]; then
   exit 1
 fi
 RANK=$(( ${IP##*.} - 1 ))
-WORLD=6
+WORLD=1
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 

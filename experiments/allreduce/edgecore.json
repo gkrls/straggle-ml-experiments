@@ -92,6 +92,6 @@
     "eal_port": "0000:41:00.1",
     "debug_trace_packet": true,
     "debug_trace_packet_rtx": false,
-    "eal_extra_args": ["--proc-type=primary", "--log-level=pmd.net.mlx5:8"]
+    "eal_extra_args": ["--log-level=pmd.net.mlx5:8"]
   }
 }
