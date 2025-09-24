@@ -78,7 +78,7 @@
     "iface": "ens4f1",
     "port" : 4242,
     "async": true,
-    "timeout_us": 1000000,
+    "timeout_us": 3000000,
     "threads": 1,
     "window": 8,
     "tx_burst": 64,
