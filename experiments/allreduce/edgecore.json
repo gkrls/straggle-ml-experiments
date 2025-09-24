@@ -78,7 +78,7 @@
     "iface": "ens4f1",
     "port" : 4242,
     "async": true,
-    "timeout_us": 10000,
+    "timeout_us": 1000000,
     "threads": 1,
     "window": 8,
     "tx_burst": 64,
@@ -92,6 +92,6 @@
     "eal_port": "0000:41:00.1",
     "debug_trace_packet": true,
     "debug_trace_packet_rtx": false,
-    "eal_extra_args": ["--proc-type=primary"]
+    "eal_extra_args": ["--proc-type=primary", "--log-level=pmd.net.mlx5:8"]
   }
 }
