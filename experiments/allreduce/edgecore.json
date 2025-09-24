@@ -80,7 +80,7 @@
     "async": true,
     "timeout_us": 10000,
     "threads": 1,
-    "window": 6,
+    "window": 8,
     "tx_burst": 64,
     "rx_burst": 64,
     "rx_pool_size": 65535,
