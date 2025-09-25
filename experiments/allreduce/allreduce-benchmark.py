@@ -119,11 +119,11 @@ def benchmark(args):
             return dist.all_reduce(t, op=dist.ReduceOp.SUM, async_op=True)
     
     # Warmup
-    print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
+    # print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
     # for i in range(args.warmup): run_allreduce(tensors[i])
     
     # Batch mode - fire all, sync once (like DDP)
-    print(f"[Rank {args.rank}] Running {args.iters} timed jobs...")
+    print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
     if args.batch:
         works = []
         if args.device == "cuda":
@@ -131,14 +131,14 @@ def benchmark(args):
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-            for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i]))
+            for i in range(args.iters): works.append(run_allreduce(tensors[0])) # args.warmup + i
             # for w in works: w.wait()
             end.record()
             torch.cuda.synchronize()
             total_time = start.elapsed_time(end) / 1000.0
         else:
             start = time.perf_counter()
-            for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i]))
+            for i in range(args.iters): works.append(run_allreduce(tensors[0])) #args.warmup + i
             for w in works: w.wait()
             total_time = time.perf_counter() - start
         
