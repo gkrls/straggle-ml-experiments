@@ -91,7 +91,7 @@
     "rx_interval_us": 0,
     "eal_port": "0000:41:00.1",
     "debug_trace_packet": true,
-    "debug_trace_packet_rtx": true,
-    "eal_extra_args": ["--log-level=pmd.net.mlx5:8"]
+    "debug_trace_packet_rtx": true
+    //"eal_extra_args": ["--log-level=pmd.net.mlx5:8"]
   }
 }
