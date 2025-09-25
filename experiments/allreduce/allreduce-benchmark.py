@@ -120,7 +120,7 @@ def benchmark(args):
     
     # Warmup
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
-    for i in range(args.warmup): run_allreduce(tensors[i])
+    # for i in range(args.warmup): run_allreduce(tensors[i])
     
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.iters} timed jobs...")
