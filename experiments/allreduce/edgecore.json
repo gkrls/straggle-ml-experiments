@@ -81,8 +81,8 @@
     "timeout_us": 1200,
     "threads": 10,
     "window": 64,
-    "tx_burst": 32,
-    "rx_burst": 32,
+    "tx_burst": 64,
+    "rx_burst": 64,
     "rx_pool_size": 65536,
     "rx_pool_cache": 512,
     "tx_pool_size": 65536,
@@ -92,6 +92,5 @@
     "eal_port": "0000:41:00.1",
     "debug_trace_packet": true,
     "debug_trace_packet_rtx": true
-    //"eal_extra_args": ["--log-level=pmd.net.mlx5:8"]
   }
 }

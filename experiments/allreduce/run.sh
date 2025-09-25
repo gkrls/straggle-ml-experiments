@@ -59,3 +59,4 @@ sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MA
 # dpa: backend finished with pool[0:16] seqnums: 6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1...
 
 
+# "eal_extra_args": ["--log-level=pmd.net.mlx5:8"]
