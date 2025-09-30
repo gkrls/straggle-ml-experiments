@@ -9,9 +9,9 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
     git clone https://github.com/gkrls/straggle-ml.git "$HOME/straggle-ml"
   fi
 
-  git -C "$DEST" checkout "$BRANCH" 2>/dev/null
-  git -C "$DEST" reset --hard
-  git -C "$DEST" pull --ff-only
+  git -C "$HOME/straggle-ml" checkout "$BRANCH" 2>/dev/null
+  git -C "$HOME/straggle-ml" reset --hard
+  git -C "$HOME/straggle-ml" pull --ff-only
 
   if [ ! -d "$HOME/straggle-ml-experiments/.git" ]; then
     git clone https://github.com/gkrls/straggle-ml-experiments.git "$HOME/straggle-ml-experiments"
