@@ -127,7 +127,7 @@ def benchmark(args):
     if args.batch:
         works = []
         if args.device == "cuda":
-            for i in range(args.warmup): run_allreduce(tensors[i])
+            for i in range(args.warmup): works.append(run_allreduce(tensors[i]))
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
@@ -148,6 +148,9 @@ def benchmark(args):
     
     # Per-iteration mode (sync each)
     else:
+        for i in range(args.warmup):
+            run_allreduce(tensors[i]).wait()
+
         times = []
         for i in range(args.iters):
             dist.barrier()

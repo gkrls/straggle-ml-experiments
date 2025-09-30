@@ -55,10 +55,11 @@ MASTER_PORT=29500
 PROG=experiments/allreduce/allreduce-benchmark.py
 CONF=experiments/allreduce/edgecore.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
+PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 100000000 -w 5 -i 20 \
-  --gloo_socket_ifname=$IFACE --global_stats --batch
+  --gloo_socket_ifname=$IFACE --global_stats
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
 #   --d_conf configs/config-edgecore.json -b nccl -d cuda -t float32 -s 1000 -i 5 -w 3 -v "$@"
