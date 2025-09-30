@@ -7,11 +7,11 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   # Sync the repos
   if [ ! -d "$HOME/straggle-ml/.git" ]; then
     git clone https://github.com/gkrls/straggle-ml.git "$HOME/straggle-ml"
-    git -C "$HOME/straggle-ml" checkout "$BRANCH" 2>/dev/null
+    git -C "$HOME/straggle-ml" checkout "origin/$BRANCH" 2>/dev/null
   else
     git -C "$HOME/straggle-ml" reset --hard >/dev/null 2>&1 || true
     git -C "$HOME/straggle-ml" pull --ff-only || true
-    git -C "$HOME/straggle-ml" checkout "$BRANCH" || true
+    git -C "$HOME/straggle-ml" checkout "origin/$BRANCH" || true
   fi
 
   if [ ! -d "$HOME/straggle-ml-experiments/.git" ]; then
