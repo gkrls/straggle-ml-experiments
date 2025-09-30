@@ -175,6 +175,9 @@ def benchmark(args):
     # Print the results
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
 
+    for i in range(min(5, len(tensors))):
+        print(f"Tensor {i} first 5 elements: {tensors[i].flatten()[:5]}")
+
     # Calculate metrics
     bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
     tensor_bytes = args.size * bytes_per_elem
