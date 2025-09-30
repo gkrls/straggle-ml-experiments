@@ -5,13 +5,17 @@ BRANCH="wip"
 
 if [[ $# -eq 1 && "$1" == "sync" ]]; then
   # Sync the repos
-  if [ ! -d "$HOME/straggle-ml/.git" ]; then
-    git clone https://github.com/gkrls/straggle-ml.git "$HOME/straggle-ml"
-  fi
+  [[ -d "$DIR/.git" ]] || git clone https://github.com/gkrls/straggle-ml.git "$HOME/straggle-ml"
 
-  git -C "$HOME/straggle-ml" checkout "$BRANCH" || true
-  git -C "$HOME/straggle-ml" reset --hard || true
-  git -C "$HOME/straggle-ml" pull --ff-only || true
+  git -C "$HOME/straggle-ml" fetch -q origin || true
+  git -C "$HOME/straggle-ml" checkout "$BRANCH" 2>/dev/null || git -C "$DIR" checkout -b "$BRANCH" --track "origin/$BRANCH" || true
+  git -C "$HOME/straggle-ml" reset --hard origin/"$BRANCH" 2>/dev/null || git -C "$DIR" reset --hard || true
+  git -C "$HOME/straggle-ml" pull --ff-only origin "$BRANCH" 2>/dev/null || true
+  git -C "$HOME/straggle-ml" clean -ffd || true
+
+  # git -C "$HOME/straggle-ml" checkout "$BRANCH" || true
+  # git -C "$HOME/straggle-ml" reset --hard || true
+  # git -C "$HOME/straggle-ml" pull --ff-only || true
 
   if [ ! -d "$HOME/straggle-ml-experiments/.git" ]; then
     git clone https://github.com/gkrls/straggle-ml-experiments.git "$HOME/straggle-ml-experiments"
