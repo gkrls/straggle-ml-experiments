@@ -9,7 +9,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
 
   git -C "$HOME/straggle-ml" fetch -q origin || true
   git -C "$HOME/straggle-ml" checkout "$BRANCH" 2>/dev/null || true
-  git -C "$HOME/straggle-ml" reset --hard origin/"$BRANCH" 2>/dev/null || git -C "$DIR" reset --hard || true
+  git -C "$HOME/straggle-ml" reset --hard origin/"$BRANCH" 2>/dev/null || true #git -C "$DIR" reset --hard || true
   git -C "$HOME/straggle-ml" pull --ff-only origin "$BRANCH" 2>/dev/null || true
   git -C "$HOME/straggle-ml" clean -ffd || true
 
