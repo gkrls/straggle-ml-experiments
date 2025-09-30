@@ -131,14 +131,14 @@ def benchmark(args):
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-            for i in range(args.iters): works.append(run_allreduce(tensors[0])) # args.warmup + i
+            for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i])) # args.warmup + i
             for w in works: w.wait()
             end.record()
             torch.cuda.synchronize()
             total_time = start.elapsed_time(end) / 1000.0
         else:
             start = time.perf_counter()
-            for i in range(args.iters): works.append(run_allreduce(tensors[0])) #args.warmup + i
+            for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i])) #args.warmup + i
             for w in works: w.wait()
             total_time = time.perf_counter() - start
         
@@ -269,8 +269,8 @@ def benchmark(args):
     print(f"{'='*50}\n")
 
     # Final test allreduce
-    dist.all_reduce(tensors[0])
-    print(tensors[0])
+    # dist.all_reduce(tensors[0])
+    # print(tensors[0])
     
     dist.destroy_process_group()
 
