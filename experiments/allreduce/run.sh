@@ -3,6 +3,9 @@ set -euo pipefail
 
 BRANCH="wip-simple"
 
+# export PKG_CONFIG_PATH=/opt/mellanox/dpdk/23.11/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH=/opt/mellanox/dpdk/lib/x86_64-linux-gnu/pkgconfig
+
 if [[ $# -eq 1 && "$1" == "sync" ]]; then
   # Sync the repos
   [[ -d "$HOME/straggle-ml/.git" ]] || git clone https://github.com/gkrls/straggle-ml.git "$HOME/straggle-ml"
@@ -25,13 +28,13 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   fi
 
   # Make sure we have up to date DPA
+  mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_BUILD_TYPE=Release -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_DPDK_RX_REUSE=ON -DDPA_SWITCH=OFF ..
   make -j4 install
 
   # Install the plugin
   source $HOME/straggle-ml-experiments/venv/bin/activate
-  export PKG_CONFIG_PATH=/opt/mellanox/dpdk/lib/x86_64-linux-gnu/pkgconfig
   python $HOME/straggle-ml/build/install/lib/dpa_plugin_pytorch/setup.py develop
 else
   source $HOME/straggle-ml-experiments/venv/bin/activate
@@ -58,7 +61,7 @@ VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 100000000 -w 5 -i 20 \
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 50000000 -w 5 -i 20 \
   --gloo_socket_ifname=$IFACE --global_stats --batch
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
