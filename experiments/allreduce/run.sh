@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BRANCH="wip"
+BRANCH="wip-simple"
 
 if [[ $# -eq 1 && "$1" == "sync" ]]; then
   # Sync the repos
