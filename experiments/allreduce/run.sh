@@ -30,7 +30,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   # Make sure we have up to date DPA
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
-  cmake -DCMAKE_BUILD_TYPE=Release -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_DPDK_RX_REUSE=ON -DDPA_DPDK_LARGE_WIN=ON -DDPA_SWITCH=OFF ..
+  cmake -DCMAKE_BUILD_TYPE=Release -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_DPDK_RX_REUSE=ON -DDPA_DPDK_WIN_HUGE=ON -DDPA_SWITCH=OFF ..
   make -j4 install
 
   # Install the plugin
@@ -61,7 +61,7 @@ VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 50000000 -w 5 -i 60 \
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 50000000 -w 5 -i 60 \
   --gloo_socket_ifname=$IFACE --global_stats --batch
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
