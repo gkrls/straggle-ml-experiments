@@ -79,7 +79,7 @@
     "port" : 4242,
     "async": true,
     "timeout_us": 10200,
-    "threads": 12,
+    "threads": 10,
     "window": 64,
     "tx_burst": 32,
     "rx_burst": 32,
