@@ -183,7 +183,7 @@ def benchmark(args):
     
     # Network bytes received depends on backend algorithm
     if args.backend.startswith("dpa"):
-        # DPA: each node receives the full tensor from all other nodes
+        # DPA: each node sends the full tensor and receives the full tensor once
         network_bytes_received = tensor_bytes * 2
     else:
         # NCCL/Gloo use ring allreduce: each node receives (N-1)/N of the data
