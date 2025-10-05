@@ -30,7 +30,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   # Make sure we have up to date DPA
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
-  cmake -DCMAKE_BUILD_TYPE=Release -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DPA_DPDK_RX_NOCOPY=ON -DDPA_DPDK_WIN_HUGE=ON -DDPA_SWITCH=OFF ..
+  cmake -DCMAKE_BUILD_TYPE=Release -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_DPDK_RX_NOCOPY=ON -DDPA_DPDK_WIN_HUGE=ON -DDPA_SWITCH=OFF ..
   make -j4 install
 
   # Install the plugin
