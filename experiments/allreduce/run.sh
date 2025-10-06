@@ -52,7 +52,7 @@ if [[ -z "${IP}" ]]; then
   exit 1
 fi
 RANK=$(( ${IP##*.} - 1 ))
-WORLD=2
+WORLD=6
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
@@ -62,7 +62,7 @@ VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 5000 -w 0 -i 1 \
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 50000 -w 0 -i 1 \
   --gloo_socket_ifname=$IFACE --global_stats --batch
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
