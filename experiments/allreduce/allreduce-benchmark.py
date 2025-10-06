@@ -297,6 +297,10 @@ def benchmark(args):
             ok = (max_err <= tol) if out.is_floating_point() else (max_err == 0)
 
             if not ok and local_ok:
+                unique_vals, counts = torch.unique(tensors[0], return_counts=True)
+                for val, cnt in zip(unique_vals, counts):
+                    if cnt < len(tensors[0]):  # Only print if not all elements
+                        print(f"[Rank {args.rank}] Value {val}: {cnt} occurrences")
                 bad = (diff > (tol if out.is_floating_point() else 0)).nonzero(as_tuple=False).flatten()
                 idx = bad[:5].tolist()
                 flat_out = out.flatten()
