@@ -137,6 +137,7 @@ def benchmark(args):
             torch.cuda.synchronize()
             total_time = start.elapsed_time(end) / 1000.0
         else:
+            for i in range(args.warmup): works.append(run_allreduce(tensors[i]))
             start = time.perf_counter()
             for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i])) #args.warmup + i
             for w in works: w.wait()
