@@ -28,6 +28,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   fi
 
   # Make sure we have up to date DPA
+  # sudo rm -rf $HOME/straggle-ml/build
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_BUILD_TYPE=Release -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_DPDK_RX_REUSE=ON -DDPA_DPDK_WIN_HUGE=ON \
@@ -62,7 +63,7 @@ VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 20000000 -w 0 -i 1 \
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 80000000 -w 0 -i 1 \
   --gloo_socket_ifname=$IFACE --global_stats --verify
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \

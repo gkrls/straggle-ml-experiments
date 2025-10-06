@@ -279,6 +279,7 @@ def benchmark(args):
     # print(tensors[0])
     
     if (args.verify):
+        time.sleep(5)
         if args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre):
             raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling ")
         S = args.world_size * (args.world_size + 1) // 2
