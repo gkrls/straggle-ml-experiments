@@ -1,6 +1,2 @@
 hpdc-gnode1
 hpdc-gnode2
-hpdc-gnode3
-hpdc-gnode4
-hpdc-gnode5
-hpdc-gnode6
