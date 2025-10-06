@@ -284,37 +284,37 @@ def benchmark(args):
         tol = 1e-6 if dtype == torch.float32 else 0
 
         local_ok = True
-        first_failure_msg = None
+        first_failure = None
 
-        for i in range(args.warmup + args.iters):
+        for i, out in enumerate(tensors):
             expected_scalar = -(i + 1) * S
-            out = tensors[i]
-            if out.is_floating_point():
-                # allclose for floats
-                ok = torch.allclose(out, torch.full_like(out, expected_scalar), rtol=0.0, atol=tol)
-            else:
-                # exact for ints
-                ok = torch.equal(out, torch.full_like(out, expected_scalar))
+            expected = torch.full_like(out, expected_scalar)
+
+            diff = (out - expected).abs()
+            max_err = diff.max().item()
+            ok = (max_err <= tol) if out.is_floating_point() else (max_err == 0)
 
             if not ok and local_ok:
-                # capture a small sample for debugging (don’t spam)
-                flat = out.flatten()
-                sample = flat[:min(5, flat.numel())].tolist()
-                first_failure_msg = (f"[Rank {args.rank}] Verification FAILED at tensor {i}: "
-                                     f"expected {expected_scalar}, sample {sample}")
+                bad = (diff > (tol if out.is_floating_point() else 0)).nonzero(as_tuple=False).flatten()
+                idx = bad[:5].tolist()
+                flat_out = out.flatten()
+                flat_exp = expected.flatten()
+                samples = [(j, float(flat_out[j].item()), float(flat_exp[j].item())) for j in idx]
+                first_failure = (f"[Rank {args.rank}] Verification FAILED at tensor {i}: "
+                                 f"expected {expected_scalar}, max_err={max_err:.3e}, bad_samples={samples}")
                 local_ok = False
 
-        ok_tensor = torch.tensor(1 if local_ok else 0, device="cpu", dtype=torch.int32)
+        ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
         dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
-        global_ok = bool(ok_tensor.item())
-        if not global_ok:
-            if first_failure_msg:
-                print(first_failure_msg)
+        if ok_tensor.item() == 1:
             if args.rank == 0:
-                print("❌ Verification FAILED. See rank logs above for details.")
+                print("✅ Verification PASSED (simple SUM).")
         else:
+            if first_failure:
+                print(first_failure)
             if args.rank == 0:
-                print("✅ Verification PASSED.")
+                print("❌ Verification FAILED (simple SUM). See rank logs above.")
+
 
     dist.destroy_process_group()
 
