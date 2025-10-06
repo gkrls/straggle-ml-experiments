@@ -302,8 +302,6 @@ def benchmark(args):
                 samples = [(j, float(flat_out[j].item()), float(flat_exp[j].item())) for j in idx]
                 first_failure = (f"[Rank {args.rank}] Verification FAILED at tensor {i}: "
                                  f"expected {expected_scalar}, max_err={max_err:.3e}, bad_samples={samples}")
-                print(tensors[i])
-                sys.exit(1)
                 local_ok = False
 
         ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
