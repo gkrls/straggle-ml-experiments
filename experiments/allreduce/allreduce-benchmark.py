@@ -277,6 +277,45 @@ def benchmark(args):
     # dist.all_reduce(tensors[0])
     # print(tensors[0])
     
+    if (args.verify):
+        if args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre):
+            raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling ")
+        S = args.world_size * (args.world_size + 1) // 2
+        tol = 1e-6 if dtype == torch.float32 else 0
+
+        local_ok = True
+        first_failure_msg = None
+
+        for i in range(args.warmup + args.iters):
+            expected_scalar = -(i + 1) * S
+            out = tensors[i]
+            if out.is_floating_point():
+                # allclose for floats
+                ok = torch.allclose(out, torch.full_like(out, expected_scalar), rtol=0.0, atol=tol)
+            else:
+                # exact for ints
+                ok = torch.equal(out, torch.full_like(out, expected_scalar))
+
+            if not ok and local_ok:
+                # capture a small sample for debugging (don’t spam)
+                flat = out.flatten()
+                sample = flat[:min(5, flat.numel())].tolist()
+                first_failure_msg = (f"[Rank {args.rank}] Verification FAILED at tensor {i}: "
+                                     f"expected {expected_scalar}, sample {sample}")
+                local_ok = False
+
+        ok_tensor = torch.tensor(1 if local_ok else 0, device="cpu", dtype=torch.int32)
+        dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
+        global_ok = bool(ok_tensor.item())
+        if not global_ok:
+            if first_failure_msg:
+                print(first_failure_msg)
+            if args.rank == 0:
+                print("❌ Verification FAILED. See rank logs above for details.")
+        else:
+            if args.rank == 0:
+                print("✅ Verification PASSED.")
+
     dist.destroy_process_group()
 
 
@@ -292,6 +331,8 @@ if __name__ == "__main__":
     parser.add_argument("-w", "--warmup", type=int, default=5, help="Number of warmup iterations")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--batch", action="store_true",  help="Queue all ops, single sync (like DDP)")
+
+    parser.add_argument("--verify", action="store_true", help="Verify output. Only works for SUM operation (no averaging/prescaling)")
     
     # Statistics aggregation
     parser.add_argument("--global_stats", action="store_true", help="Also compute and report global statistics across all ranks")
