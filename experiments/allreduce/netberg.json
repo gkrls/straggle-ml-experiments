@@ -18,7 +18,7 @@
     "flood_mgid": 1,
     "pipes": [1, 0],
     "program": {
-      "main": "lib/dpa_switch/tna/main.p4",
+      "main": "lib/dpa_switch/tna_b/main.p4",
       "straggle_aware": true,
       "config": {
         "dpa_comm": 1,
