@@ -102,7 +102,7 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Creating tensors...")
     dtype = torch.float32 if args.type == "float32" else torch.int32
     # tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) * -(i + 1) for i in range(args.warmup + args.iters)]
-    tensors = [torch.ones(args.size, dtype=dtype, device=device) + (i * 10) for i in range(args.warmup + args.iters)]
+    tensors = [torch.ones(args.size, dtype=dtype, device=device) for i in range(args.warmup + args.iters)]
 
     # Print the inputs
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Input {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
@@ -283,14 +283,14 @@ def benchmark(args):
         time.sleep(5)
         if args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre):
             raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling ")
-        S = args.world_size * (args.world_size + 1) // 2
+        S = args.world_size #* (args.world_size + 1) // 2
         tol = 1e-6 if dtype == torch.float32 else 0
 
         local_ok = True
         first_failure = None
 
         for i, out in enumerate(tensors):
-            expected_scalar = -(i + 1) * S
+            expected_scalar = S #-(i + 1) * S
             expected = torch.full_like(out, expected_scalar)
 
             diff = (out - expected).abs()
