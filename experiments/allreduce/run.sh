@@ -45,7 +45,7 @@ fi
 
 cd $HOME/straggle-ml-experiments
 
-IFACE=ens4f1
+IFACE=ens4f0
 # Derive IP on IFACE, rank = last octet - 1
 IP=$(ip -4 -o addr show dev "$IFACE" | awk '{print $4}' | cut -d/ -f1 || true)
 if [[ -z "${IP}" ]]; then
@@ -55,16 +55,17 @@ fi
 
 RANK=$(( ${IP##*.} - 1 ))
 WORLD=2
-MASTER_ADDR=42.0.1.1
+MASTER_ADDR=42.0.0.1
 MASTER_PORT=29500
 
 PROG=experiments/allreduce/allreduce-benchmark.py
-CONF=experiments/allreduce/edgecore.json
+# CONF=experiments/allreduce/edgecore.json
+CONF=experiments/allreduce/netberg.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 3 -b dpa_dpdk -d cuda -t int32 -s 1000000 -w 0 -i 1 \
+  --dpa_conf $CONF --dpa_pipes 2 -b dpa_dpdk -d cuda -t int32 -s 1000000 -w 0 -i 1 \
   --gloo_socket_ifname=$IFACE --global_stats --batch --verify
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
