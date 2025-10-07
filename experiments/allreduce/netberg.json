@@ -74,7 +74,7 @@
   },
 
   "dpdk": {
-    "iface": "ens4f1",
+    "iface": "ens4f0",
     "port" : 4242,
     "async": false,
     "drain_queues": true,
@@ -89,7 +89,7 @@
     "tx_pool_cache": 512,
     "tx_interval_us": 10,
     "rx_interval_us": 0,
-    "eal_port": "0000:41:00.1",
+    "eal_port": "0000:41:00.0",
     "debug_trace_packet": true,
     "debug_trace_packet_rtx": true
   }
