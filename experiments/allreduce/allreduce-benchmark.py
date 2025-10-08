@@ -104,7 +104,7 @@ def benchmark(args):
     
     # Create ALL tensors upfront
     print(f"[Rank {args.rank}] Creating tensors...")
-    dtype = torch.float32 if args.type == "float32" else torch.int32
+    
     # tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) * -(i + 1) for i in range(args.warmup + args.iters)]
     # tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) for i in range(args.warmup + args.iters)]
    
@@ -299,7 +299,7 @@ def benchmark(args):
         for i, out in enumerate(tensors):
             expected = original * args.world_size
 
-            tol = 1e-5 if dtype == torch.float32 else 0
+            tol = 1e-5 if args.dtype == torch.float32 else 0
             diff = (out - expected).abs()
             max_err = diff.max().item()
             ok = (max_err <= tol) if out.is_floating_point() else (max_err == 0)
@@ -385,6 +385,7 @@ if __name__ == "__main__":
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
     
     args = parser.parse_args()
+    args.dtype = torch.float32 if args.type == "float32" else torch.int32
 
     # ignore user. just enable quant if floats or disable if not
     args.dpa_qnt = args.type == "float32"
