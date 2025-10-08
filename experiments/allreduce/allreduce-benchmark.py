@@ -17,6 +17,10 @@ torch.set_printoptions(
     sci_mode=False
 )
 
+PATTERN = {
+    1: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)),
+    2: lambda args: torch.arange(args.size, device=torch.device(args.device)).remainder(5).add(1).to(args.dtype)
+}
 
 def benchmark(args):
     # Set env vars for init
@@ -102,7 +106,9 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Creating tensors...")
     dtype = torch.float32 if args.type == "float32" else torch.int32
     # tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) * -(i + 1) for i in range(args.warmup + args.iters)]
-    tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) for i in range(args.warmup + args.iters)]
+    # tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) for i in range(args.warmup + args.iters)]
+   
+    tensors = [PATTERN[args.pattern](args) for i in range(args.warmup + args.iters)]
 
     # Print the inputs
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Input {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
@@ -280,36 +286,48 @@ def benchmark(args):
     # print(tensors[0])
     
     if (args.verify):
-        time.sleep(5)
+        # time.sleep(5)
         if args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre):
             raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling ")
-        S = args.world_size * (args.world_size + 1) // 2
-        tol = 1e-6 if dtype == torch.float32 else 0
+        # S = args.world_size * (args.world_size + 1) // 2
+        # tol = 1e-6 if dtype == torch.float32 else 0
 
-        local_ok = True
-        first_failure = None
+        local_ok, first_failure = True, True
+
+        original = PATTERN[args.pattern](args)
 
         for i, out in enumerate(tensors):
-            expected_scalar = S #-(i + 1) * S
-            expected = torch.full_like(out, expected_scalar)
+            expected = original * args.world_size
 
+            tol = 1e-5 if dtype == torch.float32 else 0
             diff = (out - expected).abs()
             max_err = diff.max().item()
             ok = (max_err <= tol) if out.is_floating_point() else (max_err == 0)
-
+            
             if not ok and local_ok:
-                unique_vals, counts = torch.unique(tensors[0], return_counts=True)
-                for val, cnt in zip(unique_vals, counts):
-                    if cnt < len(tensors[i]):  # Only print if not all elements
-                        print(f"[Rank {args.rank}] Value {val}: {cnt} occurrences")
-                bad = (diff > (tol if out.is_floating_point() else 0)).nonzero(as_tuple=False).flatten()
-                idx = bad[:5].tolist()
+                bad = (diff > tol).nonzero(as_tuple=False).flatten()
+                idx = bad[:min(10, len(bad))].tolist()  # Show up to 10 errors
                 flat_out = out.flatten()
                 flat_exp = expected.flatten()
-                samples = [(j, float(flat_out[j].item()), float(flat_exp[j].item())) for j in idx]
+                flat_orig = original.flatten()
+                samples = [(j, float(flat_orig[j].item()), float(flat_exp[j].item()), float(flat_out[j].item())) for j in idx]
                 first_failure = (f"[Rank {args.rank}] Verification FAILED at tensor {i}: "
-                                 f"expected {expected_scalar}, max_err={max_err:.3e}, bad_samples={samples}")
+                                f"max_err={max_err:.3e}\n"
+                                f"  Bad samples (index, original, expected, actual): {samples}")
                 local_ok = False
+            # if not ok and local_ok:
+            #     unique_vals, counts = torch.unique(tensors[0], return_counts=True)
+            #     for val, cnt in zip(unique_vals, counts):
+            #         if cnt < len(tensors[i]):  # Only print if not all elements
+            #             print(f"[Rank {args.rank}] Value {val}: {cnt} occurrences")
+            #     bad = (diff > (tol if out.is_floating_point() else 0)).nonzero(as_tuple=False).flatten()
+            #     idx = bad[:5].tolist()
+            #     flat_out = out.flatten()
+            #     flat_exp = expected.flatten()
+            #     samples = [(j, float(flat_out[j].item()), float(flat_exp[j].item())) for j in idx]
+            #     first_failure = (f"[Rank {args.rank}] Verification FAILED at tensor {i}: "
+            #                      f"expected {expected_scalar}, max_err={max_err:.3e}, bad_samples={samples}")
+            #     local_ok = False
 
         ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
         dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
@@ -334,6 +352,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--device", default="cpu", choices=["cpu", "cuda"], help="Device to run on")
     parser.add_argument("-t", "--type", default="float32", choices=["float32", "int32"], help="Data type for tensors")
     parser.add_argument("-s", "--size", type=int, default=1000000, help="Number of elements in tensor")
+    parser.add_argument("-p", "--pattern", type=int, default=1, choices=[1,2], help="Select tensor pattern 1=ones, 2=repeating range")
     parser.add_argument("-i", "--iters", type=int, default=10, help="Number of iterations")
     parser.add_argument("-w", "--warmup", type=int, default=5, help="Number of warmup iterations")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
