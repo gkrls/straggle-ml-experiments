@@ -332,13 +332,10 @@ def benchmark(args):
         ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
         dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
         if ok_tensor.item() == 1:
-            if args.rank == 0:
-                print("✅ Verification PASSED (simple SUM).")
+            if args.rank == 0: print("✅ Verification PASSED (simple SUM).")
         else:
-            if first_failure:
-                print(first_failure)
-            if args.rank == 0:
-                print("❌ Verification FAILED (simple SUM). See rank logs above.")
+            if first_failure: print(first_failure)
+            if args.rank == 0: print("❌ Verification FAILED (simple SUM). See rank logs above.")
 
 
     dist.destroy_process_group()
