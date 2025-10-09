@@ -39,7 +39,9 @@ def benchmark(args):
         dpdk = args.backend == "dpa_dpdk"
         device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf) if dpdk else dpa.DPASocketBackendOptions.from_config(args.dpa_conf)
-        pg_options = dpa.ProcessGroupDPADpdkOptions(device, backend) if dpdk else dpa.ProcessGroupDPASocketOptions(device, backend) 
+        pg_options = dpa.ProcessGroupDPADpdkOptions(device, backend) if dpdk else dpa.ProcessGroupDPASocketOptions(device, backend)
+        pg_options.hint_pinned_tensor_size = args.size
+        pg_options.hint_pinned_tensor_pool_size = args.warmup + args.iters
 
         print(f"[Rank {args.rank}] DPA: {backend.addr}:{backend.port}, backend: {args.backend}")
 
@@ -383,9 +385,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
-
-    # ignore user. just enable quant if floats or disable if not
-    args.dpa_qnt = args.type == "float32"
+    args.dpa_qnt = args.type == "float32"     # ignore user. just enable quant if floats or disable if not
     
     # Validation
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
