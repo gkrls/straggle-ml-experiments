@@ -25,7 +25,7 @@
         "dpa_udp_port": 4242,
         "dpa_pipes": 2,
         "dpa_exponents": 1,
-        "dpa_reducers": 4,
+        "dpa_reducers": 32,
         "dpa_reducer_mode": 2,
         "dpa_slots": 16384,
         "dpa_sessions": 1,
