@@ -31,7 +31,8 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   # sudo rm -rf $HOME/straggle-ml/build
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
@@ -42,7 +43,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
 
   # Install the plugin
   source $HOME/straggle-ml-experiments/venv/bin/activate
-  python $HOME/straggle-ml/build/install/lib/dpa_plugin_pytorch/setup.py develop
+  python $HOME/straggle-ml/build/install/lib/dpa_plugin_pytorch/setup.py -q develop
 else
   source $HOME/straggle-ml-experiments/venv/bin/activate
 fi
