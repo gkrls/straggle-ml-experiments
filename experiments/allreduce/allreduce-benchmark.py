@@ -91,7 +91,6 @@ def benchmark(args):
         dist.init_process_group(backend=actual_backend, init_method=init_method, rank=args.rank, world_size=args.world_size)
     
     else:
-        # Standard PyTorch backends (mpi)
         raise ValueError(f"Unknown backend: {args.backend}")
     
     print(f"[Rank {args.rank}] Initialized {args.backend}... ")

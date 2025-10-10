@@ -26,7 +26,7 @@
         "dpa_pipes": 2,
         "dpa_exponents": 1,
         "dpa_reducers": 4,
-        "dpa_reducer_mode": 1,
+        "dpa_reducer_mode": 2,
         "dpa_slots": 16384,
         "dpa_sessions": 1,
         "net_arp_table_size": 512,
