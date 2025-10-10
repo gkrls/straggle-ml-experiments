@@ -31,7 +31,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   # sudo rm -rf $HOME/straggle-ml/build
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
-  cmake -DCMAKE_BUILD_TYPE=Release -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_DPDK_RX_REUSE=ON -DDPA_DPDK_WIN_HUGE=ON \
+  cmake -DCMAKE_BUILD_TYPE=Release -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_DPDK_RX_REUSE=OFF -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_SWITCH=OFF -DDPA_DPDK_RE_FIRST=ON ..
   make -j4 install
 
