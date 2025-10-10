@@ -31,8 +31,13 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   # sudo rm -rf $HOME/straggle-ml/build
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DDPA_DEVELOP=OFF -DDPA_AVX=ON -DDPA_DPDK_RX_REUSE=OFF -DDPA_DPDK_WIN_HUGE=ON \
-        -DDPA_SWITCH=OFF -DDPA_DPDK_RE_FIRST=ON -DENABLE_ASAN=ON ..
+  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DDPA_DEVELOP=OFF \
+        -DDPA_SWITCH=OFF \
+        -DDPA_AVX=ON \
+        -DDPA_DPDK_RX_REUSE=OFF \
+        -DDPA_DPDK_WIN_HUGE=ON \
+        -DDPA_DPDK_RE_FIRST=ON ..
   make -j4 install
 
   # Install the plugin
@@ -65,8 +70,8 @@ VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
 PERF="perf stat -d --"
 
-export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8  # or .so.6 depending on your GCC version
-export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
+# export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8  # or .so.6 depending on your GCC version
+# export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 2 -b dpa_dpdk -d cuda -t int32 -s 50000000 -w 0 -i 2\
