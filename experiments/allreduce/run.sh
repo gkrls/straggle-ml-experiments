@@ -63,8 +63,9 @@ PROG=experiments/allreduce/allreduce-benchmark.py
 CONF=experiments/allreduce/netberg.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
+PERF="perf stat -d --"
 
-sudo -E perf stat -d -- $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 2 -b dpa_dpdk -d cuda -t int32 -s 5000000 -w 0 -i 2\
   --gloo_socket_ifname=$IFACE --global_stats --batch --verify --pattern 2
 
