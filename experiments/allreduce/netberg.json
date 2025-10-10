@@ -79,7 +79,7 @@
     "async": false,
     "drain_queues": true,
     "timeout_us": 1500,
-    "threads": 2,
+    "threads": 1,
     "window": 4,
     "tx_burst": 4,
     "rx_burst": 4,
