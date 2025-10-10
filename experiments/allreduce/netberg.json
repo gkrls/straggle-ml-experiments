@@ -76,7 +76,7 @@
   "dpdk": {
     "iface": "ens4f0",
     "port" : 4242,
-    "async": false,
+    "async": true,
     "drain_queues": true,
     "timeout_us": 1500,
     "threads": 8,
