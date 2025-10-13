@@ -36,9 +36,9 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
-        -DDPA_DPDK_RX_REUSE=ON \
+        -DDPA_DPDK_RX_REUSE=OFF \
         -DDPA_DPDK_WIN_HUGE=ON \
-        -DDPA_DPDK_RE_FIRST=ON ..
+        -DDPA_DPDK_RE_FIRST=ΟFF ..
   make -j4 install
 
   # Install the plugin
@@ -75,7 +75,7 @@ PERF="perf stat -d --"
 # export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 2 -b dpa_dpdk -d cpu -t int32 -s 50000000 -w 5 -i 50\
+  --dpa_conf $CONF --dpa_pipes 2 -b dpa_dpdk -d cuda -t int32 -s 50000000 -w 5 -i 50\
   --gloo_socket_ifname=$IFACE --global_stats --batch --verify --pattern 2
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
