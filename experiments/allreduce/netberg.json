@@ -47,7 +47,7 @@
         "id": 1,
         "ports": ["1/0", "2/0", "3/0", "4/0", "5/0", "6/0"],
         "pool_base": 0,
-        "pool_size": 8192,
+        "pool_size": 16384,
         "straggle_timeout_ms": 1000,
         "mgid": 2,
         "dropsim": {
@@ -87,7 +87,7 @@
     "rx_pool_cache": 512,
     "tx_pool_size": 65536,
     "tx_pool_cache": 512,
-    "tx_interval_us": 10,
+    "tx_interval_us": 20,
     "rx_interval_us": 0,
     "eal_port": "0000:41:00.0",
     "debug_trace_packet": true,
