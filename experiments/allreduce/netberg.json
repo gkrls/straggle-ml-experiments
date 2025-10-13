@@ -87,6 +87,8 @@
     "rx_pool_cache": 512,
     "tx_pool_size": 65536,
     "tx_pool_cache": 512,
+    "rx_ring_size": 4096,
+    "tx_ring_size": 4096,
     "tx_interval_us": 20,
     "rx_interval_us": 0,
     "eal_port": "0000:41:00.0",
