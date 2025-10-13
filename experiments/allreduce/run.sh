@@ -76,7 +76,7 @@ PERF="perf stat -d --"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 2 -b dpa_dpdk -d cuda -t int32 -s 50000000 -w 5 -i 50\
-  --gloo_socket_ifname=$IFACE --global_stats --batch --verify --pattern 2
+  --gloo_socket_ifname=$IFACE --global_stats --batch #--verify --pattern 2
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
 #   --d_conf configs/config-edgecore.json -b nccl -d cuda -t float32 -s 1000 -i 5 -w 3 -v "$@"

@@ -129,8 +129,8 @@ def benchmark(args):
         
         # Warmup
         for i in range(args.warmup):  jobs.append(run_allreduce(tensors[i]))
-        for j in jobs: j.wait()
-        jobs.clear()
+        # for j in jobs: j.wait()
+        # jobs.clear()
         
         # Timed iterations - use same timing method for both CPU and CUDA
         t_start = time.time_ns()
