@@ -105,10 +105,6 @@ def benchmark(args):
     
     # Create ALL tensors upfront
     print(f"[Rank {args.rank}] Creating tensors...")
-    
-    # tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) * -(i + 1) for i in range(args.warmup + args.iters)]
-    # tensors = [torch.ones(args.size, dtype=dtype, device=device) * (args.rank + 1) for i in range(args.warmup + args.iters)]
-   
     tensors = [PATTERN[args.pattern](args) for i in range(args.warmup + args.iters)]
 
     # Print the inputs
@@ -126,31 +122,23 @@ def benchmark(args):
         else:
             return dist.all_reduce(t, op=dist.ReduceOp.SUM, async_op=True)
     
-    # Warmup
-    # print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs...")
-    # for i in range(args.warmup): run_allreduce(tensors[i])
-    
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
     if args.batch:
-        works = []
-        if args.device == "cuda":
-            for i in range(args.warmup): works.append(run_allreduce(tensors[i]))
-            torch.cuda.synchronize()
-            start = torch.cuda.Event(enable_timing=True)
-            end = torch.cuda.Event(enable_timing=True)
-            start.record()
-            for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i])) # args.warmup + i
-            for w in works: w.wait()
-            end.record()
-            torch.cuda.synchronize()
-            total_time = start.elapsed_time(end) / 1000.0
-        else:
-            for i in range(args.warmup): works.append(run_allreduce(tensors[i]))
-            start = time.perf_counter()
-            for i in range(args.iters): works.append(run_allreduce(tensors[args.warmup + i])) #args.warmup + i
-            for w in works: w.wait()
-            total_time = time.perf_counter() - start
+        jobs = []
+        
+        # Warmup
+        for i in range(args.warmup):  jobs.append(run_allreduce(tensors[i]))
+        for j in jobs: j.wait()
+        jobs.clear()
+        
+        # Timed iterations - use same timing method for both CPU and CUDA
+        t_start = time.time_ns()
+        for i in range(args.iters): 
+            jobs.append(run_allreduce(tensors[args.warmup + i]))
+        for w in jobs: 
+            w.wait()
+        total_time = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
         
         avg_time = total_time / args.iters
         # For batch mode, we only have one aggregate measurement
@@ -165,27 +153,25 @@ def benchmark(args):
         for i in range(args.iters):
             dist.barrier()
             
+            # Use consistent timing for both CPU and CUDA
             if args.device == "cuda":
                 torch.cuda.synchronize()
-                start = torch.cuda.Event(enable_timing=True)
-                end = torch.cuda.Event(enable_timing=True)
-                start.record()
-                run_allreduce(tensors[args.warmup + i]).wait()
-                end.record()
-                torch.cuda.synchronize()
-                elapsed = start.elapsed_time(end) / 1000.0
-            else:
-                start = time.perf_counter()
-                run_allreduce(tensors[args.warmup + i]).wait()
-                elapsed = time.perf_counter() - start
             
+            t_start = time.time_ns()
+            run_allreduce(tensors[args.warmup + i]).wait()
+            
+            if args.device == "cuda":
+                torch.cuda.synchronize()
+            
+            elapsed = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
             times.append(elapsed)
-            if args.rank == 0 and args.verbose: print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
+            
+            if args.rank == 0 and args.verbose: 
+                print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     
     # Print the results
-    for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
-
-    # for i in range(min(5, len(tensors))): print(f"Tensor {i} first 5 elements: {tensors[i].flatten()[:5]}")
+    for i in range(args.warmup + args.iters): 
+        print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
 
     # Calculate metrics
     bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
@@ -282,25 +268,16 @@ def benchmark(args):
         print(f"                  worker min={worker_min[2]/1e9:.3f}, max={worker_max[2]/1e9:.3f} GB/s")
     
     print(f"{'='*50}\n")
-
-    # Final test allreduce
-    # dist.all_reduce(tensors[0])
-    # print(tensors[0])
     
-    if (args.verify):
-        # time.sleep(5)
+    if args.verify:
         if args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre):
-            raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling ")
-        # S = args.world_size * (args.world_size + 1) // 2
-        # tol = 1e-6 if dtype == torch.float32 else 0
+            raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
 
         local_ok, first_failure = True, True
-
         original = PATTERN[args.pattern](args)
 
         for i, out in enumerate(tensors):
             expected = original * args.world_size
-
             tol = 1e-5 if args.dtype == torch.float32 else 0
             diff = (out - expected).abs()
             max_err = diff.max().item()
@@ -317,28 +294,17 @@ def benchmark(args):
                                 f"max_err={max_err:.3e}\n"
                                 f"  Bad samples (index, original, expected, actual): {samples}")
                 local_ok = False
-            # if not ok and local_ok:
-            #     unique_vals, counts = torch.unique(tensors[0], return_counts=True)
-            #     for val, cnt in zip(unique_vals, counts):
-            #         if cnt < len(tensors[i]):  # Only print if not all elements
-            #             print(f"[Rank {args.rank}] Value {val}: {cnt} occurrences")
-            #     bad = (diff > (tol if out.is_floating_point() else 0)).nonzero(as_tuple=False).flatten()
-            #     idx = bad[:5].tolist()
-            #     flat_out = out.flatten()
-            #     flat_exp = expected.flatten()
-            #     samples = [(j, float(flat_out[j].item()), float(flat_exp[j].item())) for j in idx]
-            #     first_failure = (f"[Rank {args.rank}] Verification FAILED at tensor {i}: "
-            #                      f"expected {expected_scalar}, max_err={max_err:.3e}, bad_samples={samples}")
-            #     local_ok = False
 
         ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
         dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
         if ok_tensor.item() == 1:
-            if args.rank == 0: print("✅ Verification PASSED (simple SUM).")
+            if args.rank == 0: 
+                print("✅ Verification PASSED (simple SUM).")
         else:
-            if first_failure: print(first_failure)
-            if args.rank == 0: print("❌ Verification FAILED (simple SUM). See rank logs above.")
-
+            if first_failure: 
+                print(first_failure)
+            if args.rank == 0: 
+                print("❌ Verification FAILED (simple SUM). See rank logs above.")
 
     dist.destroy_process_group()
 
