@@ -68,13 +68,14 @@ PROG=experiments/allreduce/allreduce-benchmark.py
 # CONF=experiments/allreduce/edgecore.json
 CONF=experiments/allreduce/netberg.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
-PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
+# PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
+NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true -s none -o profile_output -f true"
 PERF="perf stat -d --"
 
 # export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8  # or .so.6 depending on your GCC version
 # export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
-sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+sudo -E $NSYS $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 2 -b dpa_dpdk -d cuda -t int32 -s 50000000 -w 5 -i 50\
   --gloo_socket_ifname=$IFACE --global_stats --batch --verify #--pattern 2
 
