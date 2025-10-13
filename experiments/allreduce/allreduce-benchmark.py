@@ -40,7 +40,7 @@ def benchmark(args):
         device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf) if dpdk else dpa.DPASocketBackendOptions.from_config(args.dpa_conf)
         pg_options = dpa.ProcessGroupDPADpdkOptions(device, backend) if dpdk else dpa.ProcessGroupDPASocketOptions(device, backend)
-        pg_options.hint_pinned_tensor_size = args.size
+        pg_options.hint_pinned_tensor_size = args.size * 4
         pg_options.hint_pinned_tensor_pool_size = args.warmup + args.iters
 
         print(f"[Rank {args.rank}] DPA: {backend.addr}:{backend.port}, backend: {args.backend}")
@@ -134,10 +134,8 @@ def benchmark(args):
         
         # Timed iterations - use same timing method for both CPU and CUDA
         t_start = time.time_ns()
-        for i in range(args.iters): 
-            jobs.append(run_allreduce(tensors[args.warmup + i]))
-        for w in jobs: 
-            w.wait()
+        for i in range(args.iters): jobs.append(run_allreduce(tensors[args.warmup + i]))
+        for j in jobs: j.wait()
         total_time = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
         
         avg_time = total_time / args.iters
