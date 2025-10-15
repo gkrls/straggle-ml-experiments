@@ -497,7 +497,7 @@ def train(args):
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
-        model = dpa.DDPWrapper(model, straggle = args.world_size)
+        model = dpa.DDPWrapper(model, straggle_k = args.world_size)
 
     # Straggle sim
     straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)      
