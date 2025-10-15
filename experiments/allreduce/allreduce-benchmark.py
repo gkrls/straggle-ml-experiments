@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from contextlib import nullcontext
 import os
 import sys
 import time
@@ -124,48 +125,90 @@ def benchmark(args):
     
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
-    if args.batch:
-        jobs = []
-        
-        # Warmup
-        for i in range(args.warmup):  jobs.append(run_allreduce(tensors[i]))
-        for j in jobs: j.wait()
-        jobs.clear()
-        
-        # Timed iterations - use same timing method for both CPU and CUDA
-        t_start = time.time_ns()
-        for i in range(args.iters): jobs.append(run_allreduce(tensors[args.warmup + i]))
-        for j in jobs: j.wait()
-        total_time = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
-        
-        avg_time = total_time / args.iters
-        # For batch mode, we only have one aggregate measurement
-        times = [avg_time]
-    
-    # Per-iteration mode (sync each)
-    else:
-        for i in range(args.warmup):
-            run_allreduce(tensors[i]).wait()
 
-        times = []
-        for i in range(args.iters):
-            dist.barrier()
+    with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
+        if args.batch:
+            jobs = []
             
-            # Use consistent timing for both CPU and CUDA
-            if args.device == "cuda":
-                torch.cuda.synchronize()
+            # Warmup
+            for i in range(args.warmup):  jobs.append(dist.all_reduce(tensors[i], op=dist.ReduceOp.SUM, async_op=True))
+            for j in jobs: j.wait()
+            jobs.clear()
             
+            # Timed iterations - use same timing method for both CPU and CUDA
             t_start = time.time_ns()
-            run_allreduce(tensors[args.warmup + i]).wait()
+            for i in range(args.iters): jobs.append(dist.all_reduce([args.warmup + i], op=dist.ReduceOp.SUM, async_op=True))
+            for j in jobs: j.wait()
+            total_time = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
             
-            if args.device == "cuda":
-                torch.cuda.synchronize()
+            avg_time = total_time / args.iters
+            # For batch mode, we only have one aggregate measurement
+            times = [avg_time]
+        
+        # Per-iteration mode (sync each)
+        else:
+            for i in range(args.warmup):
+                dist.all_reduce(tensors[i], op=dist.ReduceOp.SUM, async_op=True).wait()
+                # run_allreduce(tensors[i]).wait()
+
+            times = []
+            for i in range(args.iters):
+                # Use consistent timing for both CPU and CUDA
+                if args.device == "cuda": torch.cuda.synchronize()
+                
+                t_start = time.time_ns()
+                dist.all_reduce(tensors[args.warmup + i], op=dist.ReduceOp.SUM, async_op=True).wait()
+                # run_allreduce(tensors[args.warmup + i]).wait()
+                
+                if args.device == "cuda": torch.cuda.synchronize()
+                
+                elapsed = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
+                times.append(elapsed)
+                
+                if args.rank == 0 and args.verbose: 
+                    print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
+    # if args.batch:
+    #     jobs = []
+        
+    #     # Warmup
+    #     for i in range(args.warmup):  jobs.append(run_allreduce(tensors[i]))
+    #     for j in jobs: j.wait()
+    #     jobs.clear()
+        
+    #     # Timed iterations - use same timing method for both CPU and CUDA
+    #     t_start = time.time_ns()
+    #     for i in range(args.iters): jobs.append(run_allreduce(tensors[args.warmup + i]))
+    #     for j in jobs: j.wait()
+    #     total_time = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
+        
+    #     avg_time = total_time / args.iters
+    #     # For batch mode, we only have one aggregate measurement
+    #     times = [avg_time]
+    
+    # # Per-iteration mode (sync each)
+    # else:
+    #     for i in range(args.warmup):
+    #         run_allreduce(tensors[i]).wait()
+
+    #     times = []
+    #     for i in range(args.iters):
+    #         dist.barrier()
             
-            elapsed = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
-            times.append(elapsed)
+    #         # Use consistent timing for both CPU and CUDA
+    #         if args.device == "cuda":
+    #             torch.cuda.synchronize()
             
-            if args.rank == 0 and args.verbose: 
-                print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
+    #         t_start = time.time_ns()
+    #         run_allreduce(tensors[args.warmup + i]).wait()
+            
+    #         if args.device == "cuda":
+    #             torch.cuda.synchronize()
+            
+    #         elapsed = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
+    #         times.append(elapsed)
+            
+    #         if args.rank == 0 and args.verbose: 
+    #             print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     
     # Print the results
     for i in range(args.warmup + args.iters): 

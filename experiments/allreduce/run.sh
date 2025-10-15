@@ -38,7 +38,9 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_AVX=ON \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
-        -DDPA_DPDK_RE_FIRST=ΟFF ..
+        -DDPA_DPDK_RE_FIRST=ΟFF \
+        -DDPA_TORCH_PINNEDPOOL=ON \
+        -DDPA_TORCH_WORKSTEALING=OFF ..
   make -j4 install
 
   # Install the plugin
@@ -60,7 +62,7 @@ if [[ -z "${IP}" ]]; then
 fi
 
 RANK=$(( ${IP##*.} - 1 ))
-WORLD=2
+WORLD=6
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
