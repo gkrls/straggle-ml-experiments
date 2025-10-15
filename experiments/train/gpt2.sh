@@ -16,10 +16,6 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   git -C "$HOME/straggle-ml" pull --ff-only origin "$BRANCH" 2>/dev/null || true
   git -C "$HOME/straggle-ml" clean -ffd || true
 
-  # git -C "$HOME/straggle-ml" checkout "$BRANCH" || true
-  # git -C "$HOME/straggle-ml" reset --hard || true
-  # git -C "$HOME/straggle-ml" pull --ff-only || true
-
   if [ ! -d "$HOME/straggle-ml-experiments/.git" ]; then
     git clone https://github.com/gkrls/straggle-ml-experiments.git "$HOME/straggle-ml-experiments"
   else
@@ -27,8 +23,6 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
     git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
   fi
 
-  # Make sure we have up to date DPA
-  # sudo rm -rf $HOME/straggle-ml/build
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
@@ -50,42 +44,58 @@ else
   source $HOME/straggle-ml-experiments/venv/bin/activate
 fi
 
+# Make sure env is ok
+python -m pip install --upgrade pip 
+python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
 
-cd $HOME/straggle-ml-experiments
 
-IFACE=ens4f1
+SCRIPT=${0##*/}
+DPA_CONF=$HOME/straggle-ml-experiments/configs/edgecore.json
+IFACE="${IFACE:-ens4f0}"                 # network interface to read IP from
+WORLD_SIZE="${WORLD_SIZE:-1}"            # set by launcher or leave 1 for single-node
+BACKEND="${BACKEND:-gloo}"
+MASTER_ADDR="${MASTER_ADDR:-"42.0.1.1"}
+MASTER_PORT="${MASTER_PORT:-"29500"}
+
 # Derive IP on IFACE, rank = last octet - 1
 IP=$(ip -4 -o addr show dev "$IFACE" | awk '{print $4}' | cut -d/ -f1 || true)
 if [[ -z "${IP}" ]]; then
-  echo "ERROR: could not get IPv4 for IFACE=$IFACE" >&2
+  echo "[$SCRIPT] ERROR: could not get IPv4 for IFACE=$IFACE" >&2
   exit 1
 fi
 
 RANK=$(( ${IP##*.} - 1 ))
-WORLD=6
-MASTER_ADDR=42.0.1.1
-MASTER_PORT=29500
 
-PROG=experiments/allreduce/allreduce-benchmark.py
-CONF=experiments/allreduce/edgecore.json
-# CONF=experiments/allreduce/netberg.json
-VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
-# PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
-NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true --sampling-period=200000 -d 30 -o profile_variance -f true"
-PERF="perf stat -d --"
+MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
-# export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8  # or .so.6 depending on your GCC version
-# export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
+echo "[$SCRIPT] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
 
-sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cpu -t int32 -s 50000000 -w 5 -i 50\
-  --gloo_socket_ifname=$IFACE --global_stats --batch --pattern 2 --verify 
+NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
+NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
-# sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-#   --d_conf configs/config-edgecore.json -b nccl -d cuda -t float32 -s 1000 -i 5 -w 3 -v "$@"
+set -x
 
-# perf stat -e cache-misses,cache-references
-# dpa: backend finished with pool[0:16] seqnums: 6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1...
-
-
-# "eal_extra_args": ["--log-level=pmd.net.mlx5:8"]
+# Standard settings for GPT2 on a 16GB GPU
+# Consumes around ~15.3GB of memory
+exec python -u $HOME/straggle-ml-experiments/train/gpt2.py \
+  --rank "$RANK" \
+  --world_size "$WORLD_SIZE" \
+  --iface "$IFACE" \
+  --master_addr "$MASTER_ADDR" \
+  --master_port "$MASTER_PORT" \
+  --dpa_conf $DPA_CONF \
+  --backend gloo \
+  --workers 8 \
+  --epochs 12 \
+  --steps_per_epoch 6000 \
+  --mini_val_every_steps 300 \
+  --gradient_accumulation_steps 5 \
+  --batch_size 12 \
+  --seq_len 1024 \
+  --amp \
+  --prefetch_factor 4 \
+  --log_every_steps 50 \
+  --json $HOME/straggle-ml-experiments/train/gpt2.json \
+  --data ~/datasets/openwebtext \
+  --cache_dir ~/datasets/openwebtext/cache \
+  "$@"
