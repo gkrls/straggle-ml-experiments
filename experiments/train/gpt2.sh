@@ -7,7 +7,9 @@ BRANCH="wip-simple"
 export PKG_CONFIG_PATH=/opt/mellanox/dpdk/lib/x86_64-linux-gnu/pkgconfig
 
 # Sync the repos if needed
-if [[ $# -eq 1 && "$1" == "sync" ]]; then
+if [[ $# -ge 1 && "$1" == "sync" ]]; then
+  shift
+  
   [[ -d "$HOME/straggle-ml/.git" ]] || git clone https://github.com/gkrls/straggle-ml.git "$HOME/straggle-ml"
 
   git -C "$HOME/straggle-ml" fetch -q origin || true
