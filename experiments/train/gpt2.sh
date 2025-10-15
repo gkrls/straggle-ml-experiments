@@ -57,7 +57,7 @@ fi
 
 SCRIPT=${0##*/}
 DPA_CONF=$HOME/straggle-ml-experiments/configs/edgecore.json
-IFACE="${IFACE:-ens4f0}"                 # network interface to read IP from
+IFACE="${IFACE:-ens4f1}"                 # network interface to read IP from
 WORLD_SIZE="${WORLD_SIZE:-1}"            # set by launcher or leave 1 for single-node
 BACKEND="${BACKEND:-gloo}"
 MASTER_ADDR="${MASTER_ADDR:-"42.0.1.1"}"
@@ -101,7 +101,7 @@ exec python -u $HOME/straggle-ml-experiments/experiments/train/gpt2.py \
   --amp \
   --prefetch_factor 4 \
   --log_every_steps 50 \
-  --json $HOME/straggle-ml-experiments/train/gpt2.json \
+  --json $HOME/straggle-ml-experiments/experiments/train/gpt2.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
   "$@"
