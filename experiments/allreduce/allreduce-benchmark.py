@@ -137,7 +137,7 @@ def benchmark(args):
             
             # Timed iterations - use same timing method for both CPU and CUDA
             t_start = time.time_ns()
-            for i in range(args.iters): jobs.append(dist.all_reduce([args.warmup + i], op=dist.ReduceOp.SUM, async_op=True))
+            for i in range(args.iters): jobs.append(dist.all_reduce(tensors[args.warmup + i], op=dist.ReduceOp.SUM, async_op=True))
             for j in jobs: j.wait()
             total_time = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
             
