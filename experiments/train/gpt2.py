@@ -492,7 +492,7 @@ def train(args):
 
     # DDP
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
-                gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
+                bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
     
 
     # Wrap the model if DPA backend is requested
@@ -749,7 +749,7 @@ def main():
     parser.add_argument('--learning_rate', type=float, default=6e-4)
     parser.add_argument('--min_lr', type=float, default=6e-5)
     parser.add_argument('--warmup_steps', '--warmup_optimizer_steps', dest='warmup_steps', type=int, default=-1,
-        help='Warmup in OPTIMIZER steps (not micro-steps). -1 = auto (10% of total optimizer steps, capped at 1000).')
+                        help='Warmup in OPTIMIZER steps (not micro-steps). -1 = auto (10% of total optimizer steps, capped at 1000).')
     parser.add_argument('--lr_decay_iters', type=int, default=-1, help='-1 = auto (total planned optimizer steps)')
     parser.add_argument('--weight_decay', type=float, default=0.1)
     parser.add_argument('--grad_clip', type=float, default=1.0)
@@ -758,6 +758,8 @@ def main():
     parser.add_argument('--val_max_batches', type=int, default=200)
     parser.add_argument('--mini_val_every_steps', type=int, default=0, help='Run a small validation every N optimizer steps. 0=off.')
     parser.add_argument('--mini_val_max_batches', type=int, default=64, help='Batches to use for mini validation.')
+
+    parser.add_argument("--bucket_cap_mb", type=int, default=25, help="DDP bucket capacity")
 
     # Model config -- mostly fixed
     parser.add_argument('--seq_len', type=int, default=1024)
