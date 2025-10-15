@@ -496,7 +496,7 @@ def train(args):
     
 
     # Wrap the model if DPA backend is requested
-    if args.backend.starts_with("dpa"):
+    if args.backend.startswith("dpa"):
         model = dpa.DDPWrapper(model, straggle_k = args.world_size)
 
     # Straggle sim
@@ -699,7 +699,7 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
 
     # Initialize process group
-    if args.backend.starts_with("dpa"):
+    if args.backend.startswith("dpa"):
         if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
         dpa_device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         dpa_backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf)
