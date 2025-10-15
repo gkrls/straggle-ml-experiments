@@ -47,6 +47,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
 
   # Compile the plugin
+  PYTHONWARNINGS="ignore::setuptools.errors.SetuptoolsDeprecationWarning,ignore::setuptools.errors.EasyInstallDeprecationWarning" \
   python $HOME/straggle-ml/build/install/lib/dpa_plugin_pytorch/setup.py -q develop
 else
   source $HOME/straggle-ml-experiments/venv/bin/activate
@@ -100,7 +101,7 @@ exec python -u $HOME/straggle-ml-experiments/experiments/train/gpt2.py \
   --seq_len 1024 \
   --amp \
   --prefetch_factor 4 \
-  --log_every_steps 50 \
+  --log_every_steps 1 \
   --json $HOME/straggle-ml-experiments/experiments/train/gpt2.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
