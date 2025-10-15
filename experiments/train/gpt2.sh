@@ -10,10 +10,6 @@ export PKG_CONFIG_PATH=/opt/mellanox/dpdk/lib/x86_64-linux-gnu/pkgconfig
 if [[ $# -ge 1 && "$1" == "sync" ]]; then
   shift
 
-  # Make sure env is ok
-  python -m pip install --upgrade pip 
-  python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
-
   [[ -d "$HOME/straggle-ml/.git" ]] || git clone https://github.com/gkrls/straggle-ml.git "$HOME/straggle-ml"
 
   git -C "$HOME/straggle-ml" fetch -q origin || true
@@ -45,6 +41,12 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
 
   # Install the plugin
   source $HOME/straggle-ml-experiments/venv/bin/activate
+
+  # Make sure env is ok
+  python -m pip install --upgrade pip 
+  python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
+
+  # Compile the plugin
   python $HOME/straggle-ml/build/install/lib/dpa_plugin_pytorch/setup.py -q develop
 else
   source $HOME/straggle-ml-experiments/venv/bin/activate
