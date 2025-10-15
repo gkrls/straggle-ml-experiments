@@ -18,8 +18,7 @@ from torch.optim import AdamW
 from transformers import GPT2LMHeadModel, GPT2Config, GPT2Tokenizer
 from datasets import load_dataset
 
-from straggle_sim import SlowWorkerPattern
-
+# from straggle_sim import SlowWorkerPattern
 
 import dpa
 
