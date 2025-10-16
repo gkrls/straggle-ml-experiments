@@ -91,7 +91,7 @@ sudo -E $(which python) experiments/train/gpt2.py \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --dpa_conf $DPA_CONF \
-  --backend dpa_dpdk \
+  --backend $BACKEND \
   --workers 8 \
   --epochs 12 \
   --steps_per_epoch 6000 \
