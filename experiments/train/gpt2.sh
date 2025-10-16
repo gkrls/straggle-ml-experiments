@@ -28,7 +28,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
-        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DDPA_TRACE=OFF \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
@@ -59,8 +60,8 @@ cd $HOME/straggle-ml-experiments
 SCRIPT=${0##*/}
 DPA_CONF=$HOME/straggle-ml-experiments/configs/edgecore.json
 IFACE="${IFACE:-ens4f1}"                 # network interface to read IP from
-WORLD_SIZE="${WORLD_SIZE:-1}"            # set by launcher or leave 1 for single-node
-BACKEND="${BACKEND:-gloo}"
+WORLD_SIZE="${WORLD_SIZE:-6}"            # set by launcher or leave 1 for single-node
+BACKEND="${BACKEND:-dpa_dpdk}"
 MASTER_ADDR="${MASTER_ADDR:-"42.0.1.1"}"
 MASTER_PORT="${MASTER_PORT:-"29500"}"
 
