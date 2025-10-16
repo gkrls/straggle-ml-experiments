@@ -83,9 +83,11 @@ NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 set -x
 
+GDB='gdb -ex run --args'
+
 # Standard settings for GPT2 on a 16GB GPU
 # Consumes around ~15.3GB of memory
-sudo -E $(which python) experiments/train/gpt2.py \
+sudo -E gdb -ex run --args $(which python) experiments/train/gpt2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -93,7 +95,7 @@ sudo -E $(which python) experiments/train/gpt2.py \
   --master_port "$MASTER_PORT" \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
-  --workers 8 \
+  --workers 4 \
   --epochs 12 \
   --steps_per_epoch 6000 \
   --mini_val_every_steps 300 \

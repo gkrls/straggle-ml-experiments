@@ -705,9 +705,9 @@ def setup_ddp(args):
         pg_options = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
         pg_options.hint_pinned_tensor_size = args.bucket_cap_mb * 4
         pg_options.hint_pinned_tensor_pool_size = 20
-        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=30), pg_options=pg_options)
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
     else:
-        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
 
     print(f"[{now()}][DDP] backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
