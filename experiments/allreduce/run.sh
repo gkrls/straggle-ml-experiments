@@ -41,7 +41,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
-        -DDPA_TORCH_PINNEDPOOL_PRETOUCH=OFF \
+        -DDPA_TORCH_PINNEDPOOL_PRETOUCH=ON \
         -DDPA_TORCH_WORKSTEALING=ON ..
   make -j4 install
 
