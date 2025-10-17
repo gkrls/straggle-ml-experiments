@@ -632,7 +632,7 @@ def train(args):
                 f"step_time={train_metrics['step_time']:.3f}s "
                 f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
                 f"epoch_time={epoch_time:.3f}s "
-                f"tp={train_metrics['throughput']:.0f} tok/s"
+                f"tp={train_metrics['throughput']:.0f} tok/s "
                 f"straggle_events={straggle.get_stats()['num_straggle_events']}", flush=True
             )
 
