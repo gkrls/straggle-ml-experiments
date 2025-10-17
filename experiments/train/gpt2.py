@@ -497,7 +497,7 @@ def train(args):
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
-        model = dpa.DDPWrapper(model, straggle = args.world_size)
+        model = dpa.DDPWrapper(model, straggle = args.world_size, prescale=args.prescale)
 
     # Straggle sim
     straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)      
@@ -632,7 +632,7 @@ def train(args):
                 f"step_time={train_metrics['step_time']:.3f}s "
                 f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
                 f"epoch_time={epoch_time:.3f}s "
-                f"tp={train_metrics['tok_per_s']:.0f} tok/s"
+                f"tp={train_metrics['throughput']:.0f} tok/s"
                 f"straggle_events={straggle.get_stats()['num_straggle_events']}", flush=True
             )
 
@@ -758,6 +758,7 @@ def main():
     parser.add_argument('--mini_val_every_steps', type=int, default=0, help='Run a small validation every N optimizer steps. 0=off.')
     parser.add_argument('--mini_val_max_batches', type=int, default=64, help='Batches to use for mini validation.')
 
+    parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
     parser.add_argument("--bucket_cap_mb", type=int, default=25, help="DDP bucket capacity")
 
     # Model config -- mostly fixed
