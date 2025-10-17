@@ -82,7 +82,7 @@
     "timeout_us": 3200,
     "threads": 10,
     "window": 512,
-    "tx_burst": 256,
+    "tx_burst": 512,
     "rx_burst": 512,
     "rx_pool_size": 65536,
     "rx_pool_cache": 512,
