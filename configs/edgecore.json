@@ -80,7 +80,7 @@
     "async": false,
     "drain_queues": true,
     "timeout_us": 3200,
-    "threads": 8,
+    "threads": 6,
     "window": 512,
     "tx_burst": 256,
     "rx_burst": 512,
