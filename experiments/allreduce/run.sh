@@ -42,7 +42,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
         -DDPA_TORCH_PINNEDPOOL_PRETOUCH=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_WORKSTEALING=OFF ..
   make -j4 install
 
   # Install the plugin
@@ -81,7 +81,7 @@ PERF="perf stat -d --"
 # export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 50000000 -w 5 -i 50 \
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 5000000 -w 5 -i 500 \
   --gloo_socket_ifname=$IFACE --global_stats --batch --pattern 2 --verify 
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
