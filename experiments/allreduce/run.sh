@@ -68,7 +68,8 @@ MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
 PROG=experiments/allreduce/allreduce-benchmark.py
-CONF=experiments/allreduce/edgecore.json
+# CONF=experiments/allreduce/edgecore.json
+CONF=configs/edgecore.json
 # CONF=experiments/allreduce/netberg.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 # PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
