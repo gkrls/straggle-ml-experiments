@@ -97,7 +97,7 @@ sudo -E $(which python) experiments/train/gpt2.py \
   --backend $BACKEND \
   --workers 4 \
   --epochs 12 \
-  --steps_per_epoch 6000 \
+  --steps_per_epoch 10 \
   --mini_val_every_steps 300 \
   --gradient_accumulation_steps 5 \
   --batch_size 12 \

@@ -657,8 +657,8 @@ def train(args):
             log["epochs"][str(epoch)] = epoch_metrics
             save_log(args.json, log)
 
-            if val_metrics['val_ppl'] < best_ppl:
-                best_ppl = val_metrics['val_ppl']
+            if val_metrics['ppl'] < best_ppl:
+                best_ppl = val_metrics['ppl']
                 print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
 
     if args.rank == 0:
