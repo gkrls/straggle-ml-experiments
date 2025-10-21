@@ -256,101 +256,220 @@ def _f1(pred: str, golds: List[str]) -> float:
     return max(score(pred, g) for g in golds) if len(golds) > 0 else score(pred, "")
 
 # ------------------------- Train / Eval -------------------------
-
 @torch.no_grad()
 def validate(model, loader, device, args):
     model.eval()
     losses = AverageMeter()
-    em_sum = 0.0
-    f1_sum = 0.0
-    count  = 0
 
     tokenizer = args._tokenizer
     id2ex = args._id2ex
 
-    def run_validation(dataloader):
-        nonlocal em_sum, f1_sum, count
-        for batch in dataloader:
-            input_ids = batch['input_ids'].to(device, non_blocking=True)
-            attention_mask = batch['attention_mask'].to(device, non_blocking=True)
-            token_type_ids = batch['token_type_ids'].to(device, non_blocking=True)
-            start_positions= batch['start_positions'].to(device, non_blocking=True)
-            end_positions  = batch['end_positions'].to(device, non_blocking=True)
+    # local best prediction per example id (eid): eid -> (score, text)
+    preds_local = {}
 
-            if args.amp and device.type == 'cuda':
-                with autocast():
-                    out = model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
-                                start_positions=start_positions, end_positions=end_positions, return_dict=True)
-                    loss = out.loss
-            else:
-                out = model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
-                            start_positions=start_positions, end_positions=end_positions, return_dict=True)
+    for batch in loader:
+        input_ids = batch['input_ids'].to(device, non_blocking=True)
+        attention_mask = batch['attention_mask'].to(device, non_blocking=True)
+        token_type_ids = batch['token_type_ids'].to(device, non_blocking=True)
+        start_positions= batch['start_positions'].to(device, non_blocking=True)
+        end_positions  = batch['end_positions'].to(device, non_blocking=True)
+
+        # forward + loss
+        if args.amp and device.type == 'cuda':
+            with torch.amp.autocast('cuda'):
+                out = model(input_ids=input_ids, attention_mask=attention_mask,
+                            token_type_ids=token_type_ids,
+                            start_positions=start_positions, end_positions=end_positions,
+                            return_dict=True)
                 loss = out.loss
-            losses.update(loss.item(), input_ids.size(0))
+        else:
+            out = model(input_ids=input_ids, attention_mask=attention_mask,
+                        token_type_ids=token_type_ids,
+                        start_positions=start_positions, end_positions=end_positions,
+                        return_dict=True)
+            loss = out.loss
 
-            s_logits = out.start_logits.cpu()
-            e_logits = out.end_logits.cpu()
+        losses.update(loss.item(), input_ids.size(0))
 
-            # pick best span with constraints
-            for i in range(input_ids.size(0)):
-                offsets = batch['offset_mapping'][i]
-                eid = batch['example_id'][i]
-                golds = id2ex[eid]['answers']['text'] if len(id2ex[eid]['answers']['text']) > 0 else [""]
-                context = id2ex[eid]['context']
+        s_logits = out.start_logits.detach().cpu()
+        e_logits = out.end_logits.detach().cpu()
 
-                s = s_logits[i]; e = e_logits[i]
-                max_len = args.max_answer_length
-                best_score = -1e9; best_text = ""
-                kS = min(args.n_best_size, s.numel())
-                kE = min(args.n_best_size, e.numel())
-                s_idx = torch.topk(s, k=kS).indices.tolist()
-                e_idx = torch.topk(e, k=kE).indices.tolist()
-                for si in s_idx:
-                    for ej in e_idx:
-                        if ej < si or (ej - si + 1) > max_len: continue
-                        if offsets[si] == (0, 0) or offsets[ej] == (0, 0): continue
-                        score = s[si].item() + e[ej].item()
-                        if score > best_score:
-                            best_score = score
-                            st, en = offsets[si][0], offsets[ej][1]
-                            best_text = context[st:en]
-                if args.squad_version == 'v2':
-                    cls_ids = (batch['input_ids'][i] == tokenizer.cls_token_id).nonzero(as_tuple=True)[0]
-                    if cls_ids.numel() > 0:
-                        idx = int(cls_ids[0].item())
-                        null_score = s[idx].item() + e[idx].item()
-                        if null_score - best_score > args.null_score_diff_threshold:
-                            best_text = ""
-                em_sum += _em(best_text, golds)
-                f1_sum += _f1(best_text, golds)
-                count  += 1
+        # choose best span per feature, then keep best across all features of same example
+        for i in range(input_ids.size(0)):
+            offsets = batch['offset_mapping'][i]
+            eid = batch['example_id'][i]
+            s = s_logits[i]; e = e_logits[i]
 
-    run_validation(loader)
+            # search over top-k start/end pairs (fast + simple)
+            kS = min(args.n_best_size, s.numel())
+            kE = min(args.n_best_size, e.numel())
+            s_idx = torch.topk(s, k=kS).indices.tolist()
+            e_idx = torch.topk(e, k=kE).indices.tolist()
 
-    # Reduce over ranks for the main shard
+            best_score = -1e9
+            best_text = ""
+
+            for si in s_idx:
+                for ej in e_idx:
+                    if ej < si or (ej - si + 1) > args.max_answer_length:
+                        continue
+                    if offsets[si] == (0, 0) or offsets[ej] == (0, 0):
+                        continue
+                    score = s[si].item() + e[ej].item()
+                    if score > best_score:
+                        st, en = offsets[si][0], offsets[ej][1]
+                        best_score = score
+                        best_text = id2ex[eid]['context'][st:en]
+
+            # (SQuAD v2 null handling – harmless for v1)
+            if args.squad_version == 'v2':
+                cls_ids = (batch['input_ids'][i] == tokenizer.cls_token_id).nonzero(as_tuple=True)[0]
+                if cls_ids.numel() > 0:
+                    idx = int(cls_ids[0].item())
+                    null_score = s[idx].item() + e[idx].item()
+                    if null_score - best_score > args.null_score_diff_threshold:
+                        best_score = null_score
+                        best_text = ""
+
+            prev = preds_local.get(eid)
+            if (prev is None) or (best_score > prev[0]):
+                preds_local[eid] = (best_score, best_text)
+
+    # ---- average validation loss across ranks ----
     if dist.is_available() and dist.is_initialized():
         backend = dist.get_backend()
         device0 = torch.device(f"cuda:{torch.cuda.current_device()}") if backend == dist.Backend.NCCL else torch.device("cpu")
-        t = torch.tensor([losses.sum, losses.count, em_sum, f1_sum, float(count)], dtype=torch.float64, device=device0)
+        t = torch.tensor([losses.sum, losses.count], dtype=torch.float64, device=device0)
         dist.all_reduce(t, op=dist.ReduceOp.SUM)
         loss_avg = (t[0] / max(1.0, t[1].item())).item()
-        em = (t[2] / max(1.0, t[4].item())).item() * 100.0
-        f1 = (t[3] / max(1.0, t[4].item())).item() * 100.0
     else:
         loss_avg = losses.avg
-        em = (em_sum / max(1, count)) * 100.0
-        f1 = (f1_sum / max(1, count)) * 100.0
 
-    # Handle leftover items not covered by sampler (rare)
-    if len(loader.sampler) * args.world_size < len(loader.dataset):
-        aux_val_dataset = Subset(loader.dataset, range(len(loader.sampler) * args.world_size, len(loader.dataset)))
-        aux_val_loader = DataLoader(aux_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True, collate_fn=_collate_val)
-        run_validation(aux_val_loader)
-        # No distributed reduce here
-        em = (em_sum / max(1, count)) * 100.0
-        f1 = (f1_sum / max(1, count)) * 100.0
+    # ---- gather predictions from all ranks, merge on rank 0 ----
+    preds = None
+    if dist.is_available() and dist.is_initialized():
+        world = dist.get_world_size()
+        gathered = [None] * world
+        dist.all_gather_object(gathered, preds_local)
+        if args.rank == 0:
+            merged = {}
+            for d in gathered:
+                for eid, (sc, tx) in d.items():
+                    if (eid not in merged) or (sc > merged[eid][0]):
+                        merged[eid] = (sc, tx)
+            preds = merged
+    else:
+        preds = preds_local
+
+    # ---- compute EM/F1 only on rank 0 (others return placeholders) ----
+    if dist.is_available() and dist.is_initialized() and args.rank != 0:
+        return {'loss': float(loss_avg), 'em': 0.0, 'f1': 0.0}
+
+    em_sum = f1_sum = 0.0
+    for eid, (_, pred_text) in preds.items():
+        golds = id2ex[eid]['answers']['text'] if id2ex[eid]['answers']['text'] else [""]
+        em_sum += _em(pred_text, golds)
+        f1_sum += _f1(pred_text, golds)
+    denom = max(1, len(preds))
+    em = (em_sum / denom) * 100.0
+    f1 = (f1_sum / denom) * 100.0
 
     return {'loss': float(loss_avg), 'em': float(em), 'f1': float(f1)}
+
+# @torch.no_grad()
+# def validate(model, loader, device, args):
+#     model.eval()
+#     losses = AverageMeter()
+#     em_sum = 0.0
+#     f1_sum = 0.0
+#     count  = 0
+
+#     tokenizer = args._tokenizer
+#     id2ex = args._id2ex
+
+#     def run_validation(dataloader):
+#         nonlocal em_sum, f1_sum, count
+#         for batch in dataloader:
+#             input_ids = batch['input_ids'].to(device, non_blocking=True)
+#             attention_mask = batch['attention_mask'].to(device, non_blocking=True)
+#             token_type_ids = batch['token_type_ids'].to(device, non_blocking=True)
+#             start_positions= batch['start_positions'].to(device, non_blocking=True)
+#             end_positions  = batch['end_positions'].to(device, non_blocking=True)
+
+#             if args.amp and device.type == 'cuda':
+#                 with autocast():
+#                     out = model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
+#                                 start_positions=start_positions, end_positions=end_positions, return_dict=True)
+#                     loss = out.loss
+#             else:
+#                 out = model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
+#                             start_positions=start_positions, end_positions=end_positions, return_dict=True)
+#                 loss = out.loss
+#             losses.update(loss.item(), input_ids.size(0))
+
+#             s_logits = out.start_logits.cpu()
+#             e_logits = out.end_logits.cpu()
+
+#             # pick best span with constraints
+#             for i in range(input_ids.size(0)):
+#                 offsets = batch['offset_mapping'][i]
+#                 eid = batch['example_id'][i]
+#                 golds = id2ex[eid]['answers']['text'] if len(id2ex[eid]['answers']['text']) > 0 else [""]
+#                 context = id2ex[eid]['context']
+
+#                 s = s_logits[i]; e = e_logits[i]
+#                 max_len = args.max_answer_length
+#                 best_score = -1e9; best_text = ""
+#                 kS = min(args.n_best_size, s.numel())
+#                 kE = min(args.n_best_size, e.numel())
+#                 s_idx = torch.topk(s, k=kS).indices.tolist()
+#                 e_idx = torch.topk(e, k=kE).indices.tolist()
+#                 for si in s_idx:
+#                     for ej in e_idx:
+#                         if ej < si or (ej - si + 1) > max_len: continue
+#                         if offsets[si] == (0, 0) or offsets[ej] == (0, 0): continue
+#                         score = s[si].item() + e[ej].item()
+#                         if score > best_score:
+#                             best_score = score
+#                             st, en = offsets[si][0], offsets[ej][1]
+#                             best_text = context[st:en]
+#                 if args.squad_version == 'v2':
+#                     cls_ids = (batch['input_ids'][i] == tokenizer.cls_token_id).nonzero(as_tuple=True)[0]
+#                     if cls_ids.numel() > 0:
+#                         idx = int(cls_ids[0].item())
+#                         null_score = s[idx].item() + e[idx].item()
+#                         if null_score - best_score > args.null_score_diff_threshold:
+#                             best_text = ""
+#                 em_sum += _em(best_text, golds)
+#                 f1_sum += _f1(best_text, golds)
+#                 count  += 1
+
+#     run_validation(loader)
+
+#     # Reduce over ranks for the main shard
+#     if dist.is_available() and dist.is_initialized():
+#         backend = dist.get_backend()
+#         device0 = torch.device(f"cuda:{torch.cuda.current_device()}") if backend == dist.Backend.NCCL else torch.device("cpu")
+#         t = torch.tensor([losses.sum, losses.count, em_sum, f1_sum, float(count)], dtype=torch.float64, device=device0)
+#         dist.all_reduce(t, op=dist.ReduceOp.SUM)
+#         loss_avg = (t[0] / max(1.0, t[1].item())).item()
+#         em = (t[2] / max(1.0, t[4].item())).item() * 100.0
+#         f1 = (t[3] / max(1.0, t[4].item())).item() * 100.0
+#     else:
+#         loss_avg = losses.avg
+#         em = (em_sum / max(1, count)) * 100.0
+#         f1 = (f1_sum / max(1, count)) * 100.0
+
+#     # Handle leftover items not covered by sampler (rare)
+#     if len(loader.sampler) * args.world_size < len(loader.dataset):
+#         aux_val_dataset = Subset(loader.dataset, range(len(loader.sampler) * args.world_size, len(loader.dataset)))
+#         aux_val_loader = DataLoader(aux_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True, collate_fn=_collate_val)
+#         run_validation(aux_val_loader)
+#         # No distributed reduce here
+#         em = (em_sum / max(1, count)) * 100.0
+#         f1 = (f1_sum / max(1, count)) * 100.0
+
+#     return {'loss': float(loss_avg), 'em': float(em), 'f1': float(f1)}
 
 def train_one_epoch(model, dataloader, optimizer, scheduler, device, scaler, args, epoch):
     model.train()
