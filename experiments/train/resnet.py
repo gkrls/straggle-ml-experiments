@@ -256,7 +256,7 @@ def train(args):
     else: raise ValueError(f"Unsupported model: {args.model}")
 
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True,
-                find_unused_parameters=False, static_graph=args.static_graph)
+                bucket_cap_mb=args.bucket_cap_mb, find_unused_parameters=False, static_graph=args.static_graph)
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
@@ -403,14 +403,28 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
     os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
 
+    if args.backend.startswith("dpa"):
+        if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
+        dpa_device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
+        dpa_backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf)
+        pg_options = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
+        # pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4) # observed max around 150-is MB
+        # pg_options.hint_pinned_tensor_pool_size = 20                                              # observed count 13
+        pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0) # observed max around 150-is MB
+        pg_options.hint_pinned_tensor_pool_size = 20                                                                                       # observed count 13
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
+    else:
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
+
+
     # Start the process group
-    dist.init_process_group(
-        backend=args.backend,
-        init_method="env://",
-        rank=args.rank,
-        world_size=args.world_size,
-        timeout=datetime.timedelta(seconds=60),
-    )
+    # dist.init_process_group(
+    #     backend=args.backend,
+    #     init_method="env://",
+    #     rank=args.rank,
+    #     world_size=args.world_size,
+    #     timeout=datetime.timedelta(seconds=60),
+    # )
 
 
     print(
@@ -450,6 +464,9 @@ def main():
     parser.add_argument("--drop_last_val", action='store_true', help="Drop last from val dataset")
     parser.add_argument("--static_graph", action='store_true', help="Enable static_graph in DDP")
     parser.add_argument("--prefetch_factor", type=int, default=2)
+
+    parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
+    parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
 
     # Straggle
     def csv_ints(s: str) -> list[int]:
