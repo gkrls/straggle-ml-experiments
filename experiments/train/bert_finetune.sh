@@ -96,6 +96,7 @@ sudo -E $(which python) experiments/train/bert_finetune.py \
   --dpa_conf $DPA_CONF \
   --data ~/datasets/squad_v1 \
   --squad_version v1 \
+  --n_best_size 50 \
   --epochs 6 \
   --batch_size 32 \
   --learning_rate 3e-5 \

@@ -950,7 +950,7 @@ def main():
     parser.add_argument('--max_seq_len', type=int, default=384)
     parser.add_argument('--doc_stride', type=int, default=128)
     parser.add_argument('--max_answer_length', type=int, default=30)
-    parser.add_argument('--n_best_size', type=int, default=50) # 20
+    parser.add_argument('--n_best_size', type=int, default=20) # 20
     parser.add_argument('--null_score_diff_threshold', type=float, default=0.0)
 
     # Straggle
