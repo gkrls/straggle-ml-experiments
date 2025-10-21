@@ -93,6 +93,7 @@ sudo -E $(which python) experiments/train/bert_finetune.py \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --backend $BACKEND \
+  --dpa_conf $DPA_CONF \
   --data ~/datasets/squad_v1 \
   --squad_version v1 \
   --epochs 6 \
