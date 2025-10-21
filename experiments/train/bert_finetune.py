@@ -757,7 +757,21 @@ def train(args):
     # print(f"Model '{args.model_name}' initialized.", flush=True)
 
     # Optim & sched
-    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=True)
+    base = model.module if hasattr(model, "module") else model
+    decay, no_decay = [], []
+    for n, p in base.named_parameters():
+        if any(nd in n for nd in ["bias", "LayerNorm.weight"]):
+            no_decay.append(p)
+        else:
+            decay.append(p)
+
+    optimizer = optim.AdamW(
+        [{"params": decay,    "weight_decay": args.weight_decay},
+        {"params": no_decay, "weight_decay": 0.0}],
+        lr=args.learning_rate,
+        foreach=True,
+    )
+    # optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=True)
     total_steps = len(train_loader) * args.epochs
     warmup_steps = int(args.warmup_ratio * total_steps)
     scheduler = get_linear_schedule_with_warmup(

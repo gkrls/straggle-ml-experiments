@@ -99,7 +99,7 @@ sudo -E $(which python) experiments/train/bert_finetune.py \
   --n_best_size 100 \
   --epochs 4 \
   --batch_size 32 \
-  --learning_rate 3e-5 \
+  --learning_rate 5e-5 \
   --warmup_ratio 0.1 \
   --deterministic \
   --workers 4 \
