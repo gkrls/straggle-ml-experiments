@@ -96,7 +96,7 @@ sudo -E $(which python) experiments/train/gpt2.py \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
   --workers 4 \
-  --epochs 6 \
+  --epochs 7 \
   --steps_per_epoch 6000 \
   --mini_val_every_steps 300 \
   --gradient_accumulation_steps 5 \
@@ -106,7 +106,12 @@ sudo -E $(which python) experiments/train/gpt2.py \
   --deterministic \
   --prefetch_factor 4 \
   --log_every_steps 10 \
-  --json experiments/train/gpt2.json \
+  --json experiments/train/gpt2_straggle_16.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
+  --straggle_points 3 \
+  --straggle_prob 16 \
+  --straggle_ranks 1 \
+  --straggle_amount 1.68 \
+  --straggle_multiply 0.5 2 \
   "$@"

@@ -759,7 +759,7 @@ def main():
     parser.add_argument('--mini_val_max_batches', type=int, default=64, help='Batches to use for mini validation.')
 
     parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
-    parser.add_argument("--bucket_cap_mb", type=int, default=25, help="DDP bucket capacity")
+    parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
 
     # Model config -- mostly fixed
     parser.add_argument('--seq_len', type=int, default=1024)
@@ -786,7 +786,9 @@ def main():
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
+        random.seed(args.seed + args.rank * 42)
+        np.random.seed(args.seed + args.rank * 42)
+        torch.manual_seed(args.seed + args.rank * 42)
         if torch.cuda.is_available(): torch.cuda.manual_seed_all(args.seed)
     else:
         torch.backends.cudnn.benchmark = True

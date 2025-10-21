@@ -16,7 +16,7 @@ import numpy as np
 import math
 from typing import List, Dict
 
-from straggle_sim import SlowWorkerPattern
+import dpa
 
 # HF
 from datasets import load_dataset, DownloadMode
@@ -470,14 +470,16 @@ def train(args):
         static_graph=args.static_graph
     )
 
-    print(f"Model '{args.model_name}' initialized.", flush=True)
+    # Wrap the model if DPA backend is requested
+    if args.backend.startswith("dpa"):
+        model = dpa.DDPWrapper(model, straggle = args.world_size, prescale=args.prescale)
 
     # Straggle sim
-    straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                    ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
-                                    verbose=args.straggle_verbose)
-    if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
+    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)      
+    if straggle.attach(model): print(f"Straggle sim initialized with {straggle}")
     else: print(f"Straggle sim inactive")
+
+    # print(f"Model '{args.model_name}' initialized.", flush=True)
 
     # Optim & sched
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay, foreach=True)
@@ -501,7 +503,7 @@ def train(args):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
         epoch_start = time.time()
 
-        straggle_sim.reset_stats()
+        straggle.reset_stats()
 
         train_loader.sampler.set_epoch(epoch)
 
@@ -525,11 +527,11 @@ def train(args):
             f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f}s "
             f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}s) "
             f"tp=~{train_metrics['throughput']:.1f} samples/s "
-            f"straggle_events={straggle_sim.get_stats().get('num_straggle_events', 0)}",
+            f"straggle_events={straggle.get_stats().get('num_straggle_events', 0)}",
             flush=True
         )
 
-        # Log JSON (match DenseNet shape + QA fields)
+        # JSON epoch log
         epoch_metrics = {
             # Training metrics
             "lr": float(current_lr),
@@ -551,7 +553,7 @@ def train(args):
             "val_f1": float(val_metrics['f1']),
 
             # straggle-sim
-            "straggle": straggle_sim.get_stats() if straggle_sim.active else {}
+            "straggle": straggle.get_stats() if straggle.active else {}
         }
 
         log["epochs"][str(epoch)] = epoch_metrics
@@ -610,12 +612,22 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
     os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
 
+    # Initialize process group
+    if args.backend.startswith("dpa"):
+        if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
+        dpa_device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
+        dpa_backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf)
+        pg_options = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
+        pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4) # observed max around 150-is MB
+        pg_options.hint_pinned_tensor_pool_size = 20                                              # observed count 13
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
+    else:
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
     # Start the process group
-    dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
+    # dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
-    if args.rank == 0:
-        print(f"[DDP] backend={args.backend} world_size={args.world_size} "
-              f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
+    print(f"[DDP] backend={args.backend} world_size={args.world_size} "
+          f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
 
 def main():
@@ -658,6 +670,8 @@ def main():
     parser.add_argument("--prefetch_factor", type=int, default=2)
     parser.add_argument('--max_grad_norm', type=float, default=1.0, help="Gradient clipping max norm")
 
+    parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
+    parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
 
     # QA tokenization / decode
     parser.add_argument('--max_seq_len', type=int, default=384)
