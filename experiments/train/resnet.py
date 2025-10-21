@@ -444,6 +444,7 @@ def main():
     parser.add_argument('--master_addr', type=str, default="42.0.0.1")
     parser.add_argument("--master_port", type=int, default=29500)
     parser.add_argument("--backend", type=str, default="gloo", help="DDP backend (e.g., gloo, nccl)")
+    parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
