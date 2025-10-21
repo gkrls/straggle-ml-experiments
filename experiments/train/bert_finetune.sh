@@ -103,5 +103,6 @@ sudo -E $(which python) experiments/train/bert_finetune.py \
   --deterministic \
   --workers 4 \
   --prefetch_factor 4 \
+  --log_interval 10 \
   --json experiments/train/bert_finetune.json \
   "$@"

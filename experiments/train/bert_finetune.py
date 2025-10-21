@@ -524,7 +524,7 @@ def train(args):
             f"train_loss={train_metrics['loss']:.4f} (global={train_metrics['loss_global']:.4f}) "
             f"val_loss={val_metrics['loss']:.4f} "
             f"val_em={val_metrics['em']:.2f}% val_f1={val_metrics['f1']:.2f}% "
-            f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f}s "
+            f"lr={current_lr:.6f} steps={int(len(train_loader))} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f}s "
             f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}s) "
             f"tp=~{train_metrics['throughput']:.1f} samples/s "
             f"straggle_events={straggle.get_stats().get('num_straggle_events', 0)}",
@@ -561,8 +561,6 @@ def train(args):
 
         best_em = max(best_em, val_metrics['em'])
         best_f1 = max(best_f1, val_metrics['f1'])
-
-        # NOTE: scheduler stepped per-batch in train_one_epoch (do not step here)
 
 # ------------------------- Entry / Setup ------------------------
 
