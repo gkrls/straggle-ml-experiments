@@ -916,7 +916,7 @@ def main():
     parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
     parser.add_argument("--deterministic", action='store_true')
-    parser.add_argument('--seed', type=int, default=1337)
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument("--workers", type=int, default=4)
     
     # Logging
@@ -974,10 +974,11 @@ def main():
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        random.seed(args.seed + args.rank * 42)
-        np.random.seed(args.seed + args.rank * 42)
-        torch.manual_seed(args.seed + args.rank * 42)
-        if torch.cuda.is_available(): torch.cuda.manual_seed_all(args.seed + args.rank * 42)
+        random.seed(args.seed + args.rank)
+        np.random.seed(args.seed + args.rank)
+        torch.manual_seed(args.seed + args.rank)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed + args.rank)
     else:
         torch.backends.cudnn.benchmark = True
 

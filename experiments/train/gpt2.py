@@ -730,7 +730,7 @@ def main():
     parser.add_argument('--deterministic', action='store_true')
     parser.add_argument('--static_graph', action='store_true')
     parser.add_argument('--workers', type=int, default=4)
-    parser.add_argument('--seed', type=int, default=1337)
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--json', type=str, default="gpt2.json", help="Path to JSON run log")
     parser.add_argument('--log_every_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
                             'Automatically disabled if epoch has fewer than N steps.')
@@ -788,10 +788,11 @@ def main():
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        random.seed(args.seed + args.rank * 42)
-        np.random.seed(args.seed + args.rank * 42)
-        torch.manual_seed(args.seed + args.rank * 42)
-        if torch.cuda.is_available(): torch.cuda.manual_seed_all(args.seed)
+        random.seed(args.seed + args.rank)
+        np.random.seed(args.seed + args.rank)
+        torch.manual_seed(args.seed + args.rank)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed + args.seed)
     else:
         torch.backends.cudnn.benchmark = True
 

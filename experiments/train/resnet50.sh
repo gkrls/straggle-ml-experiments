@@ -85,25 +85,22 @@ set -x
 
 GDB='gdb -ex run --args'
 
-set -x
-sudo -E $(which python) experiments/train/bert_finetune.py \
+# Standard settings for GPT2 on a 16GB GPU
+# Consumes around ~15.3GB of memory with AMP
+sudo -E $(which python) experiments/train/gpt2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --backend $BACKEND \
   --dpa_conf $DPA_CONF \
-  --data ~/datasets/squad_v1 \
-  --squad_version v1 \
-  --n_best_size 100 \
-  --epochs 4 \
-  --batch_size 32 \
-  --learning_rate 3e-5 \
-  --warmup_ratio 0.1 \
+  --backend $BACKEND \
+  --data ~/datasets/imagenet \
+  --model resnet50 \
+  --batch_size 128 \
+  --workers 8 \
   --deterministic \
-  --workers 4 \
+  --drop_last_val \
   --prefetch_factor 4 \
-  --log_interval 10 \
-  --json experiments/train/bert_finetune.json \
+  --json experiments/train/resnet50.json \
   "$@"
