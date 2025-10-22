@@ -42,7 +42,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
         -DDPA_TORCH_PINNEDPOOL_PRETOUCH=OFF \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_WORKSTEALING=OFF ..
   make -j4 install
 
   # Install the plugin
@@ -64,7 +64,7 @@ if [[ -z "${IP}" ]]; then
 fi
 
 RANK=$(( ${IP##*.} - 1 ))
-WORLD=6
+WORLD=2
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
@@ -74,7 +74,7 @@ CONF=configs/edgecore.json
 # CONF=experiments/allreduce/netberg.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 # PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
-NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true --sampling-period=200000 -d 30 -o profile_variance -f true"
+NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true --sampling-period=200000 -d 30 -o nsys_profile -f true"
 PERF="perf stat -d --"
 
 # export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8  # or .so.6 depending on your GCC version

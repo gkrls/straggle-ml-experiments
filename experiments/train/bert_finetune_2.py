@@ -467,7 +467,7 @@ def train(args):
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
         warmup_ratio=args.warmup_ratio,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
         logging_steps=max(1, args.log_interval) if args.log_interval > 0 else 500,
         fp16=args.amp,
