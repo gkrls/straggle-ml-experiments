@@ -10,6 +10,7 @@ transformers>=4.44,<5
 tokenizers>=0.19
 accelerate>=0.34
 datasets>=2.18
+evaluate>=0.4
 pyarrow>=14
 safetensors>=0.4
 tqdm
