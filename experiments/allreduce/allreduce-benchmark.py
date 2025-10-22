@@ -139,7 +139,7 @@ def benchmark(args):
             t_start = time.time_ns()
             for i in range(args.iters): jobs.append(dist.all_reduce(tensors[args.warmup + i], op=dist.ReduceOp.SUM, async_op=True))
             for j in jobs: j.wait()
-            for j in jobs: j.synchronize()
+            # for j in jobs: j.synchronize()
             torch.cuda.synchronize()
             total_time = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
             
