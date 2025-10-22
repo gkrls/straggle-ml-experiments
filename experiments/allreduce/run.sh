@@ -64,7 +64,7 @@ if [[ -z "${IP}" ]]; then
 fi
 
 RANK=$(( ${IP##*.} - 1 ))
-WORLD=2
+WORLD=6
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
@@ -80,7 +80,7 @@ PERF="perf stat -d --"
 # export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8  # or .so.6 depending on your GCC version
 # export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
-sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+sudo -E $NSYS $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 25000000 -w 10 -i 100 \
   --gloo_socket_ifname=$IFACE --global_stats --batch --pattern 2 --verify 
 
