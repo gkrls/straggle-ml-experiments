@@ -86,7 +86,7 @@ set -x
 GDB='gdb -ex run --args'
 
 set -x
-sudo -E $(which python) experiments/train/bert_finetune_2.py \
+sudo -E $(which python) experiments/train/bert_finetune.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
