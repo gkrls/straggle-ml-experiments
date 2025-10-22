@@ -83,7 +83,7 @@
     "threads": 6,
     "window": 512,
     "tx_burst": 128,
-    "rx_burst": 128,
+    "rx_burst": 256,
     "rx_pool_size": 65536,
     "rx_pool_cache": 512,
     "tx_pool_size": 65536,
