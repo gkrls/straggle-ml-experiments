@@ -106,6 +106,7 @@ sudo -E $(which python) experiments/train/resnet.py \
   --straggle_points 3 \
   --straggle_prob 16 \
   --straggle_ranks 1 \
-  --straggle_amount 0.64 \
+  --straggle_amount 0.65 \
   --straggle_multiply 0.5 2 \
+  --straggle_verbose \
   "$@"
