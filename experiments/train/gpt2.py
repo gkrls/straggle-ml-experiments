@@ -500,7 +500,10 @@ def train(args):
         model = dpa.DDPWrapper(model, straggle = args.world_size, prescale=args.prescale)
 
     # Straggle sim
-    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)      
+    # straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)
+    print("ARGS.STRAGGLE_MULTIPLY", args.straggle_multiply)
+    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
+                                  ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)        
     if straggle.attach(model): print(f"Straggle sim initialized with {straggle}")
     else: print(f"Straggle sim inactive")
     # straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
