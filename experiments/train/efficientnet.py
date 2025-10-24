@@ -322,7 +322,7 @@ def train(args):
 
         epoch_start = time.time()
 
-        straggle_sim.reset_stats()
+        straggle.reset_stats()
 
         train_loader.sampler.set_epoch(epoch)
 
@@ -345,7 +345,7 @@ def train(args):
             f"top1={val_metrics['top1']:.2f}% top5={val_metrics['top5']:.2f}% "
             f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
             f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) tp=~{train_metrics['throughput']:.1f} img/s",
-            f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}",
+            f"straggle_events={straggle.get_stats()['num_straggle_events']}",
             flush=True
         )
 
@@ -372,7 +372,7 @@ def train(args):
             "val_top5": float(val_metrics['top5']),
 
             # straggle-sim
-            "straggle": straggle_sim.get_stats() if straggle_sim.active else {},
+            "straggle": straggle.get_stats() if straggle.active else {},
         }
 
         log["epochs"][str(epoch)] = epoch_metrics
