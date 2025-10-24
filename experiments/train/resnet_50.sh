@@ -86,8 +86,6 @@ set -x
 
 GDB='gdb -ex run --args'
 
-# Standard settings for GPT2 on a 16GB GPU
-# Consumes around ~15.3GB of memory with AMP
 sudo -E $(which python) experiments/train/resnet.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \

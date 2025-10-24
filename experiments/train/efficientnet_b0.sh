@@ -37,6 +37,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
+        -DDPA_TORCH_PINNEDPOOL_PRETOUCH=OFF \
         -DDPA_TORCH_WORKSTEALING=ON ..
   make -j4 install
 
@@ -85,9 +86,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-# Standard settings for GPT2 on a 16GB GPU
-# Consumes around ~15.3GB of memory with AMP
-sudo -E $(which python) experiments/train/resnet.py \
+sudo -E $(which python) experiments/train/efficientnet.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -96,17 +95,11 @@ sudo -E $(which python) experiments/train/resnet.py \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
   --data ~/datasets/imagenet \
-  --model resnet50 \
+  --model efficientnet_b0 \
   --batch_size 128 \
   --workers 8 \
   --deterministic \
   --drop_last_val \
   --prefetch_factor 4 \
-  --json experiments/train/resnet50_straggle_16.json \
-  --straggle_points 3 \
-  --straggle_prob 16 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.65 \
-  --straggle_multiply 0.5 2 \
-  --straggle_verbose \
+  --json experiments/train/efficientnet_b0.json \
   "$@"

@@ -45,8 +45,8 @@ exec python -u $HOME/straggle-ml-experiments/models/lstm.py \
   --backend gloo \
   --epochs 12 \
   --batch_size 32 \
-  --workers 8 \
-  --prefetch_factor 8 \
+  --workers 4 \
+  --prefetch_factor 4 \
   --deterministic \
   --json $HOME/straggle-ml-experiments/models/lstm.json \
   "$@"

@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -13,13 +14,10 @@ import json
 import datetime
 import time
 import random
-import re
 import numpy as np
 import math
 
 import dpa
-
-# from straggle_sim import SlowWorkerPattern
 
 # ------------------------- Dataset ------------------------------
 
@@ -31,6 +29,7 @@ def get_dataloaders(args):
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize,
+        transforms.RandomErasing(p=0.2, inplace=True),
     ])
     val_transform = transforms.Compose([
         transforms.Resize(256),
@@ -70,7 +69,6 @@ def get_dataloaders(args):
 
 
 # ------------------------- Metrics ------------------------------
-
 class AverageMeter:
     def __init__(self):
         self.reset()
@@ -89,7 +87,6 @@ class AverageMeter:
     def all_reduce(self):
         if dist.is_available() and dist.is_initialized():
             backend = dist.get_backend()
-            # NCCL => must use GPU tensor; otherwise CPU is fine
             device = torch.device(f"cuda:{torch.cuda.current_device()}") if backend == dist.Backend.NCCL else torch.device("cpu")
             t = torch.tensor([self.sum, self.count], dtype=torch.float64, device=device)
             dist.all_reduce(t, op=dist.ReduceOp.SUM)
@@ -142,17 +139,16 @@ def validate(model, loader, device, args):
     top5.all_reduce()
     losses.all_reduce()
 
-    # Handle any leftover samples if DistributedSampler dropped them
+    # Cover leftover samples if sampler < dataset (same as DenseNet)
     if len(loader.sampler) * args.world_size < len(loader.dataset):
         aux_val_dataset = Subset(loader.dataset, range(len(loader.sampler) * args.world_size, len(loader.dataset)))
         aux_val_loader = torch.utils.data.DataLoader(aux_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
         run_validation(aux_val_loader)
 
-    return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg}
-
+    return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg }
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
-    """Perform 1 full pass over the dataset. Return detailed timing + accuracy metrics."""
+    """Perform 1 full pass over the dataset. Return loss, epoch duration, epoch throughput (imgs/sec)"""
     model.train()
 
     # meters
@@ -165,18 +161,17 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     if device.type == 'cuda':
         epoch_start = torch.cuda.Event(enable_timing=True)
         epoch_end   = torch.cuda.Event(enable_timing=True)
-        epoch_start.record()
+        epoch_start.record()  # on current stream
     else:
         epoch_start = time.perf_counter()
 
     step_start = time.perf_counter()
-    samples_seen = 0.0
 
+    samples_seen = 0.0
     for images, targets in dataloader:
         data_time.update(time.perf_counter() - step_start, n=1)
 
         images = images.to(device, non_blocking=True)
-        # images = images.to(device, non_blocking=True, memory_format=torch.channels_last) if device.type == 'cuda' else images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
         samples_seen += images.size(0)
 
@@ -194,7 +189,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
             loss.backward()
             optimizer.step()
 
-        # Calculate training accuracy
+        # Calculate accuracy
         acc1, acc5 = accuracy(outputs, targets, topk=(1, 5))
 
         # Update meters
@@ -215,10 +210,10 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
     throughput = samples_seen / max(1e-6, duration)
 
     local_loss = losses.avg
-    losses.all_reduce()  # global avg loss across ranks
+    losses.all_reduce()
 
     return {
-        'loss_global': losses.avg,
+        'loss_global' : losses.avg,
         'loss': local_loss,
         'top1': top1.avg,
         'top5': top5.avg,
@@ -231,7 +226,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler):
         'throughput': throughput,
     }
 
-
 def save_log(path, log):
     """Atomically write log dict to JSON file."""
     tmp = f"{path}.tmp"
@@ -241,46 +235,77 @@ def save_log(path, log):
         os.fsync(f.fileno())
     os.replace(tmp, path)
 
-
 def train(args):
     device = torch.device(args.device)
 
     # Data
     train_loader, val_loader = get_dataloaders(args)
 
-    # ------------------------- Model (ResNet variants; unchanged config) -------------------------
+    # Model - EfficientNet variants
     model = None
-    if args.model == 'resnet50': model = models.resnet50(num_classes=args.num_classes).to(device)
-    elif args.model == 'resnet101': model = models.resnet101(num_classes=args.num_classes).to(device)
-    elif args.model == 'resnet152': model = models.resnet152(num_classes=args.num_classes).to(device)
-    else: raise ValueError(f"Unsupported model: {args.model}")
+    if args.model == 'efficientnet_b0':
+        model = models.efficientnet_b0(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_b1':
+        model = models.efficientnet_b1(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_b2':
+        model = models.efficientnet_b2(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_b3':
+        model = models.efficientnet_b3(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_b4':
+        model = models.efficientnet_b4(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_b5':
+        model = models.efficientnet_b5(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_b6':
+        model = models.efficientnet_b6(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_b7':
+        model = models.efficientnet_b7(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_v2_s':
+        model = models.efficientnet_v2_s(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_v2_m':
+        model = models.efficientnet_v2_m(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    elif args.model == 'efficientnet_v2_l':
+        model = models.efficientnet_v2_l(num_classes=args.num_classes).to(device, memory_format=torch.channels_last if device.type == 'cuda' else torch.contiguous_format)
+    else:
+        raise ValueError(f"Unsupported model: {args.model}")
 
-    # DPA
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, gradient_as_bucket_view=True,
-                bucket_cap_mb=args.bucket_cap_mb, find_unused_parameters=False, static_graph=args.static_graph)
+    model = DDP(
+        model,
+        device_ids=[args.local_rank] if device.type == "cuda" else None,
+        gradient_as_bucket_view=True,
+        find_unused_parameters=False,
+        static_graph=args.static_graph,
+    )
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
         model = dpa.DDPWrapper(model, straggle = args.world_size, prescale=args.prescale)
-
+    
     print(f"Model '{args.model}' initialized.", flush=True)
 
+    # Straggle sim (match DenseNet)
     # Straggle sim
     straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks,
                                   multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)      
     if straggle.attach(model): print(f"Straggle sim initialized with {straggle}")
     else: print(f"Straggle sim inactive")
-    # straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-    #                                 ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
-    #                                 verbose=args.straggle_verbose)
-    # if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
-    # else: print(f"Straggle sim inactive")
 
-    # Optimizer / Scheduler / AMP (unchanged from original resnet script)
-    criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay, foreach=True)
+    # Loss (keep label smoothing that you had; DenseNet uses plain CE)
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1)
+    # Optimizer / Scheduler
+    if args.optimizer == 'sgd':
+        optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay, nesterov=True, foreach=True)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1)
+        # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
+    else:
+        optimizer = optim.RMSprop(model.parameters(), lr=args.learning_rate, momentum=0.0, alpha=0.9, eps=0.001, weight_decay=1e-5, foreach=True)
+        warmup_epochs = 5
+        warmup = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1/25, total_iters=warmup_epochs)
+        cosine = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs - warmup_epochs, eta_min=1e-6)
+        scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[warmup_epochs])
+        for pg in optimizer.param_groups:
+            pg['lr'] = args.learning_rate / 25.0
+
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp) if device.type == "cuda" else None
 
     def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -288,16 +313,16 @@ def train(args):
     best_top1 = 0.0
     best_top5 = 0.0
 
-    # DenseNet-style: always initialize and persist a log file (not only on rank 0)
+    # match DenseNet: write JSON header on all ranks (atomic replace)
     log = {"time": now(), "config": vars(args), "epochs": {}}
     save_log(args.json, log)
 
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
 
-        epoch_wall_start = time.time()
+        epoch_start = time.time()
 
-        straggle.reset_stats()
+        straggle_sim.reset_stats()
 
         train_loader.sampler.set_epoch(epoch)
 
@@ -305,31 +330,30 @@ def train(args):
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler)
 
         # Validate and get metrics
-        val_metrics = validate(model, val_loader, device, args)
+        val_metrics  = validate(model, val_loader, device, args)
 
-        # Epoch wall time
-        epoch_time = time.time() - epoch_wall_start
+        # Total epoch time
+        epoch_time = time.time() - epoch_start
 
-        # LR to report after eval
+        # LR for print (match DenseNet pattern)
         current_lr = scheduler.get_last_lr()[0]
 
-        # Print epoch summary (DenseNet style)
         print(
             f"[{now()}][Epoch {epoch:03d}] "
             f"train_loss={train_metrics['loss']:.4f} (global={train_metrics['loss_global']:.4f}) "
             f"val_loss={val_metrics['loss']:.4f} "
             f"top1={val_metrics['top1']:.2f}% top5={val_metrics['top5']:.2f}% "
             f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
-            f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) "
-            f"tp=~{train_metrics['throughput']:.1f} img/s",
-            f"straggle_events={straggle.get_stats()['num_straggle_events']}", flush=True)
+            f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) tp=~{train_metrics['throughput']:.1f} img/s",
+            f"straggle_events={straggle_sim.get_stats()['num_straggle_events']}",
+            flush=True
+        )
 
-        # Log all metrics in a single dict
+        # Combine all metrics into one dictionary for logging (match DenseNet keys)
         epoch_metrics = {
-            # Training metrics
             "lr": float(current_lr),
-            "train_loss": float(train_metrics['loss']),
-            "train_loss_global": float(train_metrics['loss_global']),
+            "train_loss": float(train_metrics['loss']),                 # Local loss
+            "train_loss_global": float(train_metrics['loss_global']),   # Global average loss
             "train_top1": float(train_metrics['top1']),
             "train_top5": float(train_metrics['top5']),
             "steps": int(len(train_loader)),
@@ -348,13 +372,13 @@ def train(args):
             "val_top5": float(val_metrics['top5']),
 
             # straggle-sim
-            "straggle" : straggle.get_stats() if straggle.active else {}
+            "straggle": straggle_sim.get_stats() if straggle_sim.active else {},
         }
 
         log["epochs"][str(epoch)] = epoch_metrics
         save_log(args.json, log)
 
-        # Track best validation accuracy (not printed, but could be used later)
+        # Track best validation accuracy
         if val_metrics['top1'] > best_top1:
             best_top1 = val_metrics['top1']
         if val_metrics['top5'] > best_top5:
@@ -363,47 +387,45 @@ def train(args):
         # Step the scheduler after evaluation (end of epoch)
         scheduler.step()
 
-
 # ------------------------- Entry / Setup ------------------------
 
 def setup_ddp(args):
     # Ensure args contains everything we need. Give priority to ENV vars
-    def env_int(key, default):
-        return default if os.environ.get(key) in (None, "") else int(os.environ.get(key))
+    def env_int(key, default): return default if os.environ.get(key) in (None, "") else int(os.environ.get(key))
+    def env_str(key, default): return default if os.environ.get(key) in (None, "") else os.environ.get(key)
 
-    def env_str(key, default):
-        return default if os.environ.get(key) in (None, "") else os.environ.get(key)
-
-    args.rank = env_int("RANK", args.rank)
-    args.world_size = env_int("WORLD_SIZE", args.world_size)
+    args.rank        = env_int("RANK", args.rank)
+    args.world_size  = env_int("WORLD_SIZE", args.world_size)
     args.master_addr = env_str("MASTER_ADDR", args.master_addr)
     args.master_port = env_int("MASTER_PORT", args.master_port)
-    args.iface = env_str("IFACE", args.iface)
-    args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
+    args.iface       = env_str("IFACE", args.iface)
+    args.local_rank  = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
     if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
 
     # Ensure the variables torch.distributed expects are present.
-    os.environ.setdefault("RANK", str(args.rank))
-    os.environ.setdefault("WORLD_SIZE", str(args.world_size))
+    os.environ.setdefault("RANK",        str(args.rank))
+    os.environ.setdefault("WORLD_SIZE",  str(args.world_size))
     os.environ.setdefault("MASTER_ADDR", args.master_addr)
     os.environ.setdefault("MASTER_PORT", str(args.master_port))
-    os.environ.setdefault("LOCAL_RANK", str(args.local_rank))
+    os.environ.setdefault("LOCAL_RANK",  str(args.local_rank))
 
     os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
     os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
     os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
     os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
 
-    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)  # e.g. ens4f0
+    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)               # e.g. ens4f0
     os.environ.setdefault("NCCL_DEBUG", "WARN")
     os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
     os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
-    os.environ.setdefault("NCCL_P2P_DISABLE", "1")  # P100 P2P is limited
-    os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")  # Force ring for stability
-    os.environ.setdefault("NCCL_IB_DISABLE", "0")  # Enable IB if available on 100G
+    os.environ.setdefault("NCCL_P2P_DISABLE", "1")         # keep original NCCL envs
+    os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")
+    os.environ.setdefault("NCCL_IB_DISABLE", "0")
     os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
-    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
+    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")
     os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
+
+    # dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
 
     if args.backend.startswith("dpa"):
         if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
@@ -419,48 +441,37 @@ def setup_ddp(args):
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
 
 
-    # Start the process group
-    # dist.init_process_group(
-    #     backend=args.backend,
-    #     init_method="env://",
-    #     rank=args.rank,
-    #     world_size=args.world_size,
-    #     timeout=datetime.timedelta(seconds=60),
-    # )
-
-
-    print(
-        f"[DDP] backend={args.backend} world_size={args.world_size} "
-        f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}",
-        flush=True,
-    )
-
+    print(f"[DDP] backend={args.backend} world_size={args.world_size} "
+            f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
 def main():
     parser = argparse.ArgumentParser()
 
-    # DDP/System
+    # DDP/System (match DenseNet)
     parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--iface', type=str, default="ens4f0")
     parser.add_argument('--master_addr', type=str, default="42.0.0.1")
     parser.add_argument("--master_port", type=int, default=29500)
     parser.add_argument("--backend", type=str, default="gloo", help="DDP backend (e.g., gloo, nccl)")
-    parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument("--json", type=str, default="resnet.json", help="Path to JSON run log")
 
-    # Training/model (keep ResNet config defaults)
-    parser.add_argument('--model', type=str, choices=['resnet50', 'resnet101', 'resnet152'], help="ResNet model", default="resnet50")
+    # Training/model (align with DenseNet CLI semantics)
+    parser.add_argument('--model', type=str,
+                        choices=['efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4',
+                                 'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7',
+                                 'efficientnet_v2_s', 'efficientnet_v2_m', 'efficientnet_v2_l'],
+                        help="EfficientNet model", default="efficientnet_b0")
     parser.add_argument('--data', type=str, required=True)
     parser.add_argument('--epochs', type=int, default=90)
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.1)
-    parser.add_argument('--momentum', type=float, default=0.9)
-    parser.add_argument('--weight_decay', type=float, default=1e-4)
+    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--learning_rate', type=float, default=0.08, help="Initial LR. For RMSProp path we warmup.")
+    parser.add_argument('--momentum', type=float, default=0.9, help="SGD momentum")
+    parser.add_argument('--weight_decay', type=float, default=1e-4, help="Weight decay")
     parser.add_argument('--num_classes', type=int, default=1000)
     parser.add_argument("--amp", action="store_true", help="Enable mixed precision on CUDA")
     parser.add_argument("--drop_last_train", action='store_true', help="Drop last from train dataset")
@@ -471,7 +482,11 @@ def main():
     parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
     parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
 
-    # Straggle
+
+    # Optimizer selection
+    parser.add_argument("--optimizer", type=str, choices=["sgd", "rmsprop"], default="sgd")
+
+    # Straggle (match DenseNet)
     def csv_ints(s: str) -> list[int]:
         if not s: return []
         try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
@@ -498,18 +513,15 @@ def main():
     else:
         torch.backends.cudnn.benchmark = True
 
-    # Args sanity checks/corrections
+    # Args sanity
     if args.device == 'cuda' and not torch.cuda.is_available():
         args.device = 'cpu'
-        if args.rank == 0:
-            print("[Info] Using device=cpu because CUDA is not available", flush=True)
+        if args.rank == 0: print("[Info] Using device=cpu because CUDA is not available", flush=True)
     if args.amp and args.device == 'cpu':
         args.amp = False
-        if args.rank == 0:
-            print("[Info] Disabling AMP because CUDA is not available", flush=True)
+        if args.rank == 0: print("[Info] Disabling AMP because CUDA is not available", flush=True)
     if args.workers < 1:
-        if args.rank == 0:
-            print("[Info] Workers requested < 1; using workers=1", flush=True)
+        if args.rank == 0: print("[Info] Workers requested < 1; using workers=1", flush=True)
         args.workers = 1
 
     sys.stdout.reconfigure(line_buffering=True)
@@ -522,7 +534,6 @@ def main():
     finally:
         if dist.is_available() and dist.is_initialized():
             dist.destroy_process_group()
-
 
 if __name__ == '__main__':
     main()
