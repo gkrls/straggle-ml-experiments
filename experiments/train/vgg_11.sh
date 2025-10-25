@@ -86,7 +86,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-sudo -E $(which python) experiments/train/resnet.py \
+sudo -E $(which python) experiments/train/vgg.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -95,11 +95,11 @@ sudo -E $(which python) experiments/train/resnet.py \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
   --data ~/datasets/imagenet \
-  --model resnet50 \
+  --model vgg11 \
   --batch_size 128 \
   --workers 8 \
   --deterministic \
   --drop_last_val \
   --prefetch_factor 4 \
-  --json experiments/train/resnet50.json \
+  --json experiments/train/vgg11.json \
   "$@"
