@@ -149,11 +149,12 @@ def validate(model, loader, device, args):
 
 
 def _compute_inception_loss(outputs, targets, criterion, use_aux: bool, aux_weight: float):
-    # Torchvision Inception returns a namedtuple InceptionOutputs(logits, aux_logits) when training and aux is enabled
+    # Torchvision Inception returns InceptionOutputs(logits, aux_logits) during training when aux is enabled.
+    # Standard recipe: total_loss = main_loss + aux_weight * aux_loss (aux_weight ≈ 0.3)
     if use_aux and (hasattr(outputs, 'aux_logits') or (isinstance(outputs, tuple) and len(outputs) == 2)):
         main_out = outputs.logits if hasattr(outputs, 'logits') else outputs[0]
         aux_out  = outputs.aux_logits if hasattr(outputs, 'aux_logits') else outputs[1]
-        return 0.7 * criterion(main_out, targets) + aux_weight * criterion(aux_out, targets), main_out
+        return criterion(main_out, targets) + aux_weight * criterion(aux_out, targets), main_out
     else:
         main_out = outputs.logits if hasattr(outputs, 'logits') else outputs
         return criterion(main_out, targets), main_out

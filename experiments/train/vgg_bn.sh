@@ -104,5 +104,7 @@ sudo -E $(which python) experiments/train/vgg_bn.py \
   --drop_last_val \
   --prefetch_factor 4 \
   --deterministic \
+  --hint_tensor_size 500000000 \
+  --hint_tensor_count 25 \
   --json experiments/train/vgg11_bn.json
   "$@"

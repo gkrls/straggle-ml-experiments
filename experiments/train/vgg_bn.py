@@ -371,8 +371,8 @@ def setup_ddp(args):
         pg_options = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
         # pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4) # observed max around 150-is MB
         # pg_options.hint_pinned_tensor_pool_size = 20                                              # observed count 13
-        pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0) # observed max around 150-is MB
-        pg_options.hint_pinned_tensor_pool_size = 20                                                                                      # observed count 13
+        pg_options.hint_pinned_tensor_size = max(args.hint_tensor_size, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0)
+        pg_options.hint_pinned_tensor_pool_size = args.hint_tensor_count                                                                            
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
     else:
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
@@ -422,6 +422,8 @@ def main():
 
     parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
     parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
+    parser.add_argument("--hint_tensor_size", type=int, default=200000000, help="Hint for allreduce tensor size (bytes)")
+    parser.add_argument("--hint_tensor_count", type=int, default=20, help="Hint for number of tensors allreduced, per step")
 
     # Warmup controls (only applied if warmup_epochs > 0)
     parser.add_argument('--warmup_epochs', type=int, default=0, help='Number of warmup epochs (0 disables warmup)')
