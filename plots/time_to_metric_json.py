@@ -2,10 +2,13 @@ import json, os
 import matplotlib.pyplot as plt
 import numpy as np
 
-FILE1='../experiments/train/results/deterministic/resnet50.json'
-FILE2='../experiments/train/results/deterministic/resnet50_straggle_16.json'
+FILE1='../experiments/train/results/resnet50.json'
+FILE2='../experiments/train/results/resnet50_straggle_16.json'
 FILE1=os.path.join(os.path.dirname(__file__), FILE1)
 FILE2=os.path.join(os.path.dirname(__file__), FILE2)
+METRIC="val_top5"
+YLABEL="Top5 Accuracy"
+TARGET=90
 
 # Read the first dataset (baseline)
 with open(FILE1, 'r') as f:
@@ -22,7 +25,7 @@ with open(FILE2, 'r') as f:
 def extract_data(epochs_data):
     """Extract epoch numbers, accuracies, and cumulative times from epoch data"""
     epoch_numbers = []
-    val_top5_accuracies = []
+    epoch_metrics = []
     cumulative_times = []
     
     cumulative_time = 0.0
@@ -37,38 +40,38 @@ def extract_data(epochs_data):
         
         # Store data
         epoch_numbers.append(int(epoch_key))
-        val_top5_accuracies.append(epoch_data['val_top5'])
+        epoch_metrics.append(epoch_data[METRIC])
         cumulative_times.append(cumulative_time)
     
-    return epoch_numbers, val_top5_accuracies, cumulative_times
+    return epoch_numbers, epoch_metrics, cumulative_times
 
 # Extract data for both datasets
-epochs1, acc1, times1 = extract_data(data1['epochs'])
-epochs2, acc2, times2 = extract_data(data2['epochs'])
+epochs1, metrics1, times1 = extract_data(data1['epochs'])
+epochs2, metrics2, times2 = extract_data(data2['epochs'])
 
 # Convert to minutes
 times1_min = np.array(times1) / 60
 times2_min = np.array(times2) / 60
 
 # Find when each hits 90% accuracy
-def find_90_percent(accuracies, times_min, epochs):
-    for i, acc in enumerate(accuracies):
-        if acc >= 90.0:
+def find_metric_target(metrics, metric_target, times_min, epochs):
+    for i, m in enumerate(metrics):
+        if m >= metric_target:
             return times_min[i], epochs[i], i
     return None, None, None
 
-time1_90, epoch1_90, idx1_90 = find_90_percent(acc1, times1_min, epochs1)
-time2_90, epoch2_90, idx2_90 = find_90_percent(acc2, times2_min, epochs2)
+time1_90, epoch1_90, idx1_90 = find_metric_target(metrics1, TARGET, times1_min, epochs1)
+time2_90, epoch2_90, idx2_90 = find_metric_target(metrics2, TARGET, times2_min, epochs2)
 
 # Truncate data to show only 2 points after hitting 90%
-def truncate_after_target(times, accs, idx_90):
-    if idx_90 is not None:
-        end_idx = min(idx_90 + 3, len(times))  # Show 2 more points after target
+def truncate_after_target(times, accs, idx_target):
+    if idx_target is not None:
+        end_idx = min(idx_target + 5, len(times))  # Show 4 more points after target
         return times[:end_idx], accs[:end_idx]
     return times, accs
 
-times1_plot, acc1_plot = truncate_after_target(times1_min, acc1, idx1_90)
-times2_plot, acc2_plot = truncate_after_target(times2_min, acc2, idx2_90)
+times1_plot, metrics1_plot = truncate_after_target(times1_min, metrics1, idx1_90)
+times2_plot, metrics2_plot = truncate_after_target(times2_min, metrics2, idx2_90)
 
 # Calculate speedup
 if time1_90 and time2_90:
@@ -79,14 +82,12 @@ if time1_90 and time2_90:
 plt.figure(figsize=(12, 7))
 
 # Plot both lines with thicker lines, red and blue
-plt.plot(times1_plot, acc1_plot, marker='o', linewidth=3, markersize=5, 
-         color='#D62828', label='Baseline', alpha=0.9)
-plt.plot(times2_plot, acc2_plot, marker='s', linewidth=3, markersize=5, 
-         color='#1E88E5', label='Optimized', alpha=0.9)
+plt.plot(times1_plot, metrics1_plot, marker='o', linewidth=3, markersize=5, color='#D62828', label='Baseline', alpha=0.9)
+plt.plot(times2_plot, metrics2_plot, marker='s', linewidth=3, markersize=5, color='#1E88E5', label='Optimized', alpha=0.9)
 
 # Add horizontal line at 90% target accuracy
 plt.axhline(y=90, color='gray', linestyle='--', linewidth=1.5, 
-            label='Target Accuracy (90%)', alpha=0.7)
+            label=f'Target Metric ({TARGET} {METRIC})', alpha=0.7)
 
 # Add vertical lines when each hits 90% - stop at the 90% horizontal line
 if time1_90:
@@ -114,8 +115,8 @@ if time1_90 and time2_90:
 
 # Formatting
 plt.xlabel('Time (minutes)', fontsize=12, fontweight='bold')
-plt.ylabel('Top-5 Accuracy (%)', fontsize=12, fontweight='bold')
-plt.title('Time-to-Accuracy Comparison: Baseline vs Optimized', 
+plt.ylabel(f'{YLABEL} (%)', fontsize=12, fontweight='bold')
+plt.title('Time-to-Metric Comparison: Baseline vs Optimized', 
           fontsize=14, fontweight='bold', pad=20)
 plt.grid(True, alpha=0.3, linestyle='--')
 plt.legend(fontsize=10, loc='lower left')
@@ -131,46 +132,46 @@ plt.tight_layout()
 # print(f"Plot saved to /mnt/user-data/outputs/time_to_accuracy_comparison.png")
 
 # Print statistics
-print(f"\n{'='*60}")
-print(f"TIME-TO-ACCURACY COMPARISON")
-print(f"{'='*60}")
-print(f"\nBaseline:")
-print(f"  - Reached 90% at epoch {epoch1_90}: {time1_90:.2f} minutes")
-print(f"  - Final accuracy: {acc1[-1]:.2f}%")
-print(f"  - Total time: {times1_min[-1]:.2f} minutes")
+# print(f"\n{'='*60}")
+# print(f"TIME-TO-METRIC COMPARISON")
+# print(f"{'='*60}")
+# print(f"\nBaseline:")
+# print(f"  - Reached 90% at epoch {epoch1_90}: {time1_90:.2f} minutes")
+# print(f"  - Final metric: {metrics1[-1]:.2f} {METRIC}")
+# print(f"  - Total time: {times1_min[-1]:.2f} minutes")
 
-print(f"\nOptimized:")
-print(f"  - Reached 90% at epoch {epoch2_90}: {time2_90:.2f} minutes")
-print(f"  - Final accuracy: {acc2[-1]:.2f}%")
-print(f"  - Total time: {times2_min[-1]:.2f} minutes")
+# print(f"\nOptimized:")
+# print(f"  - Reached 90% at epoch {epoch2_90}: {time2_90:.2f} minutes")
+# print(f"  - Final accuracy: {metrics2[-1]:.2f}%")
+# print(f"  - Total time: {times2_min[-1]:.2f} minutes")
 
-print(f"\n{'='*60}")
-print(f"SPEEDUP RESULTS")
-print(f"{'='*60}")
-print(f"  - Time saved to 90%: {time_saved:.2f} minutes ({time_saved/60:.2f} hours)")
-print(f"  - Speedup factor: {speedup:.2f}x")
-print(f"  - Percentage improvement: {(1 - 1/speedup)*100:.1f}%")
-print(f"{'='*60}")
+# print(f"\n{'='*60}")
+# print(f"SPEEDUP RESULTS")
+# print(f"{'='*60}")
+# print(f"  - Time saved to 90%: {time_saved:.2f} minutes ({time_saved/60:.2f} hours)")
+# print(f"  - Speedup factor: {speedup:.2f}x")
+# print(f"  - Percentage improvement: {(1 - 1/speedup)*100:.1f}%")
+# print(f"{'='*60}")
 
 # Print coordinates for LaTeX
 print(f"\n{'='*60}")
 print(f"PLOT COORDINATES (for LaTeX)")
 print(f"{'='*60}")
 print(f"\nBaseline coordinates:")
-print("% Time (min), Accuracy (%)")
-for t, a in zip(times1_plot, acc1_plot):
+print(f"% Time (min), Metric ({METRIC})")
+for t, a in zip(times1_plot, metrics1_plot):
     print(f"({t:.2f}, {a:.2f})")
 
 print(f"\nOptimized coordinates:")
-print("% Time (min), Accuracy (%)")
-for t, a in zip(times2_plot, acc2_plot):
+print(f"% Time (min), Metric ({METRIC})")
+for t, a in zip(times2_plot, metrics2_plot):
     print(f"({t:.2f}, {a:.2f})")
 
 print(f"\nTarget line:")
 print(f"% Horizontal line at y=90")
 print(f"(0, 90) ({max(times1_plot[-1], times2_plot[-1]):.2f}, 90)")
 
-print(f"\nVertical lines (90% achievement):")
+print(f"\nVertical lines ({TARGET} {METRIC}):")
 print(f"% Baseline: x={time1_90:.2f}")
 print(f"% Optimized: x={time2_90:.2f}")
 print(f"{'='*60}")
