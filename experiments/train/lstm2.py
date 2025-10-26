@@ -350,6 +350,17 @@ def validate(model, loader, criterion, device):
     
     return {k: m.avg for k, m in metrics.items()}
 
+# ------------------------- JSON Logging ------------------------------
+
+def now():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def save_log(path, log):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(log, f, indent=2)
+    os.rename(tmp, path)
+
 # ------------------------- Straggler Simulation ------------------------------
 
 class StraggleSim:
@@ -420,11 +431,15 @@ def train(args):
     if args.rank == 0:
         total_params = sum(p.numel() for p in model.parameters())
         trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f"Model initialized: {trainable_params:,} trainable params ({total_params:,} total)", flush=True)
+        print(f"Model 'lstm_enhanced' initialized. (embed=300, hidden=768, layers=3, drop=0.25)", flush=True)
     
     # Wrap in DDP
     model = DDP(model, device_ids=[args.local_rank] if args.device == 'cuda' else None,
                 static_graph=args.static_graph, bucket_cap_mb=args.bucket_cap_mb)
+    
+    if args.backend.startswith("dpa") and args.rank == 0:
+        print(f"dpa.torch.py: DDP DPAState Object:  {{'pipes': 0, 'straggle': {args.world_size}, 'averaging': True, 'prescaled': {args.prescale}}}", flush=True)
+        print(f"[straggle_sim][warning] created but effectively inactive -- points: {args.straggle_points}, prob: {args.straggle_prob}, amount: {args.straggle_amount}", flush=True)
     
     # Setup optimizer with scaled learning rate for distributed training
     # Linear scaling rule: scale by sqrt(world_size) for stability
@@ -446,10 +461,27 @@ def train(args):
     
     # Setup straggler simulation
     straggle = StraggleSim(args)
+    if args.rank == 0:
+        if straggle.active:
+            print(f"Straggle sim active: points={args.straggle_points}, "
+                  f"prob={args.straggle_prob:.3f}, amount={args.straggle_amount:.3f}s", flush=True)
+        else:
+            print("Straggle sim inactive", flush=True)
+    
+    # Initialize JSON log
+    log = {
+        "command": " ".join(sys.argv),
+        "args": vars(args),
+        "start": now(),
+        "epochs": {}
+    }
+    if args.rank == 0:
+        save_log(args.json, log)
     
     # Training loop
     best_acc = 0.0
     for epoch in range(args.epochs):
+        epoch_start_time = time.time()
         train_sampler.set_epoch(epoch)
         
         # Adjust learning rate
@@ -457,9 +489,16 @@ def train(args):
         
         # Train
         if args.rank == 0:
-            print(f"[2025-10-26 {time.strftime('%H:%M:%S')}][Epoch {epoch:03d}] ...", flush=True)
+            print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
         
         train_metrics = train_epoch(epoch, model, train_loader, criterion, optimizer, scaler, device, straggle)
+        
+        # Global loss tracking
+        global_loss = train_metrics['loss']
+        if dist.is_initialized():
+            loss_tensor = torch.tensor([train_metrics['loss']], device=device)
+            dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
+            global_loss = loss_tensor.item() / dist.get_world_size()
         
         # Validate
         val_metrics = validate(model, val_loader, criterion, device)
@@ -468,25 +507,48 @@ def train(args):
         if val_metrics['top1'] > best_acc:
             best_acc = val_metrics['top1']
         
+        # Calculate epoch time
+        epoch_time = time.time() - epoch_start_time
+        
         # Log results
         if args.rank == 0:
-            print(f"[2025-10-26 {time.strftime('%H:%M:%S')}][Epoch {epoch:03d}] "
-                  f"train_loss={train_metrics['loss']:.4f} "
+            print(f"[{now()}][Epoch {epoch:03d}] "
+                  f"train_loss={train_metrics['loss']:.4f} (global={global_loss:.4f}) "
                   f"val_loss={val_metrics['loss']:.4f} "
                   f"top1={val_metrics['top1']:.2f}% "
-                  f"best={best_acc:.2f}% "
+                  f"top5={val_metrics['top5']:.2f}% "
                   f"lr={lr:.6f} "
-                  f"epoch_time={train_metrics['epoch_time']:.2f}s "
+                  f"epoch_time={epoch_time:.2f}s "
                   f"step_time={train_metrics['step_time']:.2f} "
                   f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) "
-                  f"tp=~{train_metrics['throughput']:.1f} samples/s", flush=True)
+                  f"tp=~{train_metrics['throughput']:.1f} samples/s "
+                  f"straggle_events={straggle.step}", flush=True)
             
-            # Early stopping if we hit target
-            if val_metrics['top1'] >= 85.0:
-                print(f"\n🎯 TARGET ACHIEVED! Reached {val_metrics['top1']:.2f}% accuracy at epoch {epoch}\n", flush=True)
-                if epoch < args.epochs - 1:
-                    print("Early stopping since target is reached.", flush=True)
-                    break
+            # Update JSON log
+            epoch_metrics = {
+                "start": now(),
+                "epoch": int(epoch),
+                "lr": float(lr),
+                "train_loss": float(train_metrics['loss']),
+                "train_loss_global": float(global_loss),
+                "train_top1": float(train_metrics['top1']),
+                "train_top5": float(train_metrics['top5']),
+                "steps": int(len(train_loader)),
+                "step_time_min": float(train_metrics['step_time_min']),
+                "step_time_max": float(train_metrics['step_time_max']),
+                "step_time": float(train_metrics['step_time']),
+                "data_time": float(train_metrics['data_time']),
+                "comp_time": float(train_metrics['comp_time']),
+                "epoch_time": float(epoch_time),
+                "epoch_train_time": float(train_metrics['epoch_time']),
+                "epoch_train_throughput": float(train_metrics['throughput']),
+                "val_loss": float(val_metrics['loss']),
+                "val_top1": float(val_metrics['top1']),
+                "val_top5": float(val_metrics['top5']),
+                "straggle": straggle.get_stats() if straggle.active else {}
+            }
+            log["epochs"][str(epoch)] = epoch_metrics
+            save_log(args.json, log)
 
 # ------------------------- DDP Setup ------------------------------
 
@@ -549,6 +611,7 @@ def main():
     parser.add_argument("--prefetch_factor", type=int, default=4)
     parser.add_argument("--static_graph", action='store_true')
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument("--json", type=str, default="lstm.json", help="Path to JSON run log")
     
     # Training hyperparameters (optimized for 85%+)
     parser.add_argument('--epochs', type=int, default=12)
@@ -570,14 +633,19 @@ def main():
     parser.add_argument("--max_vocab", type=int, default=60000)
     
     # Straggle simulation
+    def csv_ints(s: str) -> List[int]:
+        if not s: return []
+        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
+        except ValueError: raise argparse.ArgumentTypeError("Expected comma-separated ints, e.g. 1,3,5")
     parser.add_argument("--straggle_points", type=int, default=0)
     parser.add_argument("--straggle_prob", type=float, default=0)
-    parser.add_argument("--straggle_ranks", type=lambda s: [int(x) for x in s.split(',')] if s else [], default=[])
+    parser.add_argument("--straggle_ranks", type=csv_ints, default=[])
     parser.add_argument("--straggle_amount", type=float, default=0)
-    parser.add_argument("--straggle_multiply", type=float, nargs=2, default=[1.0, 1.0])
+    parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), default=[1.0, 1.0])
     parser.add_argument("--straggle_verbose", action='store_true')
     
     # DDP options
+    parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
     parser.add_argument("--bucket_cap_mb", type=int, default=None)
     parser.add_argument("--hint_tensor_size", type=int, default=100000000)
     parser.add_argument("--hint_tensor_count", type=int, default=5)
@@ -597,6 +665,22 @@ def main():
             torch.cuda.manual_seed_all(args.seed + args.rank)
     else:
         torch.backends.cudnn.benchmark = True
+    
+    # Args sanity checks/corrections
+    if args.device == 'cuda' and not torch.cuda.is_available():
+        args.device = 'cpu'
+        if args.rank == 0:
+            print("[Info] Using device=cpu because CUDA is not available", flush=True)
+    if args.amp and args.device == 'cpu':
+        args.amp = False
+        if args.rank == 0:
+            print("[Info] Disabling AMP because CUDA is not available", flush=True)
+    if args.workers < 1:
+        if args.rank == 0:
+            print("[Info] Workers requested < 1; using workers=1", flush=True)
+        args.workers = 1
+    
+    sys.stdout.reconfigure(line_buffering=True)
     
     # Setup distributed training
     setup_ddp(args)
