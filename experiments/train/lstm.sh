@@ -94,10 +94,10 @@ sudo -E $(which python) experiments/train/lstm2.py \
   --master_port "$MASTER_PORT" \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
-  --epochs 12 \
+  --epochs 15 \
   --batch_size 32 \
-  --learning_rate 0.0024 \
-  --weight_decay 5e-06 \
+  --learning_rate 0.002 \
+  --weight_decay 1e-05 \
   --label_smoothing 0.01 \
   --cosine_min_lr_mult 0.05 \
   --max_len 80 \

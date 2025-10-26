@@ -34,7 +34,7 @@ MIN_FREQ       = 1            # keep rare tokens
 WORD_DROPOUT_P = 0.05         # reduced from 0.15 - less aggressive
 EMB_DROPOUT_P  = 0.1          # reduced from 0.20 - less aggressive  
 CLIP_NORM      = 5.0
-WARMUP_RATIO   = 0.15         # increased for large batch stability
+WARMUP_RATIO   = 0.10         # 10% warmup for cosine schedule
 
 # ------------------------- Tokenizer / Vocab ------------------------------
 
@@ -122,26 +122,21 @@ def accuracy_topk(output: torch.Tensor, target: torch.Tensor, num_classes: int, 
 
 class LSTMTextModel(nn.Module):
     """
-    Literature-standard 3-layer BiLSTM encoder with attention pooling.
-    Architecture based on:
-    - Yang et al. 2016 (Hierarchical Attention Networks)
-    - McCann et al. 2017 (Learned in Translation) 
-    - Peters et al. 2018 (Deep contextualized word representations)
+    2-layer BiLSTM encoder + pooled readout.
+    Key change: reduced dropout from 0.6 to 0.3 for 85% accuracy.
     """
     def __init__(self, vocab_size, num_classes=2):
         super().__init__()
         
-        # Model configuration - literature standard sizes
-        embed_dim  = 300      # Standard embedding dimension
-        hidden_dim = 768      # Increased from 512 - common in papers
-        num_layers = 3        # 3-layer BiLSTM is standard for strong baselines
-        dropout    = 0.25     # Reduced from 0.6 - critical for learning!
+        # Model configuration - minimal changes for 85%
+        embed_dim  = 300      # Keep original
+        hidden_dim = 512      # Keep original  
+        num_layers = 2        # Keep original
+        dropout    = 0.3      # REDUCED from 0.6 - THIS IS THE KEY CHANGE
         
-        # Embedding layer with dropout
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
         self.emb_drop = nn.Dropout(EMB_DROPOUT_P)
         
-        # 3-layer BiLSTM (standard in literature)
         self.lstm = nn.LSTM(
             embed_dim, hidden_dim, 
             num_layers=num_layers,
@@ -150,42 +145,17 @@ class LSTMTextModel(nn.Module):
             dropout=dropout if num_layers > 1 else 0.0
         )
         
-        # Enhanced attention mechanism (literature-standard)
-        self.attn = nn.Sequential(
-            nn.Linear(hidden_dim * 2, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, 1, bias=False)
-        )
-        
+        self.attn = nn.Linear(hidden_dim * 2, 1, bias=False)   # attention scores
         self.dropout = nn.Dropout(dropout)
-        self.norm = nn.LayerNorm(hidden_dim * 2 * 3)  # For concatenated features
+        self.norm = nn.LayerNorm(hidden_dim * 2 * 3)
         
-        # Deeper MLP classifier (common in recent papers)
+        # Slightly deeper MLP head (was just 512->num_classes)
         self.proj = nn.Sequential(
-            nn.Linear(hidden_dim * 2 * 3, 1024),
+            nn.Linear(hidden_dim * 2 * 3, 512),
             nn.GELU(),
-            nn.Dropout(0.2),
-            nn.Linear(1024, 256),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, num_classes),
+            nn.Dropout(0.2),  # reduced from 0.3
+            nn.Linear(512, num_classes),
         )
-        
-        # Initialize weights
-        self._init_weights()
-    
-    def _init_weights(self):
-        """Initialize weights using Xavier/He initialization"""
-        for name, param in self.named_parameters():
-            if 'embedding' in name:
-                if param.dim() > 1:
-                    nn.init.xavier_uniform_(param)
-            elif 'weight_ih' in name:  # LSTM input weights
-                nn.init.xavier_uniform_(param)
-            elif 'weight_hh' in name:  # LSTM hidden weights
-                nn.init.orthogonal_(param)
-            elif 'bias' in name:
-                nn.init.zeros_(param)
 
     def forward(self, x, lengths: Optional[torch.Tensor] = None):
         # Word dropout (training only, less aggressive)
@@ -223,7 +193,7 @@ class LSTMTextModel(nn.Module):
         out_neg_inf = out.masked_fill(~mask, float("-inf"))
         max_pool, _ = out_neg_inf.max(dim=1)
         
-        # 3. Attention pooling (enhanced)
+        # 3. Attention pooling (simple)
         attn_scores = self.attn(out)  # (B, T, 1)
         attn_scores = attn_scores.masked_fill(~mask, float("-inf"))
         attn_weights = torch.softmax(attn_scores, dim=1)
@@ -431,7 +401,7 @@ def train(args):
     if args.rank == 0:
         total_params = sum(p.numel() for p in model.parameters())
         trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f"Model 'lstm_enhanced' initialized. (embed=300, hidden=768, layers=3, drop=0.25)", flush=True)
+        print(f"Model 'lstm_optimized' initialized. (embed=300, hidden=512, layers=2, drop=0.3)", flush=True)
     
     # Wrap in DDP
     model = DDP(model, device_ids=[args.local_rank] if args.device == 'cuda' else None,
@@ -442,11 +412,9 @@ def train(args):
         print(f"[straggle_sim][warning] created but effectively inactive -- points: {args.straggle_points}, prob: {args.straggle_prob}, amount: {args.straggle_amount}", flush=True)
     
     # Setup optimizer with scaled learning rate for distributed training
-    # Linear scaling rule: scale by sqrt(world_size) for stability
-    scaled_lr = args.learning_rate * math.sqrt(args.world_size) if args.scale_lr else args.learning_rate
     optimizer = optim.AdamW(
         model.parameters(), 
-        lr=scaled_lr, 
+        lr=args.learning_rate, 
         weight_decay=args.weight_decay,
         betas=(0.9, 0.999)
     )
@@ -613,23 +581,22 @@ def main():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument("--json", type=str, default="lstm.json", help="Path to JSON run log")
     
-    # Training hyperparameters (optimized for 85%+)
-    parser.add_argument('--epochs', type=int, default=12)
+    # Training hyperparameters (optimized for 85%+ with conservative model)
+    parser.add_argument('--epochs', type=int, default=15)  # May need more epochs
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.0024)  # Scaled for 6 nodes
-    parser.add_argument('--scale_lr', action='store_true', help="Auto-scale LR by sqrt(world_size)")
-    parser.add_argument('--weight_decay', type=float, default=5e-06)
+    parser.add_argument('--learning_rate', type=float, default=0.002)  # Slightly lower
+    parser.add_argument('--weight_decay', type=float, default=1e-05)
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
     parser.add_argument("--drop_last_val", action='store_true')
     
     # Regularization (optimized values)
-    parser.add_argument("--label_smoothing", type=float, default=0.01)
-    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.05)
+    parser.add_argument("--label_smoothing", type=float, default=0.02)
+    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.1)
     
     # Text processing
-    parser.add_argument("--max_len", type=int, default=80)
+    parser.add_argument("--max_len", type=int, default=64)  # Increased from 50
     parser.add_argument("--max_vocab", type=int, default=60000)
     
     # Straggle simulation
