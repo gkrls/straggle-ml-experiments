@@ -94,11 +94,11 @@ sudo -E $(which python) experiments/train/lstm.py \
   --master_port "$MASTER_PORT" \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
-  --epochs 12 \
+  --epochs 18 \
   --batch_size 32 \
   --workers 4 \
   --deterministic \
-  --hint_tensor_size 50000000 \
+  --hint_tensor_size 100000000 \
   --hint_tensor_count 5 \
   --prefetch_factor 4 \
   --json experiments/train/lstm.json \

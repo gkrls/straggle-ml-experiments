@@ -24,8 +24,8 @@ import dpa
 PAD_ID         = 0
 UNK_ID         = 1
 MIN_FREQ       = 1            # keep rare tokens (helps sentiment)
-WORD_DROPOUT_P = 0.15         # bumped from 0.10
-EMB_DROPOUT_P  = 0.20         # bumped from 0.10
+WORD_DROPOUT_P = 0.05 #0.15         # bumped from 0.10
+EMB_DROPOUT_P  = 0.1 #0.20         # bumped from 0.10
 CLIP_NORM      = 5.0
 WARMUP_RATIO   = 0.10         # 10% warmup for cosine
 
@@ -126,7 +126,7 @@ class LSTMTextModel(nn.Module):
         embed_dim  = 300
         hidden_dim = 512
         num_layers = 2
-        dropout    = 0.6   # bumped from 0.5
+        dropout    = 0.3   # bumped from 0.5
 
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
         self.emb_drop = nn.Dropout(EMB_DROPOUT_P)
@@ -141,7 +141,7 @@ class LSTMTextModel(nn.Module):
         self.proj = nn.Sequential(
             nn.Linear(hidden_dim * 2 * 3, 512),
             nn.GELU(),
-            nn.Dropout(0.3),
+            nn.Dropout(0.2),
             nn.Linear(512, num_classes),
         )
 
@@ -534,21 +534,20 @@ def main():
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.001)
-    parser.add_argument('--weight_decay', type=float, default=2e-05)
+    parser.add_argument('--learning_rate', type=float, default=0.0015) # 0.001
+    parser.add_argument('--weight_decay', type=float, default=1e-05) # 1e-05
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
     parser.add_argument("--drop_last_val", action='store_true')
-
+    parser.add_argument("--label_smoothing", type=float, default=0.02, help="CrossEntropy label smoothing") # 0.05
+    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.1,
+                        help="Cosine LR floor as a fraction of base LR (e.g., 0.15 keeps LR >= 15% of base)") # 0.15
     # Text knobs
-    parser.add_argument("--max_len", type=int, default=50, help="Max tokens per sample")
+    parser.add_argument("--max_len", type=int, default=64, help="Max tokens per sample") # 50
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
+    
 
-    # Regularization knobs added
-    parser.add_argument("--label_smoothing", type=float, default=0.05, help="CrossEntropy label smoothing")
-    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.15,
-                        help="Cosine LR floor as a fraction of base LR (e.g., 0.15 keeps LR >= 15% of base)")
 
     # Straggle
     def csv_ints(s: str) -> List[int]:
