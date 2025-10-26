@@ -2,8 +2,8 @@ import json, os
 import matplotlib.pyplot as plt
 import numpy as np
 
-FILE1='../experiments/train/results/resnet50.json'
-FILE2='../experiments/train/results/resnet50_straggle_16.json'
+FILE1='../experiments/train/results/resnet50_straggle_16.json'
+FILE2='../experiments/train/results/resnet50.json'
 FILE1=os.path.join(os.path.dirname(__file__), FILE1)
 FILE2=os.path.join(os.path.dirname(__file__), FILE2)
 METRIC="val_top5"
