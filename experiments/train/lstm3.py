@@ -283,7 +283,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
             swa_model.update_parameters(unwrap(model))
 
         # per-step scheduler
-        scheduler.step()
+        if scheduler: scheduler.step()
 
         # metrics
         a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))

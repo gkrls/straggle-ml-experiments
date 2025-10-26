@@ -94,7 +94,7 @@ sudo -E $(which python) experiments/train/lstm3.py \
   --master_port "$MASTER_PORT" \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
-  --epochs 15 \
+  --epochs 12 \
   --batch_size 32 \
   --learning_rate 0.002 \
   --weight_decay 1e-05 \
