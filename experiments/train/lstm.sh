@@ -86,7 +86,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-sudo -E $(which python) experiments/train/lstm2.py \
+sudo -E $(which python) experiments/train/lstm3.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -99,7 +99,7 @@ sudo -E $(which python) experiments/train/lstm2.py \
   --learning_rate 0.002 \
   --weight_decay 1e-05 \
   --label_smoothing 0.01 \
-  --cosine_min_lr_mult 0.05 \
+  --cosine_min_lr_mult 0.2 \
   --max_len 80 \
   --max_vocab 60000 \
   --workers 4 \
