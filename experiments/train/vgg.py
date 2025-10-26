@@ -409,7 +409,7 @@ def main():
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument("--json", type=str, default="resnet.json", help="Path to JSON run log")
+    parser.add_argument("--json", type=str, default="vgg.json", help="Path to JSON run log")
 
     # Training/model
     parser.add_argument('--model', type=str, choices=['vgg11', 'vgg19'], help="VGG model", default="vgg11")

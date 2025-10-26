@@ -86,7 +86,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-sudo -E $(which python) experiments/train/vgg.py \
+sudo -E $(which python) experiments/train/lstm.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -94,19 +94,12 @@ sudo -E $(which python) experiments/train/vgg.py \
   --master_port "$MASTER_PORT" \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
-  --data ~/datasets/imagenet \
-  --model vgg11 \
-  --batch_size 128 \
-  --workers 8 \
+  --epochs 12 \
+  --batch_size 32 \
+  --workers 4 \
   --deterministic \
-  --drop_last_val \
-  --hint_tensor_size 500000000 \
-  --hint_tensor_count 25 \
+  --hint_tensor_size 50000000 \
+  --hint_tensor_count 5 \
   --prefetch_factor 4 \
-  --json experiments/train/vgg11_straggle_16.json \
-  --straggle_points 3 \
-  --straggle_prob 16 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.59 \
-  --straggle_multiply 0.5 2 \
+  --json experiments/train/lstm.json \
   "$@"
