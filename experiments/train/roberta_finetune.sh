@@ -122,7 +122,7 @@ sudo -E $(which python) experiments/train/roberta_finetune2.py \
   --data ~/datasets/squad_v2 \
   --squad_version v2 \
   --n_best_size 100 \
-  --epochs 8 \
+  --epochs 6 \
   --batch_size 32 \
   --learning_rate 3e-5 \
   --warmup_ratio 0.2 \
