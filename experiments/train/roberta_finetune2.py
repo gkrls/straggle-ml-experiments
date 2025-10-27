@@ -416,6 +416,7 @@ def train(args):
     cfg_json = {k: v for k, v in vars(args).items() if not k.startswith("_")}
     log = {"time": now(), "config": cfg_json, "epochs": {}}
     save_log(args.json, log)
+    print(f"[{now()}] Logging to {args.json}")
 
     best_em = best_f1 = 0.0
     for epoch in range(args.epochs):
@@ -456,6 +457,9 @@ def train(args):
             "val_f1": float(val_m["f1"]),
             "straggle": straggle.get_stats() if straggle.active else {}
         }
+
+        with open(args.json, "r") as f:
+            log = json.load(f)
         log["epochs"][str(epoch)] = epoch_log
         save_log(args.json, log)
 
