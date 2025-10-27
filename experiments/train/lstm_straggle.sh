@@ -61,7 +61,7 @@ cd $HOME/straggle-ml-experiments
 SCRIPT=${0##*/}
 DPA_CONF=$HOME/straggle-ml-experiments/configs/edgecore.json
 IFACE="${IFACE:-ens4f1}"                 # network interface to read IP from
-WORLD_SIZE="${WORLD_SIZE:-6}"            # set by launcher or leave 1 for single-node
+WORLD_SIZE="${WORLD_SIZE:-2}"            # set by launcher or leave 1 for single-node
 BACKEND="${BACKEND:-dpa_dpdk}"
 MASTER_ADDR="${MASTER_ADDR:-"42.0.1.1"}"
 MASTER_PORT="${MASTER_PORT:-"29500"}"
@@ -86,7 +86,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-sudo -E $(which python) experiments/train/lstm.py \
+sudo -E $(which python) experiments/train/lstm2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -101,14 +101,15 @@ sudo -E $(which python) experiments/train/lstm.py \
   --hint_tensor_size 100000000 \
   --hint_tensor_count 5 \
   --json experiments/train/lstm_straggle_16.json \
+  --deterministic \
+  --epochs 12 \
+  --batch_size 64 \
   --straggle_points 3 \
   --straggle_prob 16 \
   --straggle_ranks 1 \
   --straggle_amount 0.05 \
   --straggle_multiply 0.5 2 \
-  --deterministic \
-  --epochs 12 \
-  --batch_size 64 \
+  --straggle_k 5 \
   "$@"
 
 

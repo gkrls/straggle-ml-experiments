@@ -18,18 +18,31 @@ import json, os
 import matplotlib.pyplot as plt
 import numpy as np
 
-FILE1='../experiments/train/results/gpt2_straggle_16.json'
-FILE2='../experiments/train/results/gpt2.json'
+# FILE1='../experiments/train/results/gpt2_straggle_16.json'
+# FILE2='../experiments/train/results/gpt2.json'
+# FILE1=os.path.join(os.path.dirname(__file__), FILE1)
+# FILE2=os.path.join(os.path.dirname(__file__), FILE2)
+
+# METRIC="val_ppl"  # Change to match your data: val_ppl, val_loss, etc.
+# MINIVAL_METRIC="mini_val_ppl"  # The corresponding minival metric
+# YLABEL="Perplexity"  
+# TARGET=30.0  # Target perplexity
+# LOWER_IS_BETTER=True  # True for perplexity, loss; False for accuracy
+# USE_MINIVAL=True  # Set to False to only use epoch data
+
+
+FILE1='../experiments/train/results/roberta_finetune_straggle_16.json'
+FILE2='../experiments/train/results/roberta_finetune.json'
 FILE1=os.path.join(os.path.dirname(__file__), FILE1)
 FILE2=os.path.join(os.path.dirname(__file__), FILE2)
 
-# Configure your metric here
-METRIC="val_ppl"  # Change to match your data: val_ppl, val_loss, etc.
-MINIVAL_METRIC="mini_val_ppl"  # The corresponding minival metric
-YLABEL="Perplexity"  
-TARGET=30.0  # Target perplexity
-LOWER_IS_BETTER=True  # True for perplexity, loss; False for accuracy
+METRIC="val_f1"  # Change to match your data: val_ppl, val_loss, etc.
+MINIVAL_METRIC="mini_val_f1"  # The corresponding minival metric
+YLABEL="F1 Score"  
+TARGET=80.5  # Target
+LOWER_IS_BETTER=False  # True for perplexity, loss; False for accuracy
 USE_MINIVAL=True  # Set to False to only use epoch data
+USE_MINIVAL_EPOCHS=3
 
 # Read the first dataset (baseline)
 with open(FILE1, 'r') as f:
@@ -63,6 +76,8 @@ def extract_combined_data(epochs_data, minival_data=None, use_minival=True):
     if use_minival and minival_data:
         for epoch_key in sorted(minival_data.keys(), key=int):
             epoch_num = int(epoch_key)
+            if USE_MINIVAL_EPOCHS and epoch_num >= USE_MINIVAL_EPOCHS:
+                break
             if epoch_num not in epoch_times:
                 continue
                 
@@ -87,7 +102,7 @@ def extract_combined_data(epochs_data, minival_data=None, use_minival=True):
     for epoch_key in sorted(epochs_data.keys(), key=int):
         epoch_data = epochs_data[epoch_key]
         epoch_num = int(epoch_key)
-        global_step = epoch_data['global_step']
+        global_step = epoch_data['global_step'] if 'global_step' in epoch_data else (epoch_data['steps'] * (int(epoch_key) + 1))
         metric_value = epoch_data[METRIC]
         time_value = epoch_times[epoch_num]['end_time']
         

@@ -138,5 +138,4 @@ sudo -E $(which python) experiments/train/roberta_finetune2.py \
   --straggle_ranks 1 \
   --straggle_amount 1.2 \
   --straggle_multiply 0.5 2.0 \
-  --straggle_verbose \
   "$@"
