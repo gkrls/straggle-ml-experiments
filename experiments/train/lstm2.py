@@ -409,6 +409,8 @@ def train(args):
     log = {"time": now(), "config": vars(args), "epochs": {}}
     save_log(args.json, log)
 
+    dist.barrier()
+
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
         epoch_start = time.time()

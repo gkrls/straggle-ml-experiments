@@ -28,11 +28,12 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
-        -DCMAKE_BUILD_TYPE=Debug \
-        -DDPA_TRACE=ON \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DDPA_TRACE=OFF \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
+        -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
@@ -62,6 +63,7 @@ SCRIPT=${0##*/}
 DPA_CONF=$HOME/straggle-ml-experiments/configs/edgecore.json
 IFACE="${IFACE:-ens4f1}"                 # network interface to read IP from
 WORLD_SIZE="${WORLD_SIZE:-2}"            # set by launcher or leave 1 for single-node
+WORLD_K=$((WORLD_SIZE - 1))
 BACKEND="${BACKEND:-dpa_dpdk}"
 MASTER_ADDR="${MASTER_ADDR:-"42.0.1.1"}"
 MASTER_PORT="${MASTER_PORT:-"29500"}"
@@ -109,7 +111,7 @@ sudo -E $(which python) experiments/train/lstm2.py \
   --straggle_ranks 1 \
   --straggle_amount 0.05 \
   --straggle_multiply 0.5 2 \
-  --straggle_k 1 \
+  --straggle_k $WORLD_K \
   "$@"
 
 

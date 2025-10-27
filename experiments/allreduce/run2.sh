@@ -37,6 +37,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
+        -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
@@ -64,7 +65,7 @@ if [[ -z "${IP}" ]]; then
 fi
 
 RANK=$(( ${IP##*.} - 1 ))
-WORLD=2
+WORLD=3
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
@@ -82,7 +83,7 @@ PERF="perf stat -d --"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 2500 -w 0 -i 1 --dpa_avg \
-  --gloo_socket_ifname=$IFACE --global_stats --pattern 3 --straggle_k 1 --straggle_rank 1 --straggle_ms 9 --straggle_num 1 #--verify
+  --gloo_socket_ifname=$IFACE --global_stats --pattern 3 --straggle_k 2 --straggle_rank 1 --straggle_ms 10 --straggle_num 1 #--verify
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
 #   --d_conf configs/config-edgecore.json -b nccl -d cuda -t float32 -s 1000 -i 5 -w 3 -v "$@"
