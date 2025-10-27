@@ -109,6 +109,8 @@ set -x
 #   --json experiments/train/roberta_finetune.json \
 #   "$@"
 
+
+# squad v2
 sudo -E $(which python) experiments/train/roberta_finetune2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
@@ -117,7 +119,7 @@ sudo -E $(which python) experiments/train/roberta_finetune2.py \
   --master_port "$MASTER_PORT" \
   --backend $BACKEND \
   --dpa_conf $DPA_CONF \
-  --data ~/datasets/squad_v1 \
+  --data ~/datasets/squad_v2 \
   --squad_version v2 \
   --n_best_size 100 \
   --epochs 8 \

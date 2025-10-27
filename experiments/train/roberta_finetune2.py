@@ -333,8 +333,8 @@ def train_one_epoch(model, loader, minival_loader, optim, sched, device, scaler,
 # ------------------------- Main train ---------------------------
 def train(args):
     device = torch.device(args.device); _ensure_caches(args.data)
-    name = "squad_v2" if args.squad_version == "v2" else "squad"
-    if args.rank == 0: print(f"[Data] Loading '{name}' under {args.data}")
+    name = "squad_v2" if args.squad_version == "v2" else "squad_v1"
+    print(f"[Data] Loading '{name}' under {args.data}")
     raw = load_dataset(name, cache_dir=os.environ["HF_DATASETS_CACHE"],
                        download_mode=DownloadMode.FORCE_REDOWNLOAD if args.force_download else DownloadMode.REUSE_DATASET_IF_EXISTS)
 
