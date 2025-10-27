@@ -574,7 +574,9 @@ def main():
     args.seed = args.seed + args.rank * 1000
 
     if args.straggle_k:
-        print(f"!! Straggler mitigation enabled with straggle_k={args.straggle_k} !!")
+        print(f"!! Straggler mitigation ENABLED with straggle_k={args.straggle_k} !!")
+    else:
+        print(f"!! Straggler mitigation ENABLED !!")
 
     if args.deterministic:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
