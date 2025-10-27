@@ -97,7 +97,7 @@ sudo -E $(which python) experiments/train/lstm3.py \
   --epochs 10 \
   --batch_size 64 \
   --learning_rate 0.0015 \
-  --weight_decay 3e-05 \
+  --weight_decay 1e-05 \
   --label_smoothing 0.0 \
   --cosine_min_lr_mult 0.0 \
   --max_len 96 \
