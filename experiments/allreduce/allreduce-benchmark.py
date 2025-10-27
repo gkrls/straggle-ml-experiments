@@ -114,7 +114,8 @@ def benchmark(args):
     dist.barrier()
     
     # DPA context options
-    dpa_ctx = {"quantization": args.dpa_qnt, "averaging": args.dpa_avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, "straggle": args.world_size}
+    dpa_ctx = {"quantization": args.dpa_qnt, "averaging": args.dpa_avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, 
+               "straggle": args.world_size if not args.straggle_k else args.straggle_k}
 
     def run_allreduce(t):
         if args.backend.startswith("dpa"):
@@ -397,6 +398,7 @@ if __name__ == "__main__":
     parser.add_argument("--dpa_pre", action="store_true", help="Prescaling")
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
 
+    parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
     parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle before each allreduce call")
     
     args = parser.parse_args()
