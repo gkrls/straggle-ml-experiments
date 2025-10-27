@@ -96,11 +96,11 @@ sudo -E $(which python) experiments/train/lstm3.py \
   --backend $BACKEND \
   --epochs 12 \
   --batch_size 32 \
-  --learning_rate 0.002 \
+  --learning_rate 0.0012 \
   --weight_decay 1e-05 \
-  --label_smoothing 0.01 \
-  --cosine_min_lr_mult 0.2 \
-  --max_len 80 \
+  --label_smoothing 0.0 \
+  --cosine_min_lr_mult 0.0 \
+  --max_len 96 \
   --max_vocab 60000 \
   --workers 4 \
   --prefetch_factor 4 \

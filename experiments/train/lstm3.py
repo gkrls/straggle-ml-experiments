@@ -479,12 +479,14 @@ def train(args):
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, step_scheduler,
                                         device, scaler, num_classes=args.num_classes, ema=ema)
         
-        eval_model = swa_model if swa_active else model
+        # eval_model = swa_model if swa_active else model
 
         raw_state = [p.detach().clone() for p in unwrap(model).parameters()]
         ema.load_shadow(unwrap(model))
         val_metrics = validate(model, val_loader, device, args, num_classes=args.num_classes)
-
+        with torch.no_grad():
+            for p, r in zip(unwrap(model).parameters(), raw_state):
+                p.copy_(r)
         # train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, scheduler, device, scaler,
         #                                 num_classes=args.num_classes)
         # val_metrics   = validate(model, val_loader, device, args, num_classes=args.num_classes)
