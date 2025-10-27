@@ -147,9 +147,11 @@ class LSTMTextModel(nn.Module):
 
     def forward(self, x, lengths: Optional[torch.Tensor] = None):
         # --- word dropout (train-time only; keep PAD intact) ---
-        if self.training and WORD_DROPOUT_P > 0:
-            drop = (torch.rand_like(x, dtype=torch.float32) < WORD_DROPOUT_P) & (x != PAD_ID)
-            x = torch.where(drop, torch.full_like(x, UNK_ID), x)
+        if self.training:
+            x = self.word_dropout(x.unsqueeze(1)).squeeze(1)
+        # if self.training and WORD_DROPOUT_P > 0:
+        #     drop = (torch.rand_like(x, dtype=torch.float32) < WORD_DROPOUT_P) & (x != PAD_ID)
+        #     x = torch.where(drop, torch.full_like(x, UNK_ID), x)
 
         emb = self.emb_drop(self.embedding(x))
 
@@ -535,8 +537,8 @@ def main():
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.0015) # 0.001
-    parser.add_argument('--weight_decay', type=float, default=1e-05) # 1e-05
+    parser.add_argument('--learning_rate', type=float, default=0.0012) # 0.001
+    parser.add_argument('--weight_decay', type=float, default=2e-05) # 1e-05
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
