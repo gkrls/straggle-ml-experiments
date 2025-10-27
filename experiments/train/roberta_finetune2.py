@@ -296,7 +296,7 @@ def train_one_epoch(model, loader, minival_loader, optim, sched, device, scaler,
             mid = validate(model, minival_loader, device, args)
             # if args.rank == 0:
             print(
-                f"[{now()}][MiniVal][Epoch {epoch:03d} Step {step+1:05d}] "
+                f"[{now()}][MiniVal][Epoch {epoch:03d} Step {step:05d}] "
                 f"val_loss={mid['loss']:.4f} val_em={mid['em']:.2f}% val_f1={mid['f1']:.2f}%",
                 flush=True
             )
