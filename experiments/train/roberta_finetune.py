@@ -497,7 +497,7 @@ def main():
     p.add_argument("--backend", type=str, default="nccl", choices=["nccl", "gloo", "dpa_dpdk"])
     p.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     p.add_argument("--device", type=str, choices=["cuda", "cpu"], default="cuda")
-    p.add_argument("--deterministic", action="store_true"); p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--deterministic", action="store_true")
     p.add_argument('--seed', type=int, default=42)
     p.add_argument("--workers", type=int, default=4)
 
