@@ -131,13 +131,16 @@ def benchmark(args):
             jobs = []
             
             # Warmup
-            for i in range(args.warmup):  jobs.append(dist.all_reduce(tensors[i], op=dist.ReduceOp.SUM, async_op=True))
+            for i in range(args.warmup): 
+                jobs.append(dist.all_reduce(tensors[i], op=dist.ReduceOp.SUM, async_op=True))
             for j in jobs: j.wait()
             jobs.clear()
             
             # Timed iterations - use same timing method for both CPU and CUDA
             t_start = time.time_ns()
-            for i in range(args.iters): jobs.append(dist.all_reduce(tensors[args.warmup + i], op=dist.ReduceOp.SUM, async_op=True))
+            for i in range(args.iters):
+                if args.straggle_ms: time.sleep(args.straggle / 1000)
+                jobs.append(dist.all_reduce(tensors[args.warmup + i], op=dist.ReduceOp.SUM, async_op=True))
             for j in jobs: j.wait()
             # for j in jobs: j.synchronize()
             torch.cuda.synchronize()
@@ -155,6 +158,8 @@ def benchmark(args):
 
             times = []
             for i in range(args.iters):
+                if args.straggle_ms: time.sleep(args.straggle / 1000)
+                
                 # Use consistent timing for both CPU and CUDA
                 if args.device == "cuda": torch.cuda.synchronize()
                 
@@ -391,6 +396,8 @@ if __name__ == "__main__":
     parser.add_argument("--dpa_avg", action="store_true", help="Averaging")
     parser.add_argument("--dpa_pre", action="store_true", help="Prescaling")
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
+
+    parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle before each allreduce call")
     
     args = parser.parse_args()
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
