@@ -145,9 +145,6 @@ class LSTMTextModel(nn.Module):
             nn.Linear(512, num_classes),
         )
 
-        print(f"Model 'lstm_big' initialized. (embed={embed_dim}, hidden={hidden_dim}, layers={num_layers}, drop={dropout})", flush=True)
-
-
     def forward(self, x, lengths: Optional[torch.Tensor] = None):
         # --- word dropout (train-time only; keep PAD intact) ---
         # if self.training:
@@ -333,18 +330,9 @@ def save_log(path, log):
 
 # ------------------------- Dataloaders ------------------------------
 
-def _seed_worker(worker_id, base_seed, rank):
-    worker_seed = (base_seed + 1000 * rank + worker_id) % (2**32)
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
-    torch.manual_seed(worker_seed)
-
 def get_dataloaders(args, vocab: dict):
     train_ds = SSTDataset("train", vocab, max_len=args.max_len)
     val_ds   = SSTDataset("validation", vocab, max_len=args.max_len)
-
-    g = torch.Generator()
-    g.manual_seed(args.seed + args.rank)
 
     train_sampler = DistributedSampler(
         train_ds, num_replicas=args.world_size, rank=args.rank,
@@ -355,18 +343,14 @@ def get_dataloaders(args, vocab: dict):
         shuffle=False, drop_last=args.drop_last_val, seed=args.seed
     )
 
-    # train_loader = DataLoader(
-    #     train_ds, batch_size=args.batch_size, sampler=train_sampler,
-    #     num_workers=args.workers, pin_memory=True,
-    #     persistent_workers=True, prefetch_factor=args.prefetch_factor
-    # )
-    # val_loader = DataLoader(
-    #     val_ds, batch_size=args.batch_size, sampler=val_sampler, shuffle=False,
-    #     num_workers=args.workers, pin_memory=True,
-    #     persistent_workers=True, prefetch_factor=args.prefetch_factor
-    # )
+    def _seed_worker(worker_id, base_seed, rank):
+        s = (base_seed + 1000 * rank + worker_id) % (2**32)
+        np.random.seed(s); random.seed(s); torch.manual_seed(s)
 
-    seed_fn = lambda wid: _seed_worker(wid, args.seed, args.rank)
+    g = torch.Generator()
+    g.manual_seed(args.seed)  # same across ranks; sampler handles sharding
+
+    seed_fn = (lambda wid: _seed_worker(wid, args.seed, args.rank))
 
     train_loader = DataLoader(
         train_ds, batch_size=args.batch_size, sampler=train_sampler,
@@ -406,6 +390,7 @@ def train(args):
     model = LSTMTextModel(vocab_size=len(vocab), num_classes=args.num_classes).to(device)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
+    print(f"Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.6)", flush=True)
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
@@ -571,8 +556,8 @@ def main():
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
     parser.add_argument("--drop_last_val", action='store_true')
-    parser.add_argument("--label_smoothing", type=float, default=0.00, help="CrossEntropy label smoothing") # 0.05
-    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.0,
+    parser.add_argument("--label_smoothing", type=float, default=0.00, help="CrossEntropy label smoothing") # 0.02 # 0.05
+    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.0, # 0.1
                         help="Cosine LR floor as a fraction of base LR (e.g., 0.15 keeps LR >= 15% of base)") # 0.15
     # Text knobs
     parser.add_argument("--max_len", type=int, default=64, help="Max tokens per sample") # 50
