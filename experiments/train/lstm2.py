@@ -584,8 +584,9 @@ def main():
 
     args = parser.parse_args()
 
-    if args.deterministic:
-        args.seed = args.seed + args.rank
+    args.seed = args.seed + args.rank * 1000
+
+    if args.deterministic:  
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         os.environ["PYTHONHASHSEED"] = str(args.seed)
         torch.use_deterministic_algorithms(True, warn_only=True)
