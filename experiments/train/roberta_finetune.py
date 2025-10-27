@@ -341,7 +341,7 @@ def train(args):
     straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)      
     if straggle.attach(model): print(f"Straggle sim initialized with {straggle}")
     else: print(f"Straggle sim inactive")
-
+ 
     # Optim + sched
     base = model.module if hasattr(model, "module") else model
     decay, no_decay = [], []
@@ -378,7 +378,7 @@ def train(args):
               f"lr={cur_lr:.6f} steps={int(len(train_loader))} epoch_time={epoch_time:.2f}s "
               f"step_time={train_m['step_time']:.2f}s (min={train_m['step_time_min']:.2f}s, max={train_m['step_time_max']:.2f}s) "
               f"tp=~{train_m['throughput']:.1f} samples/s",
-              f"straggle_events={straggle.get_stats().get('num_straggle_events', 0)}",, flush=True)
+              f"straggle_events={straggle.get_stats().get('num_straggle_events', 0)}", flush=True)
 
         epoch_log = {
             "lr": float(cur_lr),
