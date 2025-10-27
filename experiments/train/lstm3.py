@@ -269,10 +269,10 @@ def train(args):
 
     # Model
     model = BiLSTMPool(vocab_size=len(vocab), num_classes=args.num_classes,
-                       embed_dim=300, hidden_dim=512, num_layers=2, lstm_dropout=0.5, head_dropout=0.5).to(device)
+                       embed_dim=300, hidden_dim=args.hidden_dim, num_layers=2, lstm_dropout=0.5, head_dropout=0.5).to(device)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    print(f"Model 'bilstm_maxpool' (embed=300, hidden=512, layers=2, lstm_drop=0.5, head_drop=0.5)", flush=True)
+    print(f"Model 'bilstm_maxpool' (embed=300, hidden={args.hidden_dim}, layers=2, lstm_drop=0.5, head_drop=0.5)", flush=True)
     unwrap(model).lstm.flatten_parameters()  # remove cuDNN warning
 
     # Straggle sim (keep yours)
@@ -420,6 +420,7 @@ def main():
     parser.add_argument("--label_smoothing", type=float, default=0.0, help="CrossEntropy label smoothing")
     parser.add_argument("--cosine_min_lr_mult", type=float, default=0.0, help="Cosine LR floor as a fraction of base LR")
     # Text knobs
+    parser.add_argument("--hidden_dim", type=int, default=512, help="LSTM hidden dim")
     parser.add_argument("--max_len", type=int, default=96, help="Max tokens per sample")
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
 
