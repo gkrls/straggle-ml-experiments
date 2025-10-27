@@ -127,13 +127,15 @@ def benchmark(args):
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
 
+    op = dist.ReduceOp.AVG if (args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre)) else dist.ReduceOp.SUM
+
     with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
         if args.batch:
             jobs = []
             
             # Warmup
             for i in range(args.warmup): 
-                jobs.append(dist.all_reduce(tensors[i], op=dist.ReduceOp.SUM, async_op=True))
+                jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
             for j in jobs: j.wait()
             jobs.clear()
             
@@ -141,7 +143,7 @@ def benchmark(args):
             t_start = time.time_ns()
             for i in range(args.iters):
                 if args.straggle_ms: time.sleep(args.straggle_ms / 1000)
-                jobs.append(dist.all_reduce(tensors[args.warmup + i], op=dist.ReduceOp.SUM, async_op=True))
+                jobs.append(dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True))
             for j in jobs: j.wait()
             # for j in jobs: j.synchronize()
             torch.cuda.synchronize()
@@ -154,7 +156,7 @@ def benchmark(args):
         # Per-iteration mode (sync each)
         else:
             for i in range(args.warmup):
-                dist.all_reduce(tensors[i], op=dist.ReduceOp.SUM, async_op=True).wait()
+                dist.all_reduce(tensors[i], op=op, async_op=True).wait()
                 # run_allreduce(tensors[i]).wait()
 
             times = []
@@ -165,7 +167,7 @@ def benchmark(args):
                 if args.device == "cuda": torch.cuda.synchronize()
                 
                 t_start = time.time_ns()
-                dist.all_reduce(tensors[args.warmup + i], op=dist.ReduceOp.SUM, async_op=True).wait()
+                dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True).wait()
                 # run_allreduce(tensors[args.warmup + i]).wait()
                 
                 if args.device == "cuda": torch.cuda.synchronize()
@@ -319,7 +321,7 @@ def benchmark(args):
     print(f"{'='*50}\n")
     
     if args.verify:
-        if args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre):
+        if op != dist.ReduceOp.SUM:
             raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
 
         local_ok, first_failure = True, True
