@@ -2,13 +2,13 @@ import json, os
 import matplotlib.pyplot as plt
 import numpy as np
 
-FILE1='../experiments/train/results/vgg11_straggle_16.json'
-FILE2='../experiments/train/results/vgg11.json'
+FILE1='../experiments/train/results/lstm_straggle_16.json'
+FILE2='../experiments/train/results/lstm.json'
 FILE1=os.path.join(os.path.dirname(__file__), FILE1)
 FILE2=os.path.join(os.path.dirname(__file__), FILE2)
-METRIC="val_top5"
-YLABEL="Top5 Accuracy"
-TARGET=80
+METRIC="val_top1"
+YLABEL="Top1 Accuracy"
+TARGET=83
 
 # Read the first dataset (baseline)
 with open(FILE1, 'r') as f:

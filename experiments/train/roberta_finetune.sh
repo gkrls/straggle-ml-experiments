@@ -86,7 +86,30 @@ set -x
 GDB='gdb -ex run --args'
 
 set -x
-sudo -E $(which python) experiments/train/roberta_finetune.py \
+# squad_v1
+# sudo -E $(which python) experiments/train/roberta_finetune.py \
+#   --rank "$RANK" \
+#   --world_size "$WORLD_SIZE" \
+#   --iface "$IFACE" \
+#   --master_addr "$MASTER_ADDR" \
+#   --master_port "$MASTER_PORT" \
+#   --backend $BACKEND \
+#   --dpa_conf $DPA_CONF \
+#   --data ~/datasets/squad_v1 \
+#   --squad_version v1 \
+#   --n_best_size 100 \
+#   --epochs 6 \
+#   --batch_size 32 \
+#   --learning_rate 5e-5 \
+#   --warmup_ratio 0.1 \
+#   --deterministic \
+#   --workers 4 \
+#   --prefetch_factor 4 \
+#   --log_interval 20 \
+#   --json experiments/train/roberta_finetune.json \
+#   "$@"
+
+sudo -E $(which python) experiments/train/roberta_finetune2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -95,15 +118,17 @@ sudo -E $(which python) experiments/train/roberta_finetune.py \
   --backend $BACKEND \
   --dpa_conf $DPA_CONF \
   --data ~/datasets/squad_v1 \
-  --squad_version v1 \
+  --squad_version v2 \
   --n_best_size 100 \
-  --epochs 4 \
+  --epochs 8 \
   --batch_size 32 \
-  --learning_rate 5e-5 \
-  --warmup_ratio 0.1 \
+  --learning_rate 3e-5 \
+  --warmup_ratio 0.2 \
   --deterministic \
   --workers 4 \
   --prefetch_factor 4 \
-  --log_interval 10 \
+  --log_interval 20 \
+  --val_every 150 \
+  --val_every_subset 0.25 \
   --json experiments/train/roberta_finetune.json \
   "$@"

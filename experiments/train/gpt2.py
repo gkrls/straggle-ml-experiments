@@ -364,27 +364,25 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                     and step_count % args.mini_val_every_steps == 0):
                 val_metrics = validate(model, val_loader, device, args, max_batches=getattr(args, "mini_val_max_batches", 64))
                 model.train()
-                if args.rank == 0:
-                    print(
-                        f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
-                        f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
-                        flush=True
-                    )
-                    if args.json:
-                        try:
-                            with open(args.json, "r") as f:
-                                log = json.load(f)
-                                updates_minival = log.setdefault("minival", {})
-                                epm = updates_minival.setdefault(str(epoch), {})
-                                epm[f"{step_count:04d}"] = {
-                                    "global_step": int(global_step),
-                                    "mini_val_loss": float(val_metrics['loss']),
-                                    "mini_val_ppl":  float(val_metrics['ppl']),
-                                    "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
-                                }
-                            save_log(args.json, log)
-                        except Exception as e:
-                            print(f"[{now()}][Warning] Failed to update JSON log (mini-val): {e}", flush=True)
+                # if args.rank == 0:
+                print(f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
+                      f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
+                      flush=True)
+                if args.json:
+                    try:
+                        with open(args.json, "r") as f:
+                            log = json.load(f)
+                            updates_minival = log.setdefault("minival", {})
+                            epm = updates_minival.setdefault(str(epoch), {})
+                            epm[f"{step_count:04d}"] = {
+                                "global_step": int(global_step),
+                                "mini_val_loss": float(val_metrics['loss']),
+                                "mini_val_ppl":  float(val_metrics['ppl']),
+                                "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
+                            }
+                        save_log(args.json, log)
+                    except Exception as e:
+                        print(f"[{now()}][Warning] Failed to update JSON log (mini-val): {e}", flush=True)
 
         # optional epoch cap by micro-steps
         if args.micro_steps_per_epoch and micro_count >= args.micro_steps_per_epoch:
