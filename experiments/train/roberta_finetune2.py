@@ -392,7 +392,8 @@ def train(args):
     if args.backend.startswith("dpa") and dpa is not None:
         model = dpa.DDPWrapper(model, straggle=args.world_size, prescale=args.prescale)
     # Straggle sim
-    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, multiplier_range=args.straggle_multiply, amount=args.straggle_amount, ranks=args.straggle_ranks)    
+    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, multiplier_range=args.straggle_multiply, 
+                                  amount=args.straggle_amount, ranks=args.straggle_ranks, verbose=args.straggle_verbose)    
     if straggle.attach(model): print(f"Straggle sim initialized with {straggle}")
     else: print(f"Straggle sim inactive")
  
