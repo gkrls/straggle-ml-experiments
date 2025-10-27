@@ -403,8 +403,11 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args, vocab)
 
     # Model
-    model = BiLSTMMeanMax(vocab_size=len(vocab), num_classes=args.num_classes,
-                       embed_dim=300, hidden_dim=args.hidden_dim, num_layers=2, lstm_dropout=0.5, head_dropout=0.5).to(device)
+    model = LSTMSimpleStrong(vocab_size=len(vocab), num_classes=args.num_classes, embed_dim=300,
+                             hidden_dim=args.hidden_dim if hasattr(args, "hidden_dim") else 768, num_layers=2, lstm_dropout=0.5, head_dropout=0.5  # try 0.4 if overfit
+    ).to(device)
+    
+
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
     

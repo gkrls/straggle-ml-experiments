@@ -1,0 +1,126 @@
+[lstm.sh.24923] iface=ens4f1 ip=42.0.1.1 rank=0 world_size=6 master=42.0.1.1:29500 backend=dpa_dpdk
++ GDB='gdb -ex run --args'
+++ which python
++ sudo -E /home/gks/straggle-ml-experiments/venv/bin/python experiments/train/lstm3.py --rank 0 --world_size 6 --iface ens4f1 --master_addr 42.0.1.1 --master_port 29500 --dpa_conf /home/gks/straggle-ml-experiments/configs/edgecore.json --backend dpa_dpdk --ep
+ochs 10 --batch_size 64 --learning_rate 0.0015 --weight_decay 1e-05 --label_smoothing 0.0 --cosine_min_lr_mult 0.0 --max_len 96 --max_vocab 60000 --hidden_dim 768 --workers 4 --prefetch_factor 4 --hint_tensor_size 100000000 --hint_tensor_count 5 --json experi
+ments/train/lstm.json
+dpa: reading DPDK backend options from config.json: /home/gks/straggle-ml-experiments/configs/edgecore.json
+dpa: [warn] session.pool.seqnums not supplied => assuming 1,1,1...
+dpa: Using address '42.0.1.1', inferred from iface 'ens4f1'
+dpa: ====================================================================================================
+dpa: context: rank=0 world=6 build=0.1.0-Release avx=2
+dpa: device : edgecore-dcs810 42.0.1.0:4242 pipes=4 quants=1 reducers=32 mode=2 slots=16384 straggle_aware=true
+dpa:          session.1
+dpa:           slots_pool_alloc: 0-16384
+dpa:           starting_seqnums: 1,1,1,1 ... 1,1,1,1
+dpa:           straggle_timeout: 1000.00 ms
+dpa:           gress_drops_prob: 0.00/0.00 %
+dpa: backend: dpa-dpdk 42.0.1.1:4242, iface 'ens4f1' threads 4 (async) window 512 subpool 0-4096 (12288 unused) loop_ns=no
+dpa:      max_outstanding: 2048 packets
+dpa:          RTT timeout: 1500 usec
+dpa:          TX/RX intrv: 20/0 usec
+dpa:          TX/RX burst: 128/128
+dpa:          TX/RX rings: 1024/1024
+dpa:          TX/RX mpool: 65536/65536
+dpa:          TX/RX cache: 512/512
+dpa:             eal_port: 0000:41:00.1 (virtual=no)
+dpa:           eal_lcores: 0-4
+dpa:       eal_extra_args: n/a
+dpa: ====================================================================================================
+dpa: Using EAL args: dpa-dpdk -l 0-4 --main-lcore 0 --file-prefix dpa-dpdk -a 0000:41:00.1
+EAL: Detected CPU lcores: 24
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/dpa-dpdk/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: No free 2048 kB hugepages reported on node 0
+EAL: Probe PCI driver: mlx5_pci (15b3:101d) device: 0000:41:00.1 (socket -1)
+dpa: DPDK link status: UP, speed: 100000
+dpa: DPDK runtime ring size: RX=1024 TX=1024
+dpa: Promiscuous mode disabled: success
+dpa: Flow created: UDP dst=4242 -> queue 0
+dpa: Flow created: UDP dst=4243 -> queue 1
+dpa: Flow created: UDP dst=4244 -> queue 2
+dpa: Flow created: UDP dst=4245 -> queue 3
+Port configured with 4 RX queues and 4 TX queues
+dpa: DPDK device configured succefully. Port: 0, address 10:70:FD:DF:A5:AB
+dpa: DPDK eth link up. Speed 100000 Mbps Full-duplex
+dpa.torch: pinned mempool enabled with 5 tensors of 100000000 bytes
+[DDP] backend=dpa_dpdk world_size=6 master=42.0.1.1:29500 iface=ens4f1 local_rank=0
+{
+  "rank": 0,
+  "world_size": 6,
+  "iface": "ens4f1",
+  "master_addr": "42.0.1.1",
+  "master_port": 29500,
+  "backend": "dpa_dpdk",
+  "dpa_conf": "/home/gks/straggle-ml-experiments/configs/edgecore.json",
+  "device": "cuda",
+  "deterministic": false,
+  "workers": 4,
+  "prefetch_factor": 4,
+  "static_graph": false,
+  "seed": 42,
+  "json": "experiments/train/lstm.json",
+  "epochs": 10,
+  "batch_size": 64,
+  "learning_rate": 0.0015,
+  "weight_decay": 1e-05,
+  "num_classes": 2,
+  "amp": false,
+  "drop_last_train": false,
+  "drop_last_val": false,
+  "label_smoothing": 0.0,
+  "cosine_min_lr_mult": 0.0,
+  "hidden_dim": 768,
+  "max_len": 96,
+  "max_vocab": 60000,
+  "straggle_points": 0,
+  "straggle_prob": 0,
+  "straggle_ranks": [],
+  "straggle_amount": 0,
+  "straggle_multiply": [
+    1.0,
+    1.0
+  ],
+  "straggle_verbose": false,
+  "prescale": false,
+  "bucket_cap_mb": null,
+  "hint_tensor_size": 100000000,
+  "hint_tensor_count": 5,
+  "local_rank": 0
+}
+[Vocab] size=14495 (includes PAD/UNK)
+/home/gks/straggle-ml-experiments/venv/lib/python3.12/site-packages/torch/utils/data/dataloader.py:626: UserWarning: This DataLoader will create 4 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what
+ this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(
+dpa.torch.py: DDP DPAState Object:  {'pipes': 0, 'straggle': 6, 'averaging': True, 'prescaled': False}
+Model 'bilstm_maxpool' (embed=300, hidden=768, layers=2, lstm_drop=0.5, head_drop=0.5)
+[straggle_sim][warning] created but effectively inactive -- points: 0, prob: 0.0, amount: 0.0
+Straggle sim inactive
+[2025-10-27 02:22:06][Epoch 000] ...
+/home/gks/straggle-ml-experiments/venv/lib/python3.12/site-packages/torch/utils/data/dataloader.py:626: UserWarning: This DataLoader will create 4 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what
+ this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(
+RETURNING PINNED - need: 106684760 got: 100000000 !!!
+[2025-10-27 02:22:20][Epoch 000] train_loss=0.5792 (global=0.5741) val_loss=0.5580 top1=73.97% top5=100.00% lr=0.001500 epoch_time=13.58s step_time=0.08 (min=0.06s, max=0.76) tp=~842.0 samples/s straggle_events=0
+[2025-10-27 02:22:20][Epoch 001] ...
+[2025-10-27 02:22:33][Epoch 001] train_loss=0.3538 (global=0.3505) val_loss=0.5131 top1=75.68% top5=100.00% lr=0.001455 epoch_time=12.84s step_time=0.07 (min=0.06s, max=0.16) tp=~879.2 samples/s straggle_events=0
+[2025-10-27 02:22:33][Epoch 002] ...
+[2025-10-27 02:22:46][Epoch 002] train_loss=0.2153 (global=0.2183) val_loss=0.4657 top1=81.16% top5=100.00% lr=0.001325 epoch_time=12.87s step_time=0.07 (min=0.05s, max=0.15) tp=~877.3 samples/s straggle_events=0
+[2025-10-27 02:22:46][Epoch 003] ...
+[2025-10-27 02:22:58][Epoch 003] train_loss=0.1450 (global=0.1486) val_loss=0.4482 top1=82.53% top5=100.00% lr=0.001125 epoch_time=12.79s step_time=0.07 (min=0.06s, max=0.16) tp=~881.8 samples/s straggle_events=0
+[2025-10-27 02:22:58][Epoch 004] ...
+[2025-10-27 02:23:11][Epoch 004] train_loss=0.1093 (global=0.1026) val_loss=0.5647 top1=82.42% top5=100.00% lr=0.000880 epoch_time=12.82s step_time=0.07 (min=0.05s, max=0.16) tp=~880.3 samples/s straggle_events=0
+[2025-10-27 02:23:11][Epoch 005] ...
+[2025-10-27 02:23:24][Epoch 005] train_loss=0.0709 (global=0.0695) val_loss=0.5936 top1=82.65% top5=100.00% lr=0.000620 epoch_time=12.82s step_time=0.07 (min=0.05s, max=0.15) tp=~880.1 samples/s straggle_events=0
+[2025-10-27 02:23:24][Epoch 006] ...
+[2025-10-27 02:23:37][Epoch 006] train_loss=0.0493 (global=0.0475) val_loss=0.7095 top1=82.65% top5=100.00% lr=0.000375 epoch_time=12.88s step_time=0.07 (min=0.06s, max=0.15) tp=~876.2 samples/s straggle_events=0
+[2025-10-27 02:23:37][Epoch 007] ...
+[2025-10-27 02:23:50][Epoch 007] train_loss=0.0278 (global=0.0316) val_loss=0.8105 top1=82.65% top5=100.00% lr=0.000175 epoch_time=12.82s step_time=0.07 (min=0.06s, max=0.15) tp=~880.0 samples/s straggle_events=0
+[2025-10-27 02:23:50][Epoch 008] ...
+[2025-10-27 02:24:03][Epoch 008] train_loss=0.0234 (global=0.0223) val_loss=0.9915 top1=83.45% top5=100.00% lr=0.000045 epoch_time=12.86s step_time=0.07 (min=0.05s, max=0.17) tp=~877.5 samples/s straggle_events=0
+[2025-10-27 02:24:03][Epoch 009] ...
+[2025-10-27 02:24:16][Epoch 009] train_loss=0.0196 (global=0.0186) val_loss=1.0433 top1=83.56% top5=100.00% lr=0.000000 epoch_time=12.81s step_time=0.07 (min=0.05s, max=0.16) tp=~880.4 samples/s straggle_events=0
+dpa: backend finished with pool[0:4096] seqnums: 51918,51917,51918,51917,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038...
+dpa: ctx-1 killed by thread 1441592, 0 tasks ignored
