@@ -96,6 +96,7 @@ sudo -E $(which python) experiments/train/lstm2.py \
   --backend $BACKEND \
   --workers 4 \
   --prefetch_factor 4 \
+  --learning_rate 0.001 \
   --hint_tensor_size 100000000 \
   --hint_tensor_count 5 \
   --json experiments/train/lstm.json \

@@ -23,22 +23,24 @@ import dpa
 # ------------------------- Fixed NLP defaults (no external downloads) -------------------------
 PAD_ID         = 0
 UNK_ID         = 1
-MIN_FREQ       = 1
-WORD_DROPOUT_P = 0.0  # DISABLED for determinism
-EMB_DROPOUT_P  = 0.1
+MIN_FREQ       = 1            # keep rare tokens (helps sentiment)
+WORD_DROPOUT_P = 0.05 #0.15         # bumped from 0.10
+EMB_DROPOUT_P  = 0.1 #0.20         # bumped from 0.10
 CLIP_NORM      = 5.0
-WARMUP_RATIO   = 0.10
+WARMUP_RATIO   = 0.10         # 10% warmup for cosine
 
 # ------------------------- Tokenizer / Vocab ------------------------------
+
 _token_re = re.compile(r"[a-z0-9']+|[!?.,;:()\-]+")
 
 def simple_tokenizer(text: str) -> List[str]:
     text = text.lower().replace("\n", " ")
-    text = re.sub(r"\d+", "<num>", text)
+    text = re.sub(r"\d+", "<num>", text)  # fold numbers
     return _token_re.findall(text)
 
 def build_vocab_sst(max_vocab: Optional[int], min_freq: int) -> dict:
     from collections import Counter
+    # build from train + validation to reduce OOV (no external data)
     ds_train = load_dataset("glue", "sst2", split="train")
     ds_val   = load_dataset("glue", "sst2", split="validation")
     ctr = Counter()
@@ -64,6 +66,7 @@ def encode(text: str, vocab: dict, max_len: int) -> Tuple[torch.Tensor, int]:
     return torch.tensor(ids, dtype=torch.long), length
 
 # ------------------------- Dataset ------------------------------
+
 class SSTDataset(Dataset):
     def __init__(self, split: str, vocab: dict, max_len: int = 128):
         self.data = load_dataset("glue", "sst2", split=split)
@@ -76,6 +79,7 @@ class SSTDataset(Dataset):
         return x, torch.tensor(item["label"], dtype=torch.long), torch.tensor(length, dtype=torch.long)
 
 # ------------------------- Metrics ------------------------------
+
 class AverageMeter:
     def __init__(self): self.reset()
     def reset(self):
@@ -107,444 +111,386 @@ def accuracy_topk(output: torch.Tensor, target: torch.Tensor, num_classes: int, 
         res.append(correct_k.mul_(100.0 / batch))
     return res
 
-# ------------------------- PROVEN LSTM MODEL FROM LITERATURE ------------------------------
-class ProvenLSTM(nn.Module):
+# ------------------------- Model (only BIG preset) ------------------------------
+
+class LSTMTextModel(nn.Module):
     """
-    Standard BiLSTM for text classification - architecture proven to work on SST2
-    Based on "Supervised Learning of Universal Sentence Representations" (2017)
-    and standard BiLSTM baselines that achieve 85%+ on SST2
+    2-layer BiLSTM encoder + pooled readout:
+      - mean pool (masked)
+      - max  pool (masked)
+      - single-head self-attention pooling (fp16 safe)
+    Final feature -> LayerNorm -> small MLP head.
     """
     def __init__(self, vocab_size, num_classes=2):
         super().__init__()
-        
-        # Standard dimensions from literature
-        embed_dim = 300
+        embed_dim  = 300
         hidden_dim = 512
-        num_layers = 1  # Single layer BiLSTM often works best for SST2
-        dropout = 0.5
-        
-        # Embedding layer
+        num_layers = 2
+        dropout    = 0.3   # bumped from 0.5
+
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
-        self.embed_dropout = nn.Dropout(p=0.5)
-        
-        # BiLSTM 
-        self.lstm = nn.LSTM(
-            embed_dim, 
-            hidden_dim,
-            num_layers=num_layers,
-            batch_first=True,
-            bidirectional=True,
-            dropout=0 if num_layers == 1 else dropout
+        self.emb_drop = nn.Dropout(EMB_DROPOUT_P)
+
+        self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=num_layers,
+                            batch_first=True, bidirectional=True,
+                            dropout=dropout if num_layers > 1 else 0.0)
+
+        self.attn = nn.Linear(hidden_dim * 2, 1, bias=False)   # attention scores
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(hidden_dim * 2 * 3)
+        self.proj = nn.Sequential(
+            nn.Linear(hidden_dim * 2 * 3, 512),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(512, num_classes),
         )
-        
-        # Max pooling over time
-        # Output projection
-        self.dropout = nn.Dropout(p=dropout)
-        self.fc = nn.Linear(hidden_dim * 2, num_classes)
-        
-        # Initialize weights (important for stability)
-        self.init_weights()
-        
-    def init_weights(self):
-        # Initialize embeddings from uniform distribution
-        nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
-        nn.init.constant_(self.embedding.weight[PAD_ID], 0)
-        
-        # Initialize LSTM weights
-        for name, param in self.lstm.named_parameters():
-            if 'weight_ih' in name:
-                nn.init.xavier_uniform_(param)
-            elif 'weight_hh' in name:
-                nn.init.orthogonal_(param)
-            elif 'bias' in name:
-                nn.init.constant_(param, 0)
-                # Set forget gate bias to 1 (helps with gradient flow)
-                n = param.size(0)
-                param.data[n//4:n//2].fill_(1)
-        
-        # Initialize classifier
-        nn.init.xavier_uniform_(self.fc.weight)
-        nn.init.constant_(self.fc.bias, 0)
-        
-    def forward(self, x, lengths=None):
-        batch_size = x.size(0)
-        
-        # Embedding
-        embedded = self.embedding(x)  # (batch, seq_len, embed_dim)
-        embedded = self.embed_dropout(embedded)
-        
-        # Pack sequences for LSTM
-        if lengths is not None:
-            # Sort by length for packing
-            lengths_sorted, perm_idx = lengths.sort(0, descending=True)
-            x_sorted = embedded[perm_idx]
-            
-            # Pack
-            packed = nn.utils.rnn.pack_padded_sequence(
-                x_sorted, lengths_sorted.cpu(), batch_first=True
-            )
-            
-            # LSTM
-            lstm_out, (hidden, cell) = self.lstm(packed)
-            
-            # Unpack
-            lstm_out, _ = nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
-            
-            # Unsort
-            _, unsort_idx = perm_idx.sort(0)
-            lstm_out = lstm_out[unsort_idx]
-        else:
-            lstm_out, (hidden, cell) = self.lstm(embedded)
-        
-        # Max pooling over time
-        # Mask padding tokens
-        if lengths is not None:
-            mask = torch.arange(lstm_out.size(1), device=lstm_out.device).unsqueeze(0)
-            mask = mask < lengths.unsqueeze(1)
-            mask = mask.unsqueeze(2).expand_as(lstm_out)
-            lstm_out = lstm_out.masked_fill(~mask, float('-inf'))
-        
-        # Max pool
-        max_pooled, _ = torch.max(lstm_out, dim=1)  # (batch, hidden*2)
-        
-        # Handle case where entire sequence is padding
-        max_pooled[max_pooled == float('-inf')] = 0
-        
-        # Classifier
-        output = self.dropout(max_pooled)
-        output = self.fc(output)
-        
-        return output
 
-# ------------------------- Straggler Simulation ------------------------------
-class Straggle:
-    def __init__(self, args):
-        self.active = False
-        self.ranks_to_straggle = set()
-        self.amounts = {}
-        self.counts = {}
-        
-        if args.straggle_prob > 0 or len(args.straggle_ranks) > 0:
-            self.active = True
-            
-            if len(args.straggle_ranks) > 0:
-                self.ranks_to_straggle = set(args.straggle_ranks)
-            elif args.straggle_points > 0:
-                np.random.seed(args.seed)
-                self.ranks_to_straggle = set(np.random.choice(
-                    args.world_size, 
-                    size=min(args.straggle_points, args.world_size),
-                    replace=False
-                ))
-            
-            for rank in range(args.world_size):
-                self.counts[rank] = 0
-                if rank in self.ranks_to_straggle:
-                    if args.straggle_amount > 0:
-                        self.amounts[rank] = args.straggle_amount
-                    else:
-                        np.random.seed(args.seed + rank)
-                        mult = np.random.uniform(args.straggle_multiply[0], args.straggle_multiply[1])
-                        self.amounts[rank] = mult
-        
-        self.prob = args.straggle_prob
-        self.verbose = args.straggle_verbose
-        self.rank = args.rank
-    
-    def delay(self, step_idx: int = 0):
-        if not self.active:
-            return
-        
-        if self.rank in self.ranks_to_straggle:
-            np.random.seed(self.rank + step_idx)
-            if np.random.random() < self.prob or self.prob == 0:
-                delay_time = self.amounts[self.rank]
-                if delay_time > 1.0:
-                    base_sleep = 0.01
-                    actual_delay = base_sleep * delay_time
-                else:
-                    actual_delay = delay_time
-                
-                if self.verbose and self.rank == 0:
-                    print(f"[Straggle] Rank {self.rank} delaying {actual_delay:.3f}s", flush=True)
-                
-                time.sleep(actual_delay)
-                self.counts[self.rank] += 1
-    
-    def get_stats(self):
-        if not self.active:
-            return {}
-        
-        return {
-            "active_ranks": list(self.ranks_to_straggle),
-            "straggle_counts": self.counts,
-            "straggle_amounts": self.amounts
-        }
+        print(f"Model 'lstm_big' initialized. (embed={embed_dim}, hidden={hidden_dim}, layers={num_layers}, drop={dropout})", flush=True)
 
-# ------------------------- Training functions ------------------------------
-def train_epoch(model, loader, optimizer, criterion, scaler, scheduler, device, epoch, args):
-    model.train()
-    
-    metrics = {
-        'loss': AverageMeter(),
-        'top1': AverageMeter(),
-        'top5': AverageMeter(),
-        'data_time': AverageMeter(),
-        'comp_time': AverageMeter(),
-        'step_time': AverageMeter(),
-        'step_time_min': float('inf'),
-        'step_time_max': 0.0,
-    }
-    
-    end = time.time()
-    
-    for batch_idx, (inputs, targets, lengths) in enumerate(loader):
-        metrics['data_time'].update(time.time() - end)
-        
-        inputs = inputs.to(device, non_blocking=True)
-        targets = targets.to(device, non_blocking=True)
-        lengths = lengths.to(device, non_blocking=True)
-        
-        comp_start = time.time()
-        
-        with torch.cuda.amp.autocast(enabled=args.amp):
-            outputs = model(inputs, lengths)
-            loss = criterion(outputs, targets)
-            if args.prescale and args.world_size > 1:
-                loss = loss / args.world_size
-        
-        optimizer.zero_grad(set_to_none=True)
-        
-        if args.amp:
-            scaler.scale(loss).backward()
-            # straggle.delay(epoch * len(loader) + batch_idx)
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP_NORM)
-            scaler.step(optimizer)
-            scaler.update()
+
+    def forward(self, x, lengths: Optional[torch.Tensor] = None):
+        # --- word dropout (train-time only; keep PAD intact) ---
+        # if self.training:
+        #     x = self.word_dropout(x.unsqueeze(1)).squeeze(1)
+        # if self.training and WORD_DROPOUT_P > 0:
+        #     drop = (torch.rand_like(x, dtype=torch.float32) < WORD_DROPOUT_P) & (x != PAD_ID)
+        #     x = torch.where(drop, torch.full_like(x, UNK_ID), x)
+
+        emb = self.emb_drop(self.embedding(x))
+
+        if lengths is not None:
+            packed = nn.utils.rnn.pack_padded_sequence(emb, lengths.cpu(), batch_first=True, enforce_sorted=False)
+            out, _ = self.lstm(packed)
+            out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)  # (B, T, 2H)
+            T = out.size(1)
+            mask = (torch.arange(T, device=out.device).unsqueeze(0) < lengths.to(out.device).unsqueeze(1)).unsqueeze(-1)  # (B,T,1)
         else:
-            loss.backward()
-            # straggle.delay(epoch * len(loader) + batch_idx)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP_NORM)
-            optimizer.step()
-        
-        scheduler.step()
-        
-        acc1, acc5 = accuracy_topk(outputs.detach(), targets, args.num_classes, ks=(1, 5))
-        batch_size = inputs.size(0)
-        metrics['loss'].update(loss.item() * (args.world_size if args.prescale and args.world_size > 1 else 1), batch_size)
-        metrics['top1'].update(acc1.item(), batch_size)
-        metrics['top5'].update(acc5.item(), batch_size)
-        
-        comp_time = time.time() - comp_start
-        metrics['comp_time'].update(comp_time)
-        
-        step_time = time.time() - end
-        metrics['step_time'].update(step_time)
-        metrics['step_time_min'] = min(metrics['step_time_min'], step_time)
-        metrics['step_time_max'] = max(metrics['step_time_max'], step_time)
-        
-        end = time.time()
-    
-    for key in ['loss', 'top1', 'top5', 'data_time', 'comp_time', 'step_time']:
-        metrics[key].all_reduce()
-    
-    metrics['epoch_time'] = metrics['step_time'].sum
-    metrics['throughput'] = len(loader.dataset) / metrics['epoch_time'] if metrics['epoch_time'] > 0 else 0
-    
-    return metrics
+            out, _ = self.lstm(emb)
+            mask = torch.ones_like(out[..., :1], dtype=torch.bool)
+
+        # mean pool (masked)
+        out_masked = out.masked_fill(~mask, 0.0)
+        sum_pool = out_masked.sum(dim=1)
+        len_pool = mask.sum(dim=1).clamp(min=1)
+        mean_pool = sum_pool / len_pool
+
+        # max pool (masked)
+        out_neg_inf = out.masked_fill(~mask, float("-inf"))
+        max_pool, _ = out_neg_inf.max(dim=1)
+        max_pool[max_pool == float("-inf")] = 0.0
+
+        # attention pool (masked softmax), fp16-safe
+        scores = self.attn(out).squeeze(-1)      # (B,T)
+        mask_t = mask.squeeze(-1)                # (B,T)
+        fill = torch.finfo(scores.dtype).min if scores.dtype != torch.float64 else -1e9
+        scores = scores.masked_fill(~mask_t, fill)
+        alpha  = torch.softmax(scores, dim=1).unsqueeze(-1)  # (B,T,1)
+        attn_pool = (out * alpha).sum(dim=1)     # (B,2H)
+
+        feat = torch.cat([mean_pool, max_pool, attn_pool], dim=1)  # (B, 6H)
+        feat = self.norm(feat)
+        return self.proj(self.dropout(feat))
+
+# ------------------------- Scheduler (per-step cosine+warmup, with floor) ------------------------------
+
+def build_per_step_cosine(optimizer, total_steps: int, warmup_steps: int, min_lr_mult: float = 0.15):
+    """
+    Cosine schedule with warmup and a non-zero floor so LR never collapses.
+    Effective LR = base_lr * lambda(step); lambda in [min_lr_mult, 1].
+    """
+    def lr_lambda(step):
+        if step < warmup_steps:
+            return float(step + 1) / float(max(1, warmup_steps))
+        progress = (step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        progress = min(max(progress, 0.0), 1.0)
+        cos = 0.5 * (1.0 + math.cos(math.pi * progress))
+        return min_lr_mult + (1.0 - min_lr_mult) * cos
+    return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
+
+# ------------------------- Train / Eval ------------------------------
 
 @torch.no_grad()
-def validate(model, loader, criterion, device, args):
+def validate(model, loader, device, args, num_classes: int):
     model.eval()
-    metrics = {'loss': AverageMeter(), 'top1': AverageMeter(), 'top5': AverageMeter()}
-    
-    for inputs, targets, lengths in loader:
-        inputs = inputs.to(device, non_blocking=True)
-        targets = targets.to(device, non_blocking=True)
-        lengths = lengths.to(device, non_blocking=True)
-        
-        with torch.cuda.amp.autocast(enabled=args.amp):
-            outputs = model(inputs, lengths)
-            loss = criterion(outputs, targets)
-        
-        acc1, acc5 = accuracy_topk(outputs, targets, args.num_classes, ks=(1, 5))
-        batch_size = inputs.size(0)
-        
-        metrics['loss'].update(loss.item(), batch_size)
-        metrics['top1'].update(acc1.item(), batch_size)
-        metrics['top5'].update(acc5.item(), batch_size)
-    
-    for m in metrics.values():
-        m.all_reduce()
-    
-    return metrics
+    top1, top5, losses = AverageMeter(), AverageMeter(), AverageMeter()
+    criterion = nn.CrossEntropyLoss().to(device)
 
-def save_log(path, data):
-    with open(path, 'w') as f:
-        json.dump(data, f, indent=2, default=str)
+    def run_validation(dataloader):
+        for x, y, lengths in dataloader:
+            x = x.to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
+            out = model(x, lengths)   # lengths on CPU
+            loss = criterion(out, y)
+            a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
+            bs = y.size(0)
+            losses.update(loss.item(), bs)
+            top1.update(a1[0].item(), bs)
+            top5.update(a5[0].item(), bs)
 
-def train(args):
-    log = {
-        "args": vars(args),
-        "epochs": {}
+    run_validation(loader)
+    top1.all_reduce(); top5.all_reduce(); losses.all_reduce()
+
+    # Leftover handling 
+    if hasattr(loader, "sampler") and len(loader.sampler) * args.world_size < len(loader.dataset):
+        start = len(loader.sampler) * args.world_size
+        aux = Subset(loader.dataset, range(start, len(loader.dataset)))
+        aux_loader = DataLoader(aux, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
+        run_validation(aux_loader)
+
+    return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg}
+
+def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, scaler, num_classes: int):
+    model.train()
+    losses = AverageMeter(); top1 = AverageMeter(); top5 = AverageMeter()
+    step_time = AverageMeter(); data_time = AverageMeter()
+
+    # epoch timing
+    if device.type == 'cuda':
+        e_start = torch.cuda.Event(enable_timing=True); e_end = torch.cuda.Event(enable_timing=True); e_start.record()
+    else:
+        e_wall = time.perf_counter()
+
+    step_start = time.perf_counter()
+    samples_seen = 0.0
+
+    for x, y, lengths in dataloader:
+        data_time.update(time.perf_counter() - step_start, 1)
+
+        x = x.to(device, non_blocking=True)
+        y = y.to(device, non_blocking=True)
+        samples_seen += y.size(0)
+
+        optimizer.zero_grad(set_to_none=True)
+        if scaler is not None:
+            with torch.amp.autocast(device_type='cuda'):
+                out = model(x, lengths)  # lengths stays on CPU
+                loss = criterion(out, y)
+            scaler.scale(loss).backward()
+            if CLIP_NORM > 0:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
+            scaler.step(optimizer); scaler.update()
+        else:
+            out = model(x, lengths)
+            loss = criterion(out, y)
+            loss.backward()
+            if CLIP_NORM > 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
+            optimizer.step()
+
+        # per-step scheduler
+        scheduler.step()
+
+        # metrics
+        a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
+        bs = y.size(0)
+        losses.update(loss.item(), bs)
+        top1.update(a1[0].item(), bs)
+        top5.update(a5[0].item(), bs)
+
+        step_time.update(time.perf_counter() - step_start, 1)
+        step_start = time.perf_counter()
+
+    # epoch duration
+    if device.type == 'cuda':
+        e_end.record()
+        e_end.synchronize()
+        duration = e_start.elapsed_time(e_end) / 1000.0
+    else:
+        duration = time.perf_counter() - e_wall
+
+    throughput = samples_seen / max(1e-6, duration)
+
+    # global loss average
+    t = torch.tensor([losses.sum, losses.count], device=device, dtype=torch.float64)
+    dist.all_reduce(t, op=dist.ReduceOp.SUM)
+    loss_global = (t[0] / torch.clamp(t[1], min=1.0)).item()
+
+    return {
+        'loss_global' : loss_global,
+        'loss': losses.avg,
+        'top1': top1.avg,
+        'top5': top5.avg,
+        'step_time_min': step_time.min,
+        'step_time_max': step_time.max,
+        'step_time': step_time.avg,
+        'data_time': data_time.avg,
+        'comp_time': step_time.avg - data_time.avg,
+        'epoch_time': duration,
+        'throughput': throughput,   # samples/s
     }
-    save_log(args.json, log)
-    
-    device = torch.device(f'cuda:{args.local_rank}' if args.device == 'cuda' else 'cpu')
-    
-    if args.rank == 0:
-        print(f"[Setup] Building vocabulary (max_vocab={args.max_vocab}, min_freq={MIN_FREQ})...", flush=True)
-    vocab = build_vocab_sst(args.max_vocab, MIN_FREQ)
-    if args.rank == 0:
-        print(f"[Setup] Vocabulary size: {len(vocab)}", flush=True)
-    
-    train_dataset = SSTDataset("train", vocab, args.max_len)
-    val_dataset = SSTDataset("validation", vocab, args.max_len)
-    
-    if args.rank == 0:
-        print(f"[Dataset] Train: {len(train_dataset)}, Val: {len(val_dataset)}", flush=True)
-    
-    train_sampler = DistributedSampler(
-        train_dataset,
-        num_replicas=args.world_size,
-        rank=args.rank,
-        shuffle=True,
-        seed=args.seed
-    )
-    
-    val_sampler = DistributedSampler(
-        val_dataset,
-        num_replicas=args.world_size,
-        rank=args.rank,
-        shuffle=False,
-        seed=args.seed
-    )
-    
-    # Deterministic data loading
-    def worker_init_fn(worker_id):
-        worker_seed = args.seed + worker_id + args.rank * 1000
-        np.random.seed(worker_seed)
-        random.seed(worker_seed)
-    
+
+# ------------------------- Logging ------------------------------
+
+def save_log(path, log):
+    """Atomically write log dict to JSON file."""
+    tmp = f"{path}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(log, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+# ------------------------- Dataloaders ------------------------------
+
+def _seed_worker(worker_id, base_seed, rank):
+    worker_seed = (base_seed + 1000 * rank + worker_id) % (2**32)
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+    torch.manual_seed(worker_seed)
+
+def get_dataloaders(args, vocab: dict):
+    train_ds = SSTDataset("train", vocab, max_len=args.max_len)
+    val_ds   = SSTDataset("validation", vocab, max_len=args.max_len)
+
     g = torch.Generator()
     g.manual_seed(args.seed + args.rank)
-    
+
+    train_sampler = DistributedSampler(
+        train_ds, num_replicas=args.world_size, rank=args.rank,
+        shuffle=True, drop_last=args.drop_last_train, seed=args.seed
+    )
+    val_sampler = DistributedSampler(
+        val_ds, num_replicas=args.world_size, rank=args.rank,
+        shuffle=False, drop_last=args.drop_last_val, seed=args.seed
+    )
+
+    # train_loader = DataLoader(
+    #     train_ds, batch_size=args.batch_size, sampler=train_sampler,
+    #     num_workers=args.workers, pin_memory=True,
+    #     persistent_workers=True, prefetch_factor=args.prefetch_factor
+    # )
+    # val_loader = DataLoader(
+    #     val_ds, batch_size=args.batch_size, sampler=val_sampler, shuffle=False,
+    #     num_workers=args.workers, pin_memory=True,
+    #     persistent_workers=True, prefetch_factor=args.prefetch_factor
+    # )
+
+    seed_fn = lambda wid: _seed_worker(wid, args.seed, args.rank)
+
     train_loader = DataLoader(
-        train_dataset,
-        batch_size=args.batch_size,
-        sampler=train_sampler,
-        num_workers=args.workers,
-        pin_memory=True,
-        drop_last=args.drop_last_train,
-        prefetch_factor=args.prefetch_factor if args.workers > 0 else None,
-        persistent_workers=args.workers > 0,
-        worker_init_fn=worker_init_fn if args.deterministic else None,
-        generator=g if args.deterministic else None
+        train_ds, batch_size=args.batch_size, sampler=train_sampler,
+        num_workers=args.workers, pin_memory=True, generator=g,
+        worker_init_fn=seed_fn,
+        persistent_workers=False if args.deterministic else True,
+        prefetch_factor=args.prefetch_factor
     )
-    
     val_loader = DataLoader(
-        val_dataset,
-        batch_size=args.batch_size,
-        sampler=val_sampler,
-        num_workers=args.workers,
-        pin_memory=True,
-        drop_last=args.drop_last_val,
-        prefetch_factor=args.prefetch_factor if args.workers > 0 else None,
-        persistent_workers=args.workers > 0,
-        worker_init_fn=worker_init_fn if args.deterministic else None,
-        generator=g if args.deterministic else None
+        val_ds, batch_size=args.batch_size, sampler=val_sampler, shuffle=False,
+        num_workers=args.workers, pin_memory=True, generator=g,
+        worker_init_fn=seed_fn,
+        persistent_workers=False if args.deterministic else True,
+        prefetch_factor=args.prefetch_factor
     )
-    
-    if args.rank == 0:
-        print(f"[DataLoader] Train batches: {len(train_loader)}, Val batches: {len(val_loader)}", flush=True)
-    
-    # Model
-    model = ProvenLSTM(len(vocab), args.num_classes).to(device)
-    
-    if args.rank == 0:
-        total_params = sum(p.numel() for p in model.parameters())
-        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f"[Model] Total params: {total_params:,}, Trainable: {trainable_params:,}", flush=True)
-    
-    # DDP
-    model = DDP(
-        model,
-        device_ids=[args.local_rank] if device.type == 'cuda' else None,
-        # broadcast_buffers=False,
-        bucket_cap_mb=args.bucket_cap_mb,
-        gradient_as_bucket_view=True if args.static_graph else False,
-        static_graph=args.static_graph
-    )
+    return train_loader, val_loader
+
+# ------------------------- Train Driver ------------------------------
+
+def train(args):
+    device = torch.device(args.device)
+
+    # ------- vocab on rank-0 then broadcast -------
+    if dist.get_rank() == 0:
+        cap = None if args.max_vocab in (0, None) else args.max_vocab
+        vocab = build_vocab_sst(max_vocab=cap, min_freq=MIN_FREQ)
+    else:
+        vocab = None
+    obj = [vocab]; dist.broadcast_object_list(obj, src=0); vocab = obj[0]
+    if dist.get_rank() == 0:
+        print(f"[Vocab] size={len(vocab)} (includes PAD/UNK)")
+
+    # Data
+    train_loader, val_loader = get_dataloaders(args, vocab)
+
+    # Model (only BIG)
+    model = LSTMTextModel(vocab_size=len(vocab), num_classes=args.num_classes).to(device)
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
+                gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
+
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
         model = dpa.DDPWrapper(model, straggle = args.world_size, prescale=args.prescale)
 
+
     # Straggle sim
     straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks,
-                                  multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)      
+                                  multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)     
     if straggle.attach(model): print(f"Straggle sim initialized with {straggle}")
     else: print(f"Straggle sim inactive")
 
-    # Loss, Optimizer, Scheduler
-    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
-    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
-    
-    total_steps = len(train_loader) * args.epochs
-    warmup_steps = int(total_steps * WARMUP_RATIO)
-    
-    def lr_lambda(step):
-        if step < warmup_steps:
-            return step / warmup_steps
-        progress = (step - warmup_steps) / (total_steps - warmup_steps)
-        return max(args.cosine_min_lr_mult, 0.5 * (1 + math.cos(math.pi * progress)))
-    
-    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-    scaler = torch.cuda.amp.GradScaler(enabled=args.amp)
-    
-    # straggle = Straggle(args)
-    
-    # Training loop
-    for epoch in range(1, args.epochs + 1):
-        train_sampler.set_epoch(epoch)
-        
+    # Loss / Optim / Scheduler / AMP
+    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
+
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate,
+                            weight_decay=args.weight_decay, betas=(0.9, 0.999), eps=1e-8)
+
+    steps_per_epoch = max(1, len(train_loader))
+    total_steps = steps_per_epoch * args.epochs
+    warmup_steps = int(WARMUP_RATIO * total_steps)
+    scheduler = build_per_step_cosine(optimizer, total_steps, warmup_steps, min_lr_mult=args.cosine_min_lr_mult)
+
+    scaler = torch.amp.GradScaler('cuda', enabled=(args.amp and device.type == "cuda"))
+
+    def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # JSON log
+    log = {"time": now(), "config": vars(args), "epochs": {}}
+    save_log(args.json, log)
+
+    for epoch in range(args.epochs):
+        print(f"[{now()}][Epoch {epoch:03d}] ...")
         epoch_start = time.time()
-        
-        train_metrics = train_epoch(model, train_loader, optimizer, criterion, scaler, scheduler, device, epoch, args)
-        val_metrics = validate(model, val_loader, criterion, device, args)
-        
+
+        straggle.reset_stats()
+
+        train_loader.sampler.set_epoch(epoch)
+
+        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, scheduler, device, scaler,
+                                        num_classes=args.num_classes)
+        val_metrics   = validate(model, val_loader, device, args, num_classes=args.num_classes)
+
         epoch_time = time.time() - epoch_start
-        
-        if args.rank == 0:
-            print(f"Epoch {epoch:3d}/{args.epochs} | "
-                  f"Train Loss: {train_metrics['loss'].avg:.4f} Top1: {train_metrics['top1'].avg:.2f}% Top5: {train_metrics['top5'].avg:.2f}% | "
-                  f"Val Loss: {val_metrics['loss'].avg:.4f} Top1: {val_metrics['top1'].avg:.2f}% Top5: {val_metrics['top5'].avg:.2f}% | "
-                  f"Time: {epoch_time:.1f}s", flush=True)
-        
-        # Log everything your original code logs
+
+        current_lr = optimizer.param_groups[0]['lr']
+
+        print(f"[{now()}][Epoch {epoch:03d}] "
+              f"train_loss={train_metrics['loss']:.4f} (global={train_metrics['loss_global']:.4f}) "
+              f"val_loss={val_metrics['loss']:.4f} "
+              f"top1={val_metrics['top1']:.2f}% top5={val_metrics['top5']:.2f}% "
+              f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
+              f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) "
+              f"tp=~{train_metrics['throughput']:.1f} samples/s",
+              f"straggle_events={straggle.get_stats()['num_straggle_events']}",
+              flush=True)
+
+        # JSON epoch record
         epoch_metrics = {
-            "train_loss": float(train_metrics['loss'].avg),
-            "train_top1": float(train_metrics['top1'].avg),
-            "train_top5": float(train_metrics['top5'].avg),
+            "lr": float(current_lr),
+            "train_loss": float(train_metrics['loss']),
+            "train_loss_global": float(train_metrics['loss_global']),
+            "train_top1": float(train_metrics['top1']),
+            "train_top5": float(train_metrics['top5']),
             "steps": int(len(train_loader)),
             "step_time_min": float(train_metrics['step_time_min']),
             "step_time_max": float(train_metrics['step_time_max']),
-            "step_time": float(train_metrics['step_time'].avg),
-            "data_time": float(train_metrics['data_time'].avg),
-            "comp_time": float(train_metrics['comp_time'].avg),
+            "step_time": float(train_metrics['step_time']),
+            "data_time": float(train_metrics['data_time']),
+            "comp_time": float(train_metrics['comp_time']),
             "epoch_time": float(epoch_time),
             "epoch_train_time": float(train_metrics['epoch_time']),
             "epoch_train_throughput": float(train_metrics['throughput']),
-            "val_loss": float(val_metrics['loss'].avg),
-            "val_top1": float(val_metrics['top1'].avg),
-            "val_top5": float(val_metrics['top5'].avg),
+            "val_loss": float(val_metrics['loss']),
+            "val_top1": float(val_metrics['top1']),
+            "val_top5": float(val_metrics['top5']),
             "straggle": straggle.get_stats() if straggle.active else {}
         }
         log["epochs"][str(epoch)] = epoch_metrics
         save_log(args.json, log)
 
 # ------------------------- DDP Setup / Main ------------------------------
+
 def setup_ddp(args):
+
     def env_int(k, d): return d if os.environ.get(k) in (None,"") else int(os.environ.get(k))
     def env_str(k, d): return d if os.environ.get(k) in (None,"") else os.environ.get(k)
 
@@ -583,15 +529,19 @@ def setup_ddp(args):
         dpa_device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         dpa_backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf)
         pg_options = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
+        # pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4) # observed max around 150-is MB
+        # pg_options.hint_pinned_tensor_pool_size = 20                                              # observed count 13
         pg_options.hint_pinned_tensor_size = max(args.hint_tensor_size, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0)
-        pg_options.hint_pinned_tensor_pool_size = args.hint_tensor_count
+        pg_options.hint_pinned_tensor_pool_size = args.hint_tensor_count                                                                            
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
     else:
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
 
+
     if args.rank == 0:
         print(f"[DDP] backend={args.backend} world_size={args.world_size} "
               f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -611,21 +561,24 @@ def main():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument("--json", type=str, default="lstm.json", help="Path to JSON run log")
 
+
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.0012)
-    parser.add_argument('--weight_decay', type=float, default=2e-05)
+    parser.add_argument('--learning_rate', type=float, default=0.0012) # 0.001
+    parser.add_argument('--weight_decay', type=float, default=2e-05) # 1e-05
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
     parser.add_argument("--drop_last_val", action='store_true')
-    parser.add_argument("--label_smoothing", type=float, default=0.02, help="CrossEntropy label smoothing")
-    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.1,
-                        help="Cosine LR floor as a fraction of base LR")
+    parser.add_argument("--label_smoothing", type=float, default=0.00, help="CrossEntropy label smoothing") # 0.05
+    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.0,
+                        help="Cosine LR floor as a fraction of base LR (e.g., 0.15 keeps LR >= 15% of base)") # 0.15
     # Text knobs
-    parser.add_argument("--max_len", type=int, default=64, help="Max tokens per sample")
+    parser.add_argument("--max_len", type=int, default=64, help="Max tokens per sample") # 50
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
+    
+
 
     # Straggle
     def csv_ints(s: str) -> List[int]:
