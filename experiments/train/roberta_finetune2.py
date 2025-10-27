@@ -392,7 +392,7 @@ def train(args):
     if args.backend.startswith("dpa") and dpa is not None:
         model = dpa.DDPWrapper(model, straggle=args.world_size, prescale=args.prescale)
     # Straggle sim
-    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)      
+    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)    
     if straggle.attach(model): print(f"Straggle sim initialized with {straggle}")
     else: print(f"Straggle sim inactive")
  
@@ -612,9 +612,13 @@ def main():
     if args.deterministic:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True, warn_only=True)
-        torch.backends.cudnn.deterministic = True; torch.backends.cudnn.benchmark = False
-        random.seed(args.seed + args.rank); np.random.seed(args.seed + args.rank); torch.manual_seed(args.seed + args.rank)
-        if torch.cuda.is_available(): torch.cuda.manual_seed_all(args.seed + args.rank)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available(): 
+            torch.cuda.manual_seed_all(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
     if args.device == "cuda" and not torch.cuda.is_available():
