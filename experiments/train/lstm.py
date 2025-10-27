@@ -543,8 +543,8 @@ def main():
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
     parser.add_argument("--drop_last_val", action='store_true')
-    parser.add_argument("--label_smoothing", type=float, default=0.02, help="CrossEntropy label smoothing") # 0.05
-    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.1,
+    parser.add_argument("--label_smoothing", type=float, default=0.00, help="CrossEntropy label smoothing") # 0.02 # 0.05
+    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.0, # 0.1
                         help="Cosine LR floor as a fraction of base LR (e.g., 0.15 keeps LR >= 15% of base)") # 0.15
     # Text knobs
     parser.add_argument("--max_len", type=int, default=64, help="Max tokens per sample") # 50
