@@ -1,9 +1,8 @@
-[lstm.sh.24923] iface=ens4f1 ip=42.0.1.1 rank=0 world_size=6 master=42.0.1.1:29500 backend=dpa_dpdk
+[lstm.sh.29996] iface=ens4f1 ip=42.0.1.1 rank=0 world_size=6 master=42.0.1.1:29500 backend=dpa_dpdk
 + GDB='gdb -ex run --args'
 ++ which python
-+ sudo -E /home/gks/straggle-ml-experiments/venv/bin/python experiments/train/lstm3.py --rank 0 --world_size 6 --iface ens4f1 --master_addr 42.0.1.1 --master_port 29500 --dpa_conf /home/gks/straggle-ml-experiments/configs/edgecore.json --backend dpa_dpdk --ep
-ochs 10 --batch_size 64 --learning_rate 0.0015 --weight_decay 1e-05 --label_smoothing 0.0 --cosine_min_lr_mult 0.0 --max_len 96 --max_vocab 60000 --hidden_dim 768 --workers 4 --prefetch_factor 4 --hint_tensor_size 100000000 --hint_tensor_count 5 --json experi
-ments/train/lstm.json
++ sudo -E /home/gks/straggle-ml-experiments/venv/bin/python experiments/train/lstm.py --rank 0 --world_size 6 --iface ens4f1 --master_addr 42.0.1.1 --master_port 29500 --dpa_conf /home/gks/straggle-ml-experiments/configs/edgecore.json --backend dpa_dpdk --wor
+kers 4 --prefetch_factor 4 --hint_tensor_size 100000000 --hint_tensor_count 5 --json experiments/train/lstm.json --deterministic --epochs 12 --batch_size 32
 dpa: reading DPDK backend options from config.json: /home/gks/straggle-ml-experiments/configs/edgecore.json
 dpa: [warn] session.pool.seqnums not supplied => assuming 1,1,1...
 dpa: Using address '42.0.1.1', inferred from iface 'ens4f1'
@@ -56,24 +55,23 @@ dpa.torch: pinned mempool enabled with 5 tensors of 100000000 bytes
   "backend": "dpa_dpdk",
   "dpa_conf": "/home/gks/straggle-ml-experiments/configs/edgecore.json",
   "device": "cuda",
-  "deterministic": false,
+  "deterministic": true,
   "workers": 4,
   "prefetch_factor": 4,
   "static_graph": false,
   "seed": 42,
   "json": "experiments/train/lstm.json",
-  "epochs": 10,
-  "batch_size": 64,
+  "epochs": 12,
+  "batch_size": 32,
   "learning_rate": 0.0015,
   "weight_decay": 1e-05,
   "num_classes": 2,
   "amp": false,
   "drop_last_train": false,
   "drop_last_val": false,
-  "label_smoothing": 0.0,
-  "cosine_min_lr_mult": 0.0,
-  "hidden_dim": 768,
-  "max_len": 96,
+  "label_smoothing": 0.02,
+  "cosine_min_lr_mult": 0.1,
+  "max_len": 64,
   "max_vocab": 60000,
   "straggle_points": 0,
   "straggle_prob": 0,
@@ -94,33 +92,36 @@ dpa.torch: pinned mempool enabled with 5 tensors of 100000000 bytes
 /home/gks/straggle-ml-experiments/venv/lib/python3.12/site-packages/torch/utils/data/dataloader.py:626: UserWarning: This DataLoader will create 4 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what
  this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
   warnings.warn(
+Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.6)
 dpa.torch.py: DDP DPAState Object:  {'pipes': 0, 'straggle': 6, 'averaging': True, 'prescaled': False}
-Model 'bilstm_maxpool' (embed=300, hidden=768, layers=2, lstm_drop=0.5, head_drop=0.5)
 [straggle_sim][warning] created but effectively inactive -- points: 0, prob: 0.0, amount: 0.0
 Straggle sim inactive
-[2025-10-27 02:22:06][Epoch 000] ...
+[2025-10-27 02:54:10][Epoch 000] ...
 /home/gks/straggle-ml-experiments/venv/lib/python3.12/site-packages/torch/utils/data/dataloader.py:626: UserWarning: This DataLoader will create 4 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what
  this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
   warnings.warn(
-RETURNING PINNED - need: 106684760 got: 100000000 !!!
-[2025-10-27 02:22:20][Epoch 000] train_loss=0.5792 (global=0.5741) val_loss=0.5580 top1=73.97% top5=100.00% lr=0.001500 epoch_time=13.58s step_time=0.08 (min=0.06s, max=0.76) tp=~842.0 samples/s straggle_events=0
-[2025-10-27 02:22:20][Epoch 001] ...
-[2025-10-27 02:22:33][Epoch 001] train_loss=0.3538 (global=0.3505) val_loss=0.5131 top1=75.68% top5=100.00% lr=0.001455 epoch_time=12.84s step_time=0.07 (min=0.06s, max=0.16) tp=~879.2 samples/s straggle_events=0
-[2025-10-27 02:22:33][Epoch 002] ...
-[2025-10-27 02:22:46][Epoch 002] train_loss=0.2153 (global=0.2183) val_loss=0.4657 top1=81.16% top5=100.00% lr=0.001325 epoch_time=12.87s step_time=0.07 (min=0.05s, max=0.15) tp=~877.3 samples/s straggle_events=0
-[2025-10-27 02:22:46][Epoch 003] ...
-[2025-10-27 02:22:58][Epoch 003] train_loss=0.1450 (global=0.1486) val_loss=0.4482 top1=82.53% top5=100.00% lr=0.001125 epoch_time=12.79s step_time=0.07 (min=0.06s, max=0.16) tp=~881.8 samples/s straggle_events=0
-[2025-10-27 02:22:58][Epoch 004] ...
-[2025-10-27 02:23:11][Epoch 004] train_loss=0.1093 (global=0.1026) val_loss=0.5647 top1=82.42% top5=100.00% lr=0.000880 epoch_time=12.82s step_time=0.07 (min=0.05s, max=0.16) tp=~880.3 samples/s straggle_events=0
-[2025-10-27 02:23:11][Epoch 005] ...
-[2025-10-27 02:23:24][Epoch 005] train_loss=0.0709 (global=0.0695) val_loss=0.5936 top1=82.65% top5=100.00% lr=0.000620 epoch_time=12.82s step_time=0.07 (min=0.05s, max=0.15) tp=~880.1 samples/s straggle_events=0
-[2025-10-27 02:23:24][Epoch 006] ...
-[2025-10-27 02:23:37][Epoch 006] train_loss=0.0493 (global=0.0475) val_loss=0.7095 top1=82.65% top5=100.00% lr=0.000375 epoch_time=12.88s step_time=0.07 (min=0.06s, max=0.15) tp=~876.2 samples/s straggle_events=0
-[2025-10-27 02:23:37][Epoch 007] ...
-[2025-10-27 02:23:50][Epoch 007] train_loss=0.0278 (global=0.0316) val_loss=0.8105 top1=82.65% top5=100.00% lr=0.000175 epoch_time=12.82s step_time=0.07 (min=0.06s, max=0.15) tp=~880.0 samples/s straggle_events=0
-[2025-10-27 02:23:50][Epoch 008] ...
-[2025-10-27 02:24:03][Epoch 008] train_loss=0.0234 (global=0.0223) val_loss=0.9915 top1=83.45% top5=100.00% lr=0.000045 epoch_time=12.86s step_time=0.07 (min=0.05s, max=0.17) tp=~877.5 samples/s straggle_events=0
-[2025-10-27 02:24:03][Epoch 009] ...
-[2025-10-27 02:24:16][Epoch 009] train_loss=0.0196 (global=0.0186) val_loss=1.0433 top1=83.56% top5=100.00% lr=0.000000 epoch_time=12.81s step_time=0.07 (min=0.05s, max=0.16) tp=~880.4 samples/s straggle_events=0
-dpa: backend finished with pool[0:4096] seqnums: 51918,51917,51918,51917,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038,51038...
-dpa: ctx-1 killed by thread 1441592, 0 tasks ignored
+[2025-10-27 02:54:26][Epoch 000] train_loss=0.5641 (global=0.5638) val_loss=0.4821 top1=78.31% top5=100.00% lr=0.001254 epoch_time=16.28s step_time=0.05 (min=0.04s, max=1.05) tp=~701.7 samples/s straggle_events=0
+[2025-10-27 02:54:26][Epoch 001] ...
+[2025-10-27 02:54:42][Epoch 001] train_loss=0.3441 (global=0.3481) val_loss=0.4002 top1=82.88% top5=100.00% lr=0.001482 epoch_time=15.48s step_time=0.04 (min=0.04s, max=0.47) tp=~727.9 samples/s straggle_events=0
+[2025-10-27 02:54:42][Epoch 002] ...
+[2025-10-27 02:54:57][Epoch 002] train_loss=0.2456 (global=0.2419) val_loss=0.4035 top1=83.90% top5=100.00% lr=0.001410 epoch_time=15.50s step_time=0.04 (min=0.04s, max=0.48) tp=~727.3 samples/s straggle_events=0
+[2025-10-27 02:54:57][Epoch 003] ...
+[2025-10-27 02:55:13][Epoch 003] train_loss=0.1929 (global=0.1910) val_loss=0.4450 top1=84.02% top5=100.00% lr=0.001288 epoch_time=15.48s step_time=0.04 (min=0.04s, max=0.47) tp=~728.1 samples/s straggle_events=0
+[2025-10-27 02:55:13][Epoch 004] ...
+[2025-10-27 02:55:28][Epoch 004] train_loss=0.1630 (global=0.1599) val_loss=0.3874 top1=84.47% top5=100.00% lr=0.001128 epoch_time=15.52s step_time=0.04 (min=0.04s, max=0.47) tp=~726.2 samples/s straggle_events=0
+[2025-10-27 02:55:28][Epoch 005] ...
+[2025-10-27 02:55:44][Epoch 005] train_loss=0.1429 (global=0.1400) val_loss=0.4166 top1=84.25% top5=100.00% lr=0.000942 epoch_time=15.53s step_time=0.04 (min=0.04s, max=0.47) tp=~725.6 samples/s straggle_events=0
+[2025-10-27 02:55:44][Epoch 006] ...
+[2025-10-27 02:56:00][Epoch 006] train_loss=0.1198 (global=0.1253) val_loss=0.4363 top1=85.50% top5=100.00% lr=0.000747 epoch_time=15.55s step_time=0.04 (min=0.04s, max=0.47) tp=~725.1 samples/s straggle_events=0
+[2025-10-27 02:56:00][Epoch 007] ...
+[2025-10-27 02:56:15][Epoch 007] train_loss=0.1104 (global=0.1112) val_loss=0.4508 top1=84.82% top5=100.00% lr=0.000558 epoch_time=15.53s step_time=0.04 (min=0.04s, max=0.46) tp=~725.4 samples/s straggle_events=0
+[2025-10-27 02:56:15][Epoch 008] ...
+[2025-10-27 02:56:31][Epoch 008] train_loss=0.1059 (global=0.1049) val_loss=0.4308 top1=85.39% top5=100.00% lr=0.000391 epoch_time=15.57s step_time=0.04 (min=0.04s, max=0.47) tp=~723.7 samples/s straggle_events=0
+[2025-10-27 02:56:31][Epoch 009] ...
+[2025-10-27 02:56:46][Epoch 009] train_loss=0.0982 (global=0.0957) val_loss=0.5092 top1=84.36% top5=100.00% lr=0.000261 epoch_time=15.53s step_time=0.04 (min=0.04s, max=0.47) tp=~725.5 samples/s straggle_events=0
+[2025-10-27 02:56:46][Epoch 010] ...
+[2025-10-27 02:57:02][Epoch 010] train_loss=0.0914 (global=0.0916) val_loss=0.4870 top1=85.05% top5=100.00% lr=0.000178 epoch_time=15.58s step_time=0.04 (min=0.04s, max=0.47) tp=~723.2 samples/s straggle_events=0
+[2025-10-27 02:57:02][Epoch 011] ...
+[2025-10-27 02:57:17][Epoch 011] train_loss=0.0851 (global=0.0881) val_loss=0.4805 top1=84.82% top5=100.00% lr=0.000150 epoch_time=15.59s step_time=0.04 (min=0.04s, max=0.47) tp=~723.0 samples/s straggle_events=0
+dpa: backend finished with pool[0:4096] seqnums: 73709,73709,73709,73709,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603,71604,71603...
+dpa: ctx-1 killed by thread 1446497, 0 tasks ignored

@@ -334,11 +334,11 @@ def get_dataloaders(args, vocab: dict):
 
     train_sampler = DistributedSampler(
         train_ds, num_replicas=args.world_size, rank=args.rank,
-        shuffle=True, drop_last=args.drop_last_train
+        shuffle=True, drop_last=args.drop_last_train, seed=args.seed
     )
     val_sampler = DistributedSampler(
         val_ds, num_replicas=args.world_size, rank=args.rank,
-        shuffle=False, drop_last=args.drop_last_val
+        shuffle=False, drop_last=args.drop_last_val, seed=args.seed
     )
 
     train_loader = DataLoader(
@@ -570,15 +570,19 @@ def main():
     args = parser.parse_args()
 
     if args.deterministic:
+        args.seed = args.seed + args.rank
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+        os.environ["PYTHONHASHSEED"] = str(args.seed)
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        random.seed(args.seed + args.rank)
-        np.random.seed(args.seed + args.rank)
-        torch.manual_seed(args.seed + args.rank)
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
         if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(args.seed + args.seed)
+            torch.cuda.manual_seed_all(args.seed)
+        g = torch.Generator()
+        g.manual_seed(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
 
