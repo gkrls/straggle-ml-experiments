@@ -402,6 +402,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
     parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle before each allreduce call")
+    parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
     
     args = parser.parse_args()
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
