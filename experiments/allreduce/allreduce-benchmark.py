@@ -20,7 +20,8 @@ torch.set_printoptions(
 
 PATTERN = {
     1: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)),
-    2: lambda args: torch.arange(args.size, device=torch.device(args.device)).remainder(5).add(1).to(args.dtype)
+    2: lambda args: torch.arange(args.size, device=torch.device(args.device)).remainder(5).add(1).to(args.dtype),
+    3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * (args.rank + 1)
 }
 
 def benchmark(args):
@@ -368,7 +369,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--device", default="cpu", choices=["cpu", "cuda"], help="Device to run on")
     parser.add_argument("-t", "--type", default="float32", choices=["float32", "int32"], help="Data type for tensors")
     parser.add_argument("-s", "--size", type=int, default=1000000, help="Number of elements in tensor")
-    parser.add_argument("-p", "--pattern", type=int, default=1, choices=[1,2], help="Select tensor pattern 1=ones, 2=repeating range")
+    parser.add_argument("-p", "--pattern", type=int, default=1, choices=[1,2,3], help="Select tensor pattern 1=ones, 2=repeating range, 3=rank")
     parser.add_argument("-i", "--iters", type=int, default=10, help="Number of iterations")
     parser.add_argument("-w", "--warmup", type=int, default=5, help="Number of warmup iterations")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
