@@ -147,8 +147,8 @@ class LSTMTextModel(nn.Module):
 
     def forward(self, x, lengths: Optional[torch.Tensor] = None):
         # --- word dropout (train-time only; keep PAD intact) ---
-        if self.training:
-            x = self.word_dropout(x.unsqueeze(1)).squeeze(1)
+        # if self.training:
+        #     x = self.word_dropout(x.unsqueeze(1)).squeeze(1)
         # if self.training and WORD_DROPOUT_P > 0:
         #     drop = (torch.rand_like(x, dtype=torch.float32) < WORD_DROPOUT_P) & (x != PAD_ID)
         #     x = torch.where(drop, torch.full_like(x, UNK_ID), x)
