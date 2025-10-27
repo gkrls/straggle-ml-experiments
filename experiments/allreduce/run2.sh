@@ -81,8 +81,8 @@ PERF="perf stat -d --"
 # export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 25000 -w 0 -i 1 --dpa_avg \
-  --gloo_socket_ifname=$IFACE --global_stats --pattern 3 --straggle_k 0 --straggle_rank 1 --straggle_ms 10000 #--verify
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 25000 -w 0 -i 2 --dpa_avg \
+  --gloo_socket_ifname=$IFACE --global_stats --pattern 3 --straggle_k 1 --straggle_rank 1 --straggle_ms 150 #--verify
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
 #   --d_conf configs/config-edgecore.json -b nccl -d cuda -t float32 -s 1000 -i 5 -w 3 -v "$@"

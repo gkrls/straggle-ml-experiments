@@ -143,8 +143,14 @@ def benchmark(args):
             # Timed iterations - use same timing method for both CPU and CUDA
             t_start = time.time_ns()
             for i in range(args.iters):
-                if args.straggle_ms and args.straggle_rank == args.rank : time.sleep(args.straggle_ms / 1000)
+                if args.straggle_ms and args.straggle_rank == args.rank:
+                    if args.straggle_num is None:
+                        time.sleep(args.straggle_ms / 1000)
+                    elif args.straggle_num > 0:
+                        args.straggle_num -= 1
+                        time.sleep(args.straggle_ms / 1000)
                 jobs.append(dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True))
+
             for j in jobs: j.wait()
             # for j in jobs: j.synchronize()
             torch.cuda.synchronize()
@@ -162,7 +168,12 @@ def benchmark(args):
 
             times = []
             for i in range(args.iters):
-                if args.straggle_ms and args.straggle_rank == args.rank : time.sleep(args.straggle_ms / 1000)
+                if args.straggle_ms and args.straggle_rank == args.rank:
+                    if args.straggle_num is None:
+                        time.sleep(args.straggle_ms / 1000)
+                    elif args.straggle_num > 0:
+                        args.straggle_num -= 1
+                        time.sleep(args.straggle_ms / 1000)
                 
                 # Use consistent timing for both CPU and CUDA
                 if args.device == "cuda": torch.cuda.synchronize()
@@ -403,6 +414,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
     parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle before each allreduce call")
+    parser.add_argument("--straggle_num", type=int, default=None, help="Number of straggles")
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
     
     args = parser.parse_args()
