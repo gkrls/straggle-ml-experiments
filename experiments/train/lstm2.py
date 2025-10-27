@@ -38,9 +38,26 @@ def simple_tokenizer(text: str) -> List[str]:
     text = re.sub(r"\d+", "<num>", text)  # fold numbers
     return _token_re.findall(text)
 
+# def build_vocab_sst(max_vocab: Optional[int], min_freq: int) -> dict:
+#     from collections import Counter
+#     # build from train + validation to reduce OOV (no external data)
+#     ds_train = load_dataset("glue", "sst2", split="train")
+#     ds_val   = load_dataset("glue", "sst2", split="validation")
+#     ctr = Counter()
+#     for ex in ds_train:
+#         ctr.update(simple_tokenizer(ex["sentence"]))
+#     for ex in ds_val:
+#         ctr.update(simple_tokenizer(ex["sentence"]))
+
+#     vocab = {"<pad>": PAD_ID, "<unk>": UNK_ID}
+#     words = [w for w, c in ctr.most_common() if c >= min_freq]
+#     if max_vocab and max_vocab > 0:
+#         words = words[: max(0, max_vocab - len(vocab))]
+#     for w in words:
+#         vocab[w] = len(vocab)
+#     return vocab
 def build_vocab_sst(max_vocab: Optional[int], min_freq: int) -> dict:
     from collections import Counter
-    # build from train + validation to reduce OOV (no external data)
     ds_train = load_dataset("glue", "sst2", split="train")
     ds_val   = load_dataset("glue", "sst2", split="validation")
     ctr = Counter()
@@ -49,11 +66,16 @@ def build_vocab_sst(max_vocab: Optional[int], min_freq: int) -> dict:
     for ex in ds_val:
         ctr.update(simple_tokenizer(ex["sentence"]))
 
+    # Deterministic order: by count desc, then token asc as tiebreak
+    items = sorted(ctr.items(), key=lambda kv: (-kv[1], kv[0]))
+
     vocab = {"<pad>": PAD_ID, "<unk>": UNK_ID}
-    words = [w for w, c in ctr.most_common() if c >= min_freq]
-    if max_vocab and max_vocab > 0:
-        words = words[: max(0, max_vocab - len(vocab))]
-    for w in words:
+    cap = None if max_vocab in (0, None) else max_vocab
+    for w, c in items:
+        if c < min_freq:
+            continue
+        if cap and len(vocab) >= cap:
+            break
         vocab[w] = len(vocab)
     return vocab
 
