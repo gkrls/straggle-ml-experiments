@@ -250,22 +250,6 @@ def validate(model, loader, device, args):
         denom = max(1, len(preds_local)); em = (em_sum / denom) * 100.0; f1 = (f1_sum / denom) * 100.0
         return {"loss": float(loss_avg), "em": float(em), "f1": float(f1)}
 
-# ------------------------- DDP setup ----------------------------
-def setup_ddp(args):
-    def env_i(k, d): return d if os.environ.get(k) in (None, "") else int(os.environ.get(k))
-    def env_s(k, d): return d if os.environ.get(k) in (None, "") else os.environ.get(k)
-    args.rank = env_i("RANK", args.rank); args.world_size = env_i("WORLD_SIZE", args.world_size)
-    args.master_addr = env_s("MASTER_ADDR", args.master_addr); args.master_port = env_i("MASTER_PORT", args.master_port)
-    if os.environ.get("LOCAL_RANK") is not None:
-        args.local_rank = int(os.environ["LOCAL_RANK"])
-    elif torch.cuda.device_count(): args.local_rank = (args.rank % torch.cuda.device_count())
-    else: args.local_rank = 0
-    if args.device == "cuda" and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
-    os.environ.setdefault("RANK", str(args.rank)); os.environ.setdefault("WORLD_SIZE", str(args.world_size))
-    os.environ.setdefault("MASTER_ADDR", args.master_addr); os.environ.setdefault("MASTER_PORT", str(args.master_port))
-    os.environ.setdefault("LOCAL_RANK", str(args.local_rank))
-    dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
-    print(f"[DDP] backend={args.backend} world_size={args.world_size} master={args.master_addr}:{args.master_port} local_rank={args.local_rank}", flush=True)
 
 # ------------------------- Train one epoch ----------------------
 def train_one_epoch(model, loader, optim, sched, device, scaler, args, epoch):
@@ -353,6 +337,10 @@ def train(args):
     # Optional dpa wrapper
     if args.backend.startswith("dpa") and dpa is not None:
         model = dpa.DDPWrapper(model, straggle=args.world_size, prescale=args.prescale)
+    # Straggle sim
+    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)      
+    if straggle.attach(model): print(f"Straggle sim initialized with {straggle}")
+    else: print(f"Straggle sim inactive")
 
     # Optim + sched
     base = model.module if hasattr(model, "module") else model
@@ -375,6 +363,9 @@ def train(args):
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
         epoch_start = time.time()
+
+        straggle.reset_stats()
+
         train_loader.sampler.set_epoch(epoch)
 
         train_m = train_one_epoch(model, train_loader, optim, sched, device, scaler, args, epoch)
@@ -386,7 +377,8 @@ def train(args):
               f"val_loss={val_m['loss']:.4f} val_em={val_m['em']:.2f}% val_f1={val_m['f1']:.2f}% "
               f"lr={cur_lr:.6f} steps={int(len(train_loader))} epoch_time={epoch_time:.2f}s "
               f"step_time={train_m['step_time']:.2f}s (min={train_m['step_time_min']:.2f}s, max={train_m['step_time_max']:.2f}s) "
-              f"tp=~{train_m['throughput']:.1f} samples/s", flush=True)
+              f"tp=~{train_m['throughput']:.1f} samples/s",
+              f"straggle_events={straggle.get_stats().get('num_straggle_events', 0)}",, flush=True)
 
         epoch_log = {
             "lr": float(cur_lr),
@@ -401,14 +393,101 @@ def train(args):
             "epoch_time": float(epoch_time),
             "epoch_train_time": float(train_m["epoch_time"]),
             "epoch_train_throughput": float(train_m["throughput"]),
-            "val_loss": float(val_m["loss"]), "val_em": float(val_m["em"]), "val_f1": float(val_m["f1"]),
-            "straggle": {}
+            "val_loss": float(val_m["loss"]),
+            "val_em": float(val_m["em"]),
+            "val_f1": float(val_m["f1"]),
+            "straggle": straggle.get_stats() if straggle.active else {}
         }
-        log["epochs"][str(epoch)] = epoch_log; save_log(args.json, log)
+        log["epochs"][str(epoch)] = epoch_log
+        save_log(args.json, log)
 
         best_em = max(best_em, val_m["em"]); best_f1 = max(best_f1, val_m["f1"])
 
-# ------------------------- CLI / Entry --------------------------
+
+# # ------------------------- DDP setup ----------------------------
+# def setup_ddp(args):
+#     def env_i(k, d): return d if os.environ.get(k) in (None, "") else int(os.environ.get(k))
+#     def env_s(k, d): return d if os.environ.get(k) in (None, "") else os.environ.get(k)
+#     args.rank = env_i("RANK", args.rank); args.world_size = env_i("WORLD_SIZE", args.world_size)
+#     args.master_addr = env_s("MASTER_ADDR", args.master_addr); args.master_port = env_i("MASTER_PORT", args.master_port)
+#     if os.environ.get("LOCAL_RANK") is not None:
+#         args.local_rank = int(os.environ["LOCAL_RANK"])
+#     elif torch.cuda.device_count(): args.local_rank = (args.rank % torch.cuda.device_count())
+#     else: args.local_rank = 0
+#     if args.device == "cuda" and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
+#     os.environ.setdefault("RANK", str(args.rank)); os.environ.setdefault("WORLD_SIZE", str(args.world_size))
+#     os.environ.setdefault("MASTER_ADDR", args.master_addr); os.environ.setdefault("MASTER_PORT", str(args.master_port))
+#     os.environ.setdefault("LOCAL_RANK", str(args.local_rank))
+#     dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
+#     print(f"[DDP] backend={args.backend} world_size={args.world_size} master={args.master_addr}:{args.master_port} local_rank={args.local_rank}", flush=True)
+
+
+# ------------------------- Entry / Setup ------------------------
+
+def setup_ddp(args):
+    # Ensure args contains everything we need. Give priority to ENV vars
+    def env_int(key, default): return default if os.environ.get(key) in (None, "") else int(os.environ.get(key))
+    def env_str(key, default): return default if os.environ.get(key) in (None, "") else os.environ.get(key)
+
+    args.rank        = env_int("RANK", args.rank)
+    args.world_size  = env_int("WORLD_SIZE", args.world_size)
+    args.master_addr = env_str("MASTER_ADDR", args.master_addr)
+    args.master_port = env_int("MASTER_PORT", args.master_port)
+    args.iface       = env_str("IFACE", args.iface)
+
+    # Respect LOCAL_RANK if present (torchrun)
+    env_local_rank = os.environ.get("LOCAL_RANK")
+    if env_local_rank is not None:
+        args.local_rank = int(env_local_rank)
+    elif torch.cuda.device_count():
+        args.local_rank = (args.rank % torch.cuda.device_count())
+    else:
+        args.local_rank = 0
+
+    if args.device == 'cuda' and torch.cuda.is_available():
+        torch.cuda.set_device(args.local_rank)
+
+    # Ensure the variables torch.distributed expects are present.
+    os.environ.setdefault("RANK",        str(args.rank))
+    os.environ.setdefault("WORLD_SIZE",  str(args.world_size))
+    os.environ.setdefault("MASTER_ADDR", args.master_addr)
+    os.environ.setdefault("MASTER_PORT", str(args.master_port))
+    os.environ.setdefault("LOCAL_RANK",  str(args.local_rank))
+
+    os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
+    os.environ.setdefault("GLOO_SOCKET_NTHREADS", "8")
+    os.environ.setdefault("GLOO_NSOCKS_PERTHREAD", "2")
+    os.environ.setdefault("GLOO_BUFFSIZE", "8388608")
+
+    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)               # e.g. ens4f0
+    os.environ.setdefault("NCCL_DEBUG", "WARN")
+    os.environ.setdefault("NCCL_DEBUG_SUBSYS", "INIT,NET,ENV")
+    os.environ.setdefault("NCCL_DEBUG_FILE", f"/tmp/nccl_%h_rank{os.environ.get('RANK','0')}.log")
+    os.environ.setdefault("NCCL_P2P_DISABLE", "1")         # P100 P2P is limited
+    os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")      # Force ring for stability
+    os.environ.setdefault("NCCL_IB_DISABLE", "0")          # Enable IB if available on 100G
+    os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
+    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
+    os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
+
+    # Initialize process group
+    if args.backend.startswith("dpa"):
+        if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
+        dpa_device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
+        dpa_backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf)
+        pg_options = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
+        pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0)
+        pg_options.hint_pinned_tensor_pool_size = 20                                                                                      
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
+    else:
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
+    # Start the process group
+    # dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=30))
+
+    print(f"[DDP] backend={args.backend} world_size={args.world_size} "
+          f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
+
+
 def main():
     p = argparse.ArgumentParser()
     # DDP/System
@@ -416,8 +495,10 @@ def main():
     p.add_argument("--iface", type=str, default="ens4f0")
     p.add_argument("--master_addr", type=str, default="42.0.0.1"); p.add_argument("--master_port", type=int, default=29500)
     p.add_argument("--backend", type=str, default="nccl", choices=["nccl", "gloo", "dpa_dpdk"])
+    p.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     p.add_argument("--device", type=str, choices=["cuda", "cpu"], default="cuda")
     p.add_argument("--deterministic", action="store_true"); p.add_argument("--seed", type=int, default=42)
+    p.add_argument('--seed', type=int, default=42)
     p.add_argument("--workers", type=int, default=4)
 
     # Logging
@@ -444,6 +525,7 @@ def main():
     args = p.parse_args()
 
     os.environ["TOKENIZERS_PARALLELISM"] = "0"
+    args.seed = args.seed + args.rank * 1000
     if args.deterministic:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True, warn_only=True)
@@ -457,6 +539,9 @@ def main():
     if args.amp and args.device == "cpu":
         args.amp = False; print("[Info] Disabling AMP on CPU", flush=True)
     if args.workers < 1: args.workers = 1
+
+    cfg = {k: v for k, v in vars(args).items() if not k.startswith('_')}
+    print(json.dumps(cfg, indent=2))
 
     sys.stdout.reconfigure(line_buffering=True)
     setup_ddp(args)
