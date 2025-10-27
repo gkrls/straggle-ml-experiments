@@ -20,11 +20,29 @@ from datasets import load_dataset  # Hugging Face
 
 import dpa
 
+
+class EMA:
+    def __init__(self, model, decay=0.999):
+        self.decay = decay
+        self.shadow = [p.detach().clone() for p in model.parameters() if p.requires_grad]
+        self.params = [p for p in model.parameters() if p.requires_grad]
+    @torch.no_grad()
+    def update(self):
+        for s, p in zip(self.shadow, self.params):
+            s.mul_(self.decay).add_(p.detach(), alpha=1.0 - self.decay)
+    @torch.no_grad()
+    def load_shadow(self, model):
+        for s, p in zip(self.shadow, self.params):
+            p.data.copy_(s.data)
+
+def unwrap(m: nn.Module) -> nn.Module:
+    return m.module if isinstance(m, DDP) else m
+
 # ------------------------- Fixed NLP defaults (no external downloads) -------------------------
 PAD_ID         = 0
 UNK_ID         = 1
 MIN_FREQ       = 1            # keep rare tokens (helps sentiment)
-WORD_DROPOUT_P = 0.05 #0.15         # bumped from 0.10
+WORD_DROPOUT_P = 0.0 #0.05 #0.15         # bumped from 0.10
 EMB_DROPOUT_P  = 0.1 #0.20         # bumped from 0.10
 CLIP_NORM      = 5.0
 WARMUP_RATIO   = 0.10         # 10% warmup for cosine
@@ -124,9 +142,9 @@ class LSTMTextModel(nn.Module):
     def __init__(self, vocab_size, num_classes=2):
         super().__init__()
         embed_dim  = 300
-        hidden_dim = 640
+        hidden_dim = 768
         num_layers = 2
-        dropout    = 0.5
+        dropout    = 0.4
 
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
         self.emb_drop = nn.Dropout(EMB_DROPOUT_P)
@@ -134,6 +152,15 @@ class LSTMTextModel(nn.Module):
         self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=num_layers,
                             batch_first=True, bidirectional=True,
                             dropout=dropout if num_layers > 1 else 0.0)
+        # init LSTM nicely + forget gate bias = 1.0 (helps stability)
+        for name, p in self.lstm.named_parameters():
+            if "weight_ih" in name or "weight_hh" in name:
+                nn.init.xavier_uniform_(p)
+            elif "bias_ih" in name or "bias_hh" in name:
+                nn.init.zeros_(p)
+                # set forget gate bias (f gate is the 2nd quarter)
+                q = p.shape[0] // 4
+                p.data[q:2*q].fill_(1.0)
 
         self.attn = nn.Linear(hidden_dim * 2, 1, bias=False)   # attention scores
         self.dropout = nn.Dropout(dropout)
@@ -204,42 +231,59 @@ def build_per_step_cosine(optimizer, total_steps: int, warmup_steps: int, min_lr
 
 # ------------------------- Train / Eval ------------------------------
 
-from torch.optim.swa_utils import AveragedModel
-def unwrap(m: nn.Module) -> nn.Module:
-    return m.module if isinstance(m, DDP) else m
 
+
+# @torch.no_grad()
+# def validate(model, loader, device, args, num_classes: int):
+#     model.eval()
+#     top1, top5, losses = AverageMeter(), AverageMeter(), AverageMeter()
+#     criterion = nn.CrossEntropyLoss().to(device)
+
+#     def run_validation(dataloader):
+#         for x, y, lengths in dataloader:
+#             x = x.to(device, non_blocking=True)
+#             y = y.to(device, non_blocking=True)
+#             out = model(x, lengths)   # lengths on CPU
+#             loss = criterion(out, y)
+#             a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
+#             bs = y.size(0)
+#             losses.update(loss.item(), bs)
+#             top1.update(a1[0].item(), bs)
+#             top5.update(a5[0].item(), bs)
+
+#     run_validation(loader)
+#     top1.all_reduce(); top5.all_reduce(); losses.all_reduce()
+
+#     # Leftover handling 
+#     if hasattr(loader, "sampler") and len(loader.sampler) * args.world_size < len(loader.dataset):
+#         start = len(loader.sampler) * args.world_size
+#         aux = Subset(loader.dataset, range(start, len(loader.dataset)))
+#         aux_loader = DataLoader(aux, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
+#         run_validation(aux_loader)
+
+#     return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg}
 @torch.no_grad()
 def validate(model, loader, device, args, num_classes: int):
     model.eval()
     top1, top5, losses = AverageMeter(), AverageMeter(), AverageMeter()
     criterion = nn.CrossEntropyLoss().to(device)
 
-    def run_validation(dataloader):
-        for x, y, lengths in dataloader:
-            x = x.to(device, non_blocking=True)
-            y = y.to(device, non_blocking=True)
-            out = model(x, lengths)   # lengths on CPU
-            loss = criterion(out, y)
-            a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
-            bs = y.size(0)
-            losses.update(loss.item(), bs)
-            top1.update(a1[0].item(), bs)
-            top5.update(a5[0].item(), bs)
+    for x, y, lengths in loader:
+        x = x.to(device, non_blocking=True)
+        y = y.to(device, non_blocking=True)
+        out = model(x, lengths)   # lengths on CPU
+        loss = criterion(out, y)
+        a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
+        bs = y.size(0)
+        losses.update(loss.item(), bs)
+        top1.update(a1[0].item(), bs)
+        top5.update(a5[0].item(), bs)
 
-    run_validation(loader)
     top1.all_reduce(); top5.all_reduce(); losses.all_reduce()
-
-    # Leftover handling 
-    if hasattr(loader, "sampler") and len(loader.sampler) * args.world_size < len(loader.dataset):
-        start = len(loader.sampler) * args.world_size
-        aux = Subset(loader.dataset, range(start, len(loader.dataset)))
-        aux_loader = DataLoader(aux, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
-        run_validation(aux_loader)
-
     return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg}
 
 def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, scaler, num_classes: int,
-                    swa_model: Optional[AveragedModel] = None, swa_active: bool = False):
+                    ema: Optional[EMA] = None):
     model.train()
     losses = AverageMeter(); top1 = AverageMeter(); top5 = AverageMeter()
     step_time = AverageMeter(); data_time = AverageMeter()
@@ -269,7 +313,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
             if CLIP_NORM > 0:
                 scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
-            scaler.step(optimizer); scaler.update()
+            scaler.step(optimizer)
+            scaler.update()
         else:
             out = model(x, lengths)
             loss = criterion(out, y)
@@ -279,8 +324,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
             optimizer.step()
 
         # --- SWA update (no BN in this model, so this is enough)
-        if swa_active and (swa_model is not None):
-            swa_model.update_parameters(unwrap(model))
+        if ema is not None:
+            ema.update()
 
         # per-step scheduler
         if scheduler: scheduler.step()
@@ -383,17 +428,16 @@ def train(args):
     model = LSTMTextModel(vocab_size=len(vocab), num_classes=args.num_classes).to(device)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    print(f"Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.6)", flush=True)
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
         model = dpa.DDPWrapper(model, straggle = args.world_size, prescale=args.prescale)
+    
+    unwrap(model).lstm.flatten_parameters()  # you already call this later; keeping it here is good too
+    ema = EMA(unwrap(model), decay=0.999)
 
-
-    swa_model = AveragedModel(unwrap(model))
-    swa_start_epoch = int(0.6 * args.epochs)  # start SWA at 60% of training
-    swa_lr = 3e-4                             # simple, small constant LR for SWA phase
-
+    # print(f"Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.6)", flush=True)
+    print(f"Model 'lstm_big' initialized. (embed=300, hidden=768, layers=2, drop=0.5)", flush=True)
 
     # Straggle sim
     straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks,
@@ -427,24 +471,19 @@ def train(args):
         straggle.reset_stats()
 
         train_loader.sampler.set_epoch(epoch)
+        unwrap(model).lstm.flatten_parameters()
 
-        swa_active = (epoch >= swa_start_epoch)
-        if swa_active:
-            for g in optimizer.param_groups:
-                g['lr'] = swa_lr
-            # kill schedule noise in SWA phase
-            step_scheduler = None
-            # optional: remove word-dropout noise to keep metric steady
-            global WORD_DROPOUT_P
-            WORD_DROPOUT_P = 0.0
-        else:
-            step_scheduler = scheduler
+
+        step_scheduler = scheduler
 
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, step_scheduler,
-                                        device, scaler, num_classes=args.num_classes,
-                                        swa_model=swa_model, swa_active=swa_active)
+                                        device, scaler, num_classes=args.num_classes, ema=ema)
+        
         eval_model = swa_model if swa_active else model
-        val_metrics = validate(eval_model, val_loader, device, args, num_classes=args.num_classes)
+
+        raw_state = [p.detach().clone() for p in unwrap(model).parameters()]
+        ema.load_shadow(unwrap(model))
+        val_metrics = validate(model, val_loader, device, args, num_classes=args.num_classes)
 
         # train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, scheduler, device, scaler,
         #                                 num_classes=args.num_classes)
@@ -566,17 +605,17 @@ def main():
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.0015) # 0.001
+    parser.add_argument('--learning_rate', type=float, default=0.0012) # 0.001
     parser.add_argument('--weight_decay', type=float, default=1e-05) # 1e-05
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
     parser.add_argument("--drop_last_val", action='store_true')
-    parser.add_argument("--label_smoothing", type=float, default=0.02, help="CrossEntropy label smoothing") # 0.05
-    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.1,
+    parser.add_argument("--label_smoothing", type=float, default=0.00, help="CrossEntropy label smoothing") # 0.05
+    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.0,
                         help="Cosine LR floor as a fraction of base LR (e.g., 0.15 keeps LR >= 15% of base)") # 0.15
     # Text knobs
-    parser.add_argument("--max_len", type=int, default=64, help="Max tokens per sample") # 50
+    parser.add_argument("--max_len", type=int, default=96, help="Max tokens per sample") # 50
     parser.add_argument("--max_vocab", type=int, default=60000, help="Max vocab size; 0 for unlimited")
     
 
