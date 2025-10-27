@@ -142,7 +142,7 @@ def benchmark(args):
             # Timed iterations - use same timing method for both CPU and CUDA
             t_start = time.time_ns()
             for i in range(args.iters):
-                if args.straggle_ms: time.sleep(args.straggle_ms / 1000)
+                if args.straggle_ms and args.straggle_rank == args.rank : time.sleep(args.straggle_ms / 1000)
                 jobs.append(dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True))
             for j in jobs: j.wait()
             # for j in jobs: j.synchronize()
@@ -161,7 +161,7 @@ def benchmark(args):
 
             times = []
             for i in range(args.iters):
-                if args.straggle_ms: time.sleep(args.straggle_ms / 1000)
+                if args.straggle_ms and args.straggle_rank == args.rank : time.sleep(args.straggle_ms / 1000)
                 
                 # Use consistent timing for both CPU and CUDA
                 if args.device == "cuda": torch.cuda.synchronize()
