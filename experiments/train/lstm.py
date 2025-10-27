@@ -537,8 +537,8 @@ def main():
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.0012) # 0.001
-    parser.add_argument('--weight_decay', type=float, default=2e-05) # 1e-05
+    parser.add_argument('--learning_rate', type=float, default=0.001) # 0.001
+    parser.add_argument('--weight_decay', type=float, default=1e-05) # 1e-05
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--drop_last_train", action='store_true')
@@ -570,9 +570,9 @@ def main():
     parser.add_argument("--hint_tensor_count", type=int, default=20, help="Hint for number of tensors allreduced, per step")
 
     args = parser.parse_args()
+    args.seed = args.seed + args.rank * 1000
 
     if args.deterministic:
-        args.seed = args.seed + args.rank
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         os.environ["PYTHONHASHSEED"] = str(args.seed)
         torch.use_deterministic_algorithms(True, warn_only=True)
@@ -583,8 +583,6 @@ def main():
         torch.manual_seed(args.seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(args.seed)
-        g = torch.Generator()
-        g.manual_seed(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
 

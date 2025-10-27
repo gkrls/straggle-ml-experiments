@@ -406,7 +406,7 @@ def train(args):
     # Loss / Optim / Scheduler / AMP
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
 
-    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate,
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, fused=False,
                             weight_decay=args.weight_decay, betas=(0.9, 0.999), eps=1e-8)
 
     steps_per_epoch = max(1, len(train_loader))
