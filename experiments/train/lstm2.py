@@ -1,571 +1,482 @@
 #!/usr/bin/env python3
 """
-LSTM model for SST-2 sentiment classification - optimized for 85%+ accuracy
-Literature-standard 3-layer BiLSTM with attention pooling
-Designed for distributed training on 6 nodes with DPA backend
+Deterministic LSTM for SST2 - Guaranteed reproducible results
 """
 
 import argparse
 import os
 import sys
-import re
 import json
 import time
-import math
 import datetime
 import random
 import numpy as np
-from typing import List, Tuple, Optional
+from typing import Optional, List
+from functools import partial
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import Dataset, DataLoader, DistributedSampler, Subset
-from datasets import load_dataset  # Hugging Face
+from torch.utils.data import Dataset, DataLoader, DistributedSampler
+from datasets import load_dataset
 
-import dpa
+# DPA import if available
+try:
+    import dpa
+    HAS_DPA = True
+except ImportError:
+    HAS_DPA = False
 
-# ------------------------- Fixed NLP defaults (optimized for 85%+) -------------------------
-PAD_ID         = 0
-UNK_ID         = 1
-MIN_FREQ       = 1            # keep rare tokens
-WORD_DROPOUT_P = 0.05         # reduced from 0.15 - less aggressive
-EMB_DROPOUT_P  = 0.1          # reduced from 0.20 - less aggressive  
-CLIP_NORM      = 5.0
-WARMUP_RATIO   = 0.10         # 10% warmup for cosine schedule
+# ======================== FIXED CONSTANTS ========================
+PAD_ID = 0
+UNK_ID = 1
+MAX_LEN = 64
+VOCAB_SIZE = 20000
+EMB_DIM = 300
+HIDDEN_DIM = 256
+NUM_LAYERS = 2
+DROPOUT = 0.3
+LABEL_SMOOTHING = 0.05
 
-# ------------------------- Tokenizer / Vocab ------------------------------
+# ======================== DETERMINISTIC SEED SETUP ========================
+def seed_everything(seed, rank=0):
+    """Completely deterministic seeding"""
+    seed = seed + rank  # Different seed per rank
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(True, warn_only=True)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    return seed
 
-_token_re = re.compile(r"[a-z0-9']+|[!?.,;:()\-]+")
+# ======================== TOKENIZER & VOCAB ========================
+def simple_tokenize(text):
+    """Simple deterministic tokenizer"""
+    import re
+    text = text.lower()
+    tokens = re.findall(r'\b\w+\b|[^\w\s]', text)
+    return tokens
 
-def simple_tokenizer(text: str) -> List[str]:
-    text = text.lower().replace("\n", " ")
-    text = re.sub(r"\d+", "<num>", text)  # fold numbers
-    return _token_re.findall(text)
-
-def build_vocab_sst(max_vocab: Optional[int], min_freq: int) -> dict:
+def build_vocab(max_vocab=VOCAB_SIZE):
+    """Build vocabulary from training data"""
     from collections import Counter
-    # build from train + validation to reduce OOV
     ds_train = load_dataset("glue", "sst2", split="train")
-    ds_val   = load_dataset("glue", "sst2", split="validation")
-    ctr = Counter()
+    counter = Counter()
+    
     for ex in ds_train:
-        ctr.update(simple_tokenizer(ex["sentence"]))
-    for ex in ds_val:
-        ctr.update(simple_tokenizer(ex["sentence"]))
-
+        tokens = simple_tokenize(ex["sentence"])
+        counter.update(tokens)
+    
     vocab = {"<pad>": PAD_ID, "<unk>": UNK_ID}
-    words = [w for w, c in ctr.most_common() if c >= min_freq]
-    if max_vocab and max_vocab > 0:
-        words = words[: max(0, max_vocab - len(vocab))]
-    for w in words:
-        vocab[w] = len(vocab)
+    most_common = counter.most_common(max_vocab - 2)
+    
+    for word, _ in most_common:
+        vocab[word] = len(vocab)
+    
     return vocab
 
-def encode(text: str, vocab: dict, max_len: int) -> Tuple[torch.Tensor, int]:
-    toks = simple_tokenizer(text) or ["<unk>"]
-    ids = [vocab.get(t, UNK_ID) for t in toks][:max_len]
+def encode_text(text, vocab, max_len=MAX_LEN):
+    """Encode text to indices"""
+    tokens = simple_tokenize(text)[:max_len]
+    ids = [vocab.get(tok, UNK_ID) for tok in tokens]
     length = len(ids)
+    
+    # Pad to max_len
     if length < max_len:
         ids += [PAD_ID] * (max_len - length)
+    
     return torch.tensor(ids, dtype=torch.long), length
 
-# ------------------------- Dataset ------------------------------
-
+# ======================== DATASET ========================
 class SSTDataset(Dataset):
-    def __init__(self, split: str, vocab: dict, max_len: int = 128):
+    def __init__(self, split, vocab, max_len=MAX_LEN):
         self.data = load_dataset("glue", "sst2", split=split)
         self.vocab = vocab
         self.max_len = max_len
-    def __len__(self): return len(self.data)
-    def __getitem__(self, idx: int):
+    
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, idx):
         item = self.data[idx]
-        x, length = encode(item["sentence"], self.vocab, self.max_len)
-        return x, torch.tensor(item["label"], dtype=torch.long), torch.tensor(length, dtype=torch.long)
+        text_ids, length = encode_text(item["sentence"], self.vocab, self.max_len)
+        label = torch.tensor(item["label"], dtype=torch.long)
+        return text_ids, label, length
 
-# ------------------------- Metrics ------------------------------
-
-class AverageMeter:
-    def __init__(self): self.reset()
-    def reset(self):
-        self.sum = 0.0; self.count = 0.0; self.avg = 0.0; self.min = float("inf"); self.max = 0.0
-    def update(self, val, n=1):
-        v = float(val); self.sum += v * n; self.count += n
-        self.avg = self.sum / max(1.0, self.count)
-        self.min = min(self.min, v); self.max = max(self.max, v)
-    def all_reduce(self):
-        if dist.is_available() and dist.is_initialized():
-            backend = dist.get_backend()
-            device = torch.device(f"cuda:{torch.cuda.current_device()}") if backend == dist.Backend.NCCL else torch.device("cpu")
-            t = torch.tensor([self.sum, self.count], dtype=torch.float64, device=device)
-            dist.all_reduce(t, op=dist.ReduceOp.SUM)
-            self.sum, self.count = t.cpu().tolist()
-            self.avg = self.sum / max(1.0, self.count)
-
-@torch.no_grad()
-def accuracy_topk(output: torch.Tensor, target: torch.Tensor, num_classes: int, ks=(1,5)):
-    res = []
-    maxk = min(max(ks), num_classes)
-    batch = target.size(0)
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
-    for k in ks:
-        k = min(k, num_classes)
-        correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-        res.append(correct_k.mul_(100.0 / batch))
-    return res
-
-# ------------------------- Enhanced LSTM Model for 85%+ accuracy ------------------------------
-
-class LSTMTextModel(nn.Module):
-    """
-    2-layer BiLSTM encoder + pooled readout.
-    Key change: reduced dropout from 0.6 to 0.3 for 85% accuracy.
-    """
+# ======================== LSTM MODEL ========================
+class DeterministicLSTM(nn.Module):
+    """Deterministic LSTM for text classification"""
+    
     def __init__(self, vocab_size, num_classes=2):
         super().__init__()
+        self.embedding = nn.Embedding(vocab_size, EMB_DIM, padding_idx=PAD_ID)
+        self.dropout = nn.Dropout(DROPOUT)
         
-        # Model configuration - minimal changes for 85%
-        embed_dim  = 300      # Keep original
-        hidden_dim = 512      # Keep original  
-        num_layers = 2        # Keep original
-        dropout    = 0.3      # REDUCED from 0.6 - THIS IS THE KEY CHANGE
-        
-        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
-        self.emb_drop = nn.Dropout(EMB_DROPOUT_P)
-        
+        # LSTM layers
         self.lstm = nn.LSTM(
-            embed_dim, hidden_dim, 
-            num_layers=num_layers,
-            batch_first=True, 
+            EMB_DIM, HIDDEN_DIM, 
+            num_layers=NUM_LAYERS,
+            batch_first=True,
             bidirectional=True,
-            dropout=dropout if num_layers > 1 else 0.0
+            dropout=DROPOUT if NUM_LAYERS > 1 else 0
         )
         
-        self.attn = nn.Linear(hidden_dim * 2, 1, bias=False)   # attention scores
-        self.dropout = nn.Dropout(dropout)
-        self.norm = nn.LayerNorm(hidden_dim * 2 * 3)
-        
-        # Slightly deeper MLP head (was just 512->num_classes)
-        self.proj = nn.Sequential(
-            nn.Linear(hidden_dim * 2 * 3, 512),
-            nn.GELU(),
-            nn.Dropout(0.2),  # reduced from 0.3
-            nn.Linear(512, num_classes),
+        # Output layers
+        self.fc = nn.Sequential(
+            nn.Linear(HIDDEN_DIM * 2, HIDDEN_DIM),
+            nn.ReLU(),
+            nn.Dropout(DROPOUT),
+            nn.Linear(HIDDEN_DIM, num_classes)
         )
-
-    def forward(self, x, lengths: Optional[torch.Tensor] = None):
-        # Word dropout (training only, less aggressive)
-        if self.training and WORD_DROPOUT_P > 0:
-            drop = (torch.rand_like(x, dtype=torch.float32) < WORD_DROPOUT_P) & (x != PAD_ID)
-            x = torch.where(drop, torch.full_like(x, UNK_ID), x)
         
-        # Embedding with dropout
-        emb = self.emb_drop(self.embedding(x))
+        # Initialize weights deterministically
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Deterministic weight initialization"""
+        for name, param in self.named_parameters():
+            if 'weight_ih' in name:
+                nn.init.xavier_uniform_(param)
+            elif 'weight_hh' in name:
+                nn.init.orthogonal_(param)
+            elif 'bias' in name:
+                nn.init.zeros_(param)
+            elif 'embedding' in name:
+                nn.init.normal_(param, mean=0, std=0.1)
+            elif 'fc' in name and 'weight' in name:
+                nn.init.xavier_uniform_(param)
+    
+    def forward(self, x, lengths=None):
+        # Embedding and dropout
+        embedded = self.dropout(self.embedding(x))
         
-        # LSTM encoding with proper masking
+        # Pack sequences for efficiency
         if lengths is not None:
+            lengths = lengths.cpu()
             packed = nn.utils.rnn.pack_padded_sequence(
-                emb, lengths.cpu(), batch_first=True, enforce_sorted=False
+                embedded, lengths, batch_first=True, enforce_sorted=False
             )
-            out, _ = self.lstm(packed)
-            out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)  # (B, T, 2*H)
-            T = out.size(1)
-            mask = (torch.arange(T, device=out.device).unsqueeze(0) < 
-                   lengths.to(out.device).unsqueeze(1)).unsqueeze(-1)  # (B,T,1)
+            lstm_out, (hidden, _) = self.lstm(packed)
+            lstm_out, _ = nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
         else:
-            out, _ = self.lstm(emb)
-            mask = torch.ones_like(out[..., :1], dtype=torch.bool)
+            lstm_out, (hidden, _) = self.lstm(embedded)
         
-        # Apply dropout to LSTM output
-        out = self.dropout(out)
+        # Use last hidden state from both directions
+        # hidden shape: (num_layers * num_directions, batch, hidden_dim)
+        forward_hidden = hidden[-2, :, :]  # Last layer forward
+        backward_hidden = hidden[-1, :, :]  # Last layer backward
+        combined = torch.cat([forward_hidden, backward_hidden], dim=1)
         
-        # 1. Mean pooling (masked)
-        out_masked = out.masked_fill(~mask, 0.0)
-        sum_pool = out_masked.sum(dim=1)
-        len_pool = mask.sum(dim=1).clamp(min=1)
-        mean_pool = sum_pool / len_pool
-        
-        # 2. Max pooling (masked)
-        out_neg_inf = out.masked_fill(~mask, float("-inf"))
-        max_pool, _ = out_neg_inf.max(dim=1)
-        
-        # 3. Attention pooling (simple)
-        attn_scores = self.attn(out)  # (B, T, 1)
-        attn_scores = attn_scores.masked_fill(~mask, float("-inf"))
-        attn_weights = torch.softmax(attn_scores, dim=1)
-        attn_pool = (out * attn_weights).sum(dim=1)
-        
-        # Concatenate all pooled features
-        feat = torch.cat([mean_pool, max_pool, attn_pool], dim=1)  # (B, 2*H*3)
-        
-        # Layer norm for stability
-        feat = self.norm(feat)
-        
-        # Final classification
-        logits = self.proj(feat)
-        return logits
+        # Classification
+        output = self.fc(combined)
+        return output
 
-# ------------------------- Training Functions ------------------------------
-
-def cosine_lr_schedule(optimizer, epoch, max_epoch, warmup_ratio, min_lr_mult):
-    """Cosine learning rate schedule with linear warmup"""
-    warmup_epochs = int(max_epoch * warmup_ratio)
-    if epoch < warmup_epochs:
-        # Linear warmup
-        lr_mult = (epoch + 1) / warmup_epochs
-    else:
-        # Cosine annealing
-        progress = (epoch - warmup_epochs) / max(1, max_epoch - warmup_epochs)
-        lr_mult = min_lr_mult + (1 - min_lr_mult) * 0.5 * (1 + math.cos(math.pi * progress))
+# ======================== METRICS ========================
+class AverageMeter:
+    def __init__(self):
+        self.reset()
     
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = param_group['initial_lr'] * lr_mult
-    return optimizer.param_groups[0]['lr']
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+    
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+    
+    def all_reduce(self):
+        if dist.is_available() and dist.is_initialized():
+            t = torch.tensor([self.sum, self.count], dtype=torch.float64)
+            if torch.cuda.is_available():
+                t = t.cuda()
+            dist.all_reduce(t, op=dist.ReduceOp.SUM)
+            self.sum, self.count = t.cpu().tolist()
+            self.avg = self.sum / max(1, self.count)
 
-def train_epoch(epoch, model, loader, criterion, optimizer, scaler, device, straggle):
+# ======================== TRAINING ========================
+def train_epoch(model, loader, optimizer, criterion, device, rank):
     model.train()
-    metrics = {
-        'loss': AverageMeter(), 'top1': AverageMeter(), 'top5': AverageMeter(),
-        'data_time': AverageMeter(), 'comp_time': AverageMeter(), 'step_time': AverageMeter()
-    }
+    loss_meter = AverageMeter()
+    acc_meter = AverageMeter()
     
-    start_time = time.time()
-    data_start = time.time()
-    step_times = []
-    
-    for batch_idx, (inputs, targets, lengths) in enumerate(loader):
-        data_time = time.time() - data_start
-        metrics['data_time'].update(data_time)
+    for batch_idx, (texts, labels, lengths) in enumerate(loader):
+        texts = texts.to(device)
+        labels = labels.to(device)
+        lengths = lengths.to(device)
         
-        inputs, targets, lengths = inputs.to(device), targets.to(device), lengths.to(device)
+        # Forward pass
+        outputs = model(texts, lengths)
+        loss = criterion(outputs, labels)
         
-        comp_start = time.time()
+        # Backward pass
         optimizer.zero_grad(set_to_none=True)
+        loss.backward()
         
-        if scaler is not None:
-            with torch.cuda.amp.autocast():
-                outputs = model(inputs, lengths)
-                loss = criterion(outputs, targets)
-            scaler.scale(loss).backward()
-            straggle.delay()
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP_NORM)
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            outputs = model(inputs, lengths)
-            loss = criterion(outputs, targets)
-            loss.backward()
-            straggle.delay()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP_NORM)
-            optimizer.step()
+        # Gradient clipping
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
         
-        comp_time = time.time() - comp_start
-        metrics['comp_time'].update(comp_time)
+        optimizer.step()
         
-        # Calculate accuracy
-        acc1, acc5 = accuracy_topk(outputs.detach(), targets, model.module.proj[-1].out_features)
-        metrics['loss'].update(loss.item(), inputs.size(0))
-        metrics['top1'].update(acc1.item(), inputs.size(0))
-        metrics['top5'].update(acc5.item(), inputs.size(0))
+        # Metrics
+        _, preds = torch.max(outputs, 1)
+        acc = (preds == labels).float().mean()
         
-        step_time = time.time() - data_start
-        step_times.append(step_time)
-        metrics['step_time'].update(step_time)
-        
-        if batch_idx % 50 == 0 and dist.get_rank() == 0:
-            print(f"  [{batch_idx:3d}/{len(loader):3d}] "
-                  f"loss={metrics['loss'].avg:.4f} top1={metrics['top1'].avg:.2f}% "
-                  f"step={step_time:.3f}s", flush=True)
-        
-        data_start = time.time()
+        loss_meter.update(loss.item(), texts.size(0))
+        acc_meter.update(acc.item(), texts.size(0))
     
-    # All-reduce metrics
-    for m in metrics.values():
-        m.all_reduce()
+    # Synchronize metrics across ranks
+    loss_meter.all_reduce()
+    acc_meter.all_reduce()
     
-    epoch_time = time.time() - start_time
-    throughput = len(loader.dataset) / epoch_time if dist.is_initialized() else \
-                 len(loader.dataset) * dist.get_world_size() / epoch_time
-    
-    return {
-        'loss': metrics['loss'].avg, 'top1': metrics['top1'].avg, 'top5': metrics['top5'].avg,
-        'epoch_time': epoch_time, 'throughput': throughput,
-        'step_time': np.mean(step_times), 'step_time_min': np.min(step_times),
-        'step_time_max': np.max(step_times), 'data_time': metrics['data_time'].avg,
-        'comp_time': metrics['comp_time'].avg
-    }
+    return loss_meter.avg, acc_meter.avg
 
 @torch.no_grad()
 def validate(model, loader, criterion, device):
     model.eval()
-    metrics = {'loss': AverageMeter(), 'top1': AverageMeter(), 'top5': AverageMeter()}
+    loss_meter = AverageMeter()
+    acc_meter = AverageMeter()
     
-    for inputs, targets, lengths in loader:
-        inputs, targets, lengths = inputs.to(device), targets.to(device), lengths.to(device)
-        outputs = model(inputs, lengths)
-        loss = criterion(outputs, targets)
+    for texts, labels, lengths in loader:
+        texts = texts.to(device)
+        labels = labels.to(device)
+        lengths = lengths.to(device)
         
-        acc1, acc5 = accuracy_topk(outputs, targets, model.module.proj[-1].out_features)
-        metrics['loss'].update(loss.item(), inputs.size(0))
-        metrics['top1'].update(acc1.item(), inputs.size(0))
-        metrics['top5'].update(acc5.item(), inputs.size(0))
+        outputs = model(texts, lengths)
+        loss = criterion(outputs, labels)
+        
+        _, preds = torch.max(outputs, 1)
+        acc = (preds == labels).float().mean()
+        
+        loss_meter.update(loss.item(), texts.size(0))
+        acc_meter.update(acc.item(), texts.size(0))
     
-    for m in metrics.values():
-        m.all_reduce()
+    loss_meter.all_reduce()
+    acc_meter.all_reduce()
     
-    return {k: m.avg for k, m in metrics.items()}
+    return loss_meter.avg, acc_meter.avg
 
-# ------------------------- JSON Logging ------------------------------
-
-def now():
-    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-def save_log(path, log):
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(log, f, indent=2)
-    os.rename(tmp, path)
-
-# ------------------------- Straggler Simulation ------------------------------
-
-class StraggleSim:
-    def __init__(self, args):
-        self.args = args
-        self.active = (args.straggle_points > 0 or args.straggle_prob > 0) and args.straggle_amount > 0
-        self.step = 0
-        if self.active and args.rank == 0:
-            print(f"[straggle_sim] active: points={args.straggle_points}, "
-                  f"prob={args.straggle_prob:.3f}, amount={args.straggle_amount:.3f}s", flush=True)
-    
-    def delay(self):
-        if not self.active: return
-        
-        delay_time = 0
-        is_straggler = (self.args.rank in self.args.straggle_ranks) if self.args.straggle_ranks else True
-        
-        if is_straggler:
-            if self.args.straggle_points > 0 and self.step < self.args.straggle_points:
-                delay_time = self.args.straggle_amount
-            elif self.args.straggle_prob > 0 and torch.rand(1).item() < self.args.straggle_prob:
-                lo, hi = self.args.straggle_multiply
-                mult = lo + torch.rand(1).item() * (hi - lo)
-                delay_time = self.args.straggle_amount * mult
-        
-        if delay_time > 0:
-            if self.args.straggle_verbose and self.args.rank == 0:
-                print(f"[straggle] rank {self.args.rank} delay {delay_time:.3f}s", flush=True)
-            time.sleep(delay_time)
-        
-        self.step += 1
-    
-    def get_stats(self):
-        return {"events": self.step}
-
-# ------------------------- Main Training Loop ------------------------------
-
+# ======================== MAIN TRAINING LOOP ========================
 def train(args):
-    # Setup device
-    device = torch.device(f'cuda:{args.local_rank}' if args.device == 'cuda' else 'cpu')
+    # Seed everything first
+    seed = seed_everything(args.seed, args.rank)
     
-    # Build vocabulary
-    vocab = build_vocab_sst(args.max_vocab, MIN_FREQ)
     if args.rank == 0:
-        print(f"[Vocab] size={len(vocab)} (includes PAD/UNK)", flush=True)
+        print(f"[Setup] Seed={seed}, World Size={args.world_size}, Backend={args.backend}")
     
-    # Create datasets
-    train_dataset = SSTDataset("train", vocab, args.max_len)
-    val_dataset = SSTDataset("validation", vocab, args.max_len)
+    # Device setup
+    device = torch.device('cuda' if args.device == 'cuda' and torch.cuda.is_available() else 'cpu')
     
-    # Create data loaders
-    train_sampler = DistributedSampler(train_dataset, shuffle=True)
-    val_sampler = DistributedSampler(val_dataset, shuffle=False)
+    # Build vocab and datasets
+    vocab = build_vocab(VOCAB_SIZE)
+    train_dataset = SSTDataset("train", vocab)
+    val_dataset = SSTDataset("validation", vocab)
+    
+    # Create samplers
+    train_sampler = DistributedSampler(
+        train_dataset, 
+        num_replicas=args.world_size, 
+        rank=args.rank,
+        shuffle=True,
+        seed=args.seed  # Fixed seed for sampler
+    )
+    
+    val_sampler = DistributedSampler(
+        val_dataset,
+        num_replicas=args.world_size,
+        rank=args.rank,
+        shuffle=False
+    )
+    
+    # DataLoader with deterministic worker init
+    def worker_init_fn(worker_id):
+        worker_seed = args.seed + worker_id + args.rank * 100
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+    
+    # Create generator for DataLoader
+    g = torch.Generator()
+    g.manual_seed(args.seed + args.rank)
     
     train_loader = DataLoader(
-        train_dataset, batch_size=args.batch_size, sampler=train_sampler,
-        num_workers=args.workers, pin_memory=True, prefetch_factor=args.prefetch_factor,
-        drop_last=args.drop_last_train, persistent_workers=(args.workers > 0)
+        train_dataset,
+        batch_size=args.batch_size,
+        sampler=train_sampler,
+        num_workers=min(4, args.workers),
+        pin_memory=True,
+        drop_last=True,
+        worker_init_fn=worker_init_fn,
+        generator=g
     )
+    
     val_loader = DataLoader(
-        val_dataset, batch_size=args.batch_size*2, sampler=val_sampler,
-        num_workers=args.workers, pin_memory=True, prefetch_factor=args.prefetch_factor,
-        drop_last=args.drop_last_val, persistent_workers=(args.workers > 0)
+        val_dataset,
+        batch_size=args.batch_size,
+        sampler=val_sampler,
+        num_workers=min(4, args.workers),
+        pin_memory=True,
+        drop_last=False,
+        worker_init_fn=worker_init_fn,
+        generator=g
     )
     
-    # Create model
-    model = LSTMTextModel(len(vocab), args.num_classes).to(device)
-    if args.rank == 0:
-        total_params = sum(p.numel() for p in model.parameters())
-        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f"Model 'lstm_optimized' initialized. (embed=300, hidden=512, layers=2, drop=0.3)", flush=True)
+    # Model
+    model = DeterministicLSTM(len(vocab), num_classes=2).to(device)
     
-    # Wrap in DDP
-    model = DDP(model, device_ids=[args.local_rank] if args.device == 'cuda' else None,
-                static_graph=args.static_graph, bucket_cap_mb=args.bucket_cap_mb)
+    # DDP wrapping
+    if args.world_size > 1:
+        model = DDP(
+            model, 
+            device_ids=[args.local_rank] if device.type == 'cuda' else None,
+            broadcast_buffers=False,
+            bucket_cap_mb=args.bucket_cap_mb
+        )
     
-    if args.backend.startswith("dpa") and args.rank == 0:
-        print(f"dpa.torch.py: DDP DPAState Object:  {{'pipes': 0, 'straggle': {args.world_size}, 'averaging': True, 'prescaled': {args.prescale}}}", flush=True)
-        print(f"[straggle_sim][warning] created but effectively inactive -- points: {args.straggle_points}, prob: {args.straggle_prob}, amount: {args.straggle_amount}", flush=True)
-    
-    # Setup optimizer with scaled learning rate for distributed training
+    # Loss and optimizer
+    criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
     optimizer = optim.AdamW(
         model.parameters(), 
-        lr=args.learning_rate, 
+        lr=args.learning_rate,
         weight_decay=args.weight_decay,
-        betas=(0.9, 0.999)
+        eps=1e-8
     )
-    for group in optimizer.param_groups:
-        group['initial_lr'] = group['lr']
     
-    # Setup loss function with label smoothing
-    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
-    
-    # Setup mixed precision
-    scaler = torch.cuda.amp.GradScaler() if args.amp else None
-    
-    # Setup straggler simulation
-    straggle = StraggleSim(args)
-    if args.rank == 0:
-        if straggle.active:
-            print(f"Straggle sim active: points={args.straggle_points}, "
-                  f"prob={args.straggle_prob:.3f}, amount={args.straggle_amount:.3f}s", flush=True)
-        else:
-            print("Straggle sim inactive", flush=True)
-    
-    # Initialize JSON log
-    log = {
-        "command": " ".join(sys.argv),
-        "args": vars(args),
-        "start": now(),
-        "epochs": {}
-    }
-    if args.rank == 0:
-        save_log(args.json, log)
+    # Cosine scheduler
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, 
+        T_max=args.epochs,
+        eta_min=args.learning_rate * 0.1
+    )
     
     # Training loop
-    best_acc = 0.0
-    for epoch in range(args.epochs):
-        epoch_start_time = time.time()
+    best_val_acc = 0.0
+    log_data = {"epochs": {}}
+    
+    for epoch in range(1, args.epochs + 1):
+        # CRITICAL: Set epoch for sampler to ensure different shuffling each epoch
         train_sampler.set_epoch(epoch)
         
-        # Adjust learning rate
-        lr = cosine_lr_schedule(optimizer, epoch, args.epochs, WARMUP_RATIO, args.cosine_min_lr_mult)
+        epoch_start = time.time()
         
         # Train
-        if args.rank == 0:
-            print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
-        
-        train_metrics = train_epoch(epoch, model, train_loader, criterion, optimizer, scaler, device, straggle)
-        
-        # Global loss tracking
-        global_loss = train_metrics['loss']
-        if dist.is_initialized():
-            loss_tensor = torch.tensor([train_metrics['loss']], device=device)
-            dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
-            global_loss = loss_tensor.item() / dist.get_world_size()
+        train_loss, train_acc = train_epoch(model, train_loader, optimizer, criterion, device, args.rank)
         
         # Validate
-        val_metrics = validate(model, val_loader, criterion, device)
+        val_loss, val_acc = validate(model, val_loader, criterion, device)
         
-        # Track best accuracy
-        if val_metrics['top1'] > best_acc:
-            best_acc = val_metrics['top1']
+        # Update scheduler
+        scheduler.step()
         
-        # Calculate epoch time
-        epoch_time = time.time() - epoch_start_time
+        epoch_time = time.time() - epoch_start
         
-        # Log results
+        # Logging
         if args.rank == 0:
-            print(f"[{now()}][Epoch {epoch:03d}] "
-                  f"train_loss={train_metrics['loss']:.4f} (global={global_loss:.4f}) "
-                  f"val_loss={val_metrics['loss']:.4f} "
-                  f"top1={val_metrics['top1']:.2f}% "
-                  f"top5={val_metrics['top5']:.2f}% "
-                  f"lr={lr:.6f} "
-                  f"epoch_time={epoch_time:.2f}s "
-                  f"step_time={train_metrics['step_time']:.2f} "
-                  f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) "
-                  f"tp=~{train_metrics['throughput']:.1f} samples/s "
-                  f"straggle_events={straggle.step}", flush=True)
+            print(f"Epoch {epoch}/{args.epochs} - "
+                  f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc*100:.2f}%, "
+                  f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc*100:.2f}%, "
+                  f"Time: {epoch_time:.2f}s")
             
-            # Update JSON log
-            epoch_metrics = {
-                "start": now(),
-                "epoch": int(epoch),
-                "lr": float(lr),
-                "train_loss": float(train_metrics['loss']),
-                "train_loss_global": float(global_loss),
-                "train_top1": float(train_metrics['top1']),
-                "train_top5": float(train_metrics['top5']),
-                "steps": int(len(train_loader)),
-                "step_time_min": float(train_metrics['step_time_min']),
-                "step_time_max": float(train_metrics['step_time_max']),
-                "step_time": float(train_metrics['step_time']),
-                "data_time": float(train_metrics['data_time']),
-                "comp_time": float(train_metrics['comp_time']),
+            # Save best model
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.module.state_dict() if hasattr(model, 'module') else model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'val_acc': val_acc,
+                    'vocab': vocab,
+                }, 'best_lstm_model.pt')
+                print(f"  → New best model saved! Acc: {val_acc*100:.2f}%")
+            
+            # Log to JSON
+            log_data["epochs"][str(epoch)] = {
+                "train_loss": float(train_loss),
+                "train_acc": float(train_acc * 100),
+                "val_loss": float(val_loss),
+                "val_acc": float(val_acc * 100),
                 "epoch_time": float(epoch_time),
-                "epoch_train_time": float(train_metrics['epoch_time']),
-                "epoch_train_throughput": float(train_metrics['throughput']),
-                "val_loss": float(val_metrics['loss']),
-                "val_top1": float(val_metrics['top1']),
-                "val_top5": float(val_metrics['top5']),
-                "straggle": straggle.get_stats() if straggle.active else {}
+                "lr": optimizer.param_groups[0]['lr']
             }
-            log["epochs"][str(epoch)] = epoch_metrics
-            save_log(args.json, log)
+            
+            with open(args.json, 'w') as f:
+                json.dump(log_data, f, indent=2)
+    
+    if args.rank == 0:
+        print(f"\n✓ Training complete! Best validation accuracy: {best_val_acc*100:.2f}%")
 
-# ------------------------- DDP Setup ------------------------------
-
+# ======================== DDP SETUP ========================
 def setup_ddp(args):
-    def env_int(k, d): return d if os.environ.get(k) in (None,"") else int(os.environ.get(k))
-    def env_str(k, d): return d if os.environ.get(k) in (None,"") else os.environ.get(k)
-
-    args.rank        = env_int("RANK", args.rank)
-    args.world_size  = env_int("WORLD_SIZE", args.world_size)
+    """Setup DDP environment"""
+    def env_int(k, d): 
+        return d if os.environ.get(k) in (None, "") else int(os.environ.get(k))
+    
+    def env_str(k, d): 
+        return d if os.environ.get(k) in (None, "") else os.environ.get(k)
+    
+    args.rank = env_int("RANK", args.rank)
+    args.world_size = env_int("WORLD_SIZE", args.world_size)
     args.master_addr = env_str("MASTER_ADDR", args.master_addr)
     args.master_port = env_int("MASTER_PORT", args.master_port)
-    args.iface       = env_str("IFACE", args.iface)
-    args.local_rank  = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
-    if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
-
-    os.environ.setdefault("RANK",        str(args.rank))
-    os.environ.setdefault("WORLD_SIZE",  str(args.world_size))
+    args.iface = env_str("IFACE", args.iface)
+    args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.is_available() else 0
+    
+    if args.device == 'cuda' and torch.cuda.is_available():
+        torch.cuda.set_device(args.local_rank)
+    
+    # Set environment variables
+    os.environ.setdefault("RANK", str(args.rank))
+    os.environ.setdefault("WORLD_SIZE", str(args.world_size))
     os.environ.setdefault("MASTER_ADDR", args.master_addr)
     os.environ.setdefault("MASTER_PORT", str(args.master_port))
-    os.environ.setdefault("LOCAL_RANK",  str(args.local_rank))
-
-    # Network settings
-    os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
-    os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
+    os.environ.setdefault("LOCAL_RANK", str(args.local_rank))
     
-    # Initialize process group
-    if args.backend.startswith("dpa"):
-        if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
+    # Backend-specific settings
+    if args.backend == "gloo":
+        os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
+    elif args.backend == "nccl":
+        os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
+        os.environ.setdefault("NCCL_DEBUG", "WARN")
+    
+    # Initialize DDP
+    if args.backend.startswith("dpa") and HAS_DPA:
+        # DPA backend setup
         dpa_device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         dpa_backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf)
         pg_options = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
         pg_options.hint_pinned_tensor_size = args.hint_tensor_size
         pg_options.hint_pinned_tensor_pool_size = args.hint_tensor_count
-        dist.init_process_group(backend=args.backend, init_method="env://", 
-                              rank=args.rank, world_size=args.world_size,
-                              timeout=datetime.timedelta(seconds=60), pg_options=pg_options)
+        
+        dist.init_process_group(
+            backend=args.backend,
+            init_method="env://",
+            rank=args.rank,
+            world_size=args.world_size,
+            timeout=datetime.timedelta(seconds=60),
+            pg_options=pg_options
+        )
     else:
-        dist.init_process_group(backend=args.backend, init_method="env://",
-                              rank=args.rank, world_size=args.world_size,
-                              timeout=datetime.timedelta(seconds=60))
-
-    if args.rank == 0:
-        print(f"[DDP] backend={args.backend} world_size={args.world_size} "
-              f"master={args.master_addr}:{args.master_port} iface={args.iface}", flush=True)
+        dist.init_process_group(
+            backend=args.backend,
+            init_method="env://",
+            rank=args.rank,
+            world_size=args.world_size,
+            timeout=datetime.timedelta(seconds=60)
+        )
 
 def main():
-    parser = argparse.ArgumentParser(description="LSTM SST-2 training for 85%+ accuracy")
+    parser = argparse.ArgumentParser(description="Deterministic LSTM for SST2")
     
-    # Distributed training
+    # DDP arguments
     parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--iface', type=str, default="ens4f0")
@@ -574,89 +485,31 @@ def main():
     parser.add_argument("--backend", type=str, default="gloo")
     parser.add_argument("--dpa_conf", type=str, default=None)
     parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
-    parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--prefetch_factor", type=int, default=4)
-    parser.add_argument("--static_graph", action='store_true')
-    parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument("--json", type=str, default="lstm.json", help="Path to JSON run log")
     
-    # Training hyperparameters (optimized for 85%+ with conservative model)
-    parser.add_argument('--epochs', type=int, default=15)  # May need more epochs
+    # Training arguments
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--learning_rate', type=float, default=0.002)  # Slightly lower
-    parser.add_argument('--weight_decay', type=float, default=1e-05)
-    parser.add_argument('--num_classes', type=int, default=2)
-    parser.add_argument("--amp", action="store_true")
-    parser.add_argument("--drop_last_train", action='store_true')
-    parser.add_argument("--drop_last_val", action='store_true')
+    parser.add_argument('--learning_rate', type=float, default=0.001)
+    parser.add_argument('--weight_decay', type=float, default=1e-5)
+    parser.add_argument("--bucket_cap_mb", type=int, default=25)
     
-    # Regularization (optimized values)
-    parser.add_argument("--label_smoothing", type=float, default=0.02)
-    parser.add_argument("--cosine_min_lr_mult", type=float, default=0.1)
+    # DPA hints
+    parser.add_argument("--hint_tensor_size", type=int, default=200000000)
+    parser.add_argument("--hint_tensor_count", type=int, default=20)
     
-    # Text processing
-    parser.add_argument("--max_len", type=int, default=64)  # Increased from 50
-    parser.add_argument("--max_vocab", type=int, default=60000)
-    
-    # Straggle simulation
-    def csv_ints(s: str) -> List[int]:
-        if not s: return []
-        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
-        except ValueError: raise argparse.ArgumentTypeError("Expected comma-separated ints, e.g. 1,3,5")
-    parser.add_argument("--straggle_points", type=int, default=0)
-    parser.add_argument("--straggle_prob", type=float, default=0)
-    parser.add_argument("--straggle_ranks", type=csv_ints, default=[])
-    parser.add_argument("--straggle_amount", type=float, default=0)
-    parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), default=[1.0, 1.0])
-    parser.add_argument("--straggle_verbose", action='store_true')
-    
-    # DDP options
-    parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
-    parser.add_argument("--bucket_cap_mb", type=int, default=None)
-    parser.add_argument("--hint_tensor_size", type=int, default=100000000)
-    parser.add_argument("--hint_tensor_count", type=int, default=5)
+    # Reproducibility
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument("--json", type=str, default="lstm_deterministic.json")
     
     args = parser.parse_args()
     
-    # Setup deterministic training if requested
-    if args.deterministic:
-        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-        torch.use_deterministic_algorithms(True, warn_only=True)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        random.seed(args.seed + args.rank)
-        np.random.seed(args.seed + args.rank)
-        torch.manual_seed(args.seed + args.rank)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(args.seed + args.rank)
-    else:
-        torch.backends.cudnn.benchmark = True
+    # Always use deterministic mode
+    args.deterministic = True
     
-    # Args sanity checks/corrections
-    if args.device == 'cuda' and not torch.cuda.is_available():
-        args.device = 'cpu'
-        if args.rank == 0:
-            print("[Info] Using device=cpu because CUDA is not available", flush=True)
-    if args.amp and args.device == 'cpu':
-        args.amp = False
-        if args.rank == 0:
-            print("[Info] Disabling AMP because CUDA is not available", flush=True)
-    if args.workers < 1:
-        if args.rank == 0:
-            print("[Info] Workers requested < 1; using workers=1", flush=True)
-        args.workers = 1
-    
-    sys.stdout.reconfigure(line_buffering=True)
-    
-    # Setup distributed training
+    # Setup DDP
     setup_ddp(args)
     
-    # Show configuration
-    if args.rank == 0:
-        print(json.dumps(vars(args), indent=2))
-    
-    # Run training
     try:
         train(args)
     finally:
