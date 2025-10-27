@@ -296,18 +296,19 @@ def train_one_epoch(model, loader, minival_loader, optim, sched, device, scaler,
             mid = validate(model, minival_loader, device, args)
             # if args.rank == 0:
             print(
-                f"[{now()}][MiniVal][Epoch {epoch:03d} Step {step+1:05d}]"
+                f"[{now()}][MiniVal][Epoch {epoch:03d} Step {step+1:05d}] "
                 f"val_loss={mid['loss']:.4f} val_em={mid['em']:.2f}% val_f1={mid['f1']:.2f}%",
                 flush=True
             )
             if args.json:
                 try:
+                    global_step = int(epoch * total_steps + step)  # cumulative; use `step` alone if you prefer per-epoch
                     with open(args.json, "r") as f:
                         log = json.load(f)
                         updates_minival = log.setdefault("minival", {})
                         epm = updates_minival.setdefault(str(epoch), {})
                         epm[f"{step:04d}"] = {
-                            # "global_step": int(global_step),
+                            "global_step": int(global_step),
                             "mini_val_em": float(mid['em']),
                             "mini_val_f1":  float(mid['f1']),
                             "lr": float(optim.param_groups[0]["lr"])

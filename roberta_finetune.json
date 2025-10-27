@@ -1,0 +1,68 @@
+{
+  "time": "2025-10-27 12:04:23",
+  "config": {
+    "rank": 0,
+    "world_size": 6,
+    "iface": "ens4f1",
+    "master_addr": "42.0.1.1",
+    "master_port": 29500,
+    "backend": "dpa_dpdk",
+    "dpa_conf": "/home/gks/straggle-ml-experiments/configs/edgecore.json",
+    "device": "cuda",
+    "deterministic": true,
+    "seed": 42,
+    "workers": 4,
+    "json": "experiments/train/roberta_finetune.json",
+    "log_interval": 20,
+    "val_every": 150,
+    "val_every_subset": 0.25,
+    "squad_version": "v2",
+    "data": "/home/gks/datasets/squad_v2",
+    "force_download": false,
+    "sched": "cosine",
+    "model_name": "roberta-base",
+    "epochs": 8,
+    "batch_size": 32,
+    "learning_rate": 3e-05,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.2,
+    "amp": false,
+    "drop_last_train": false,
+    "drop_last_val": false,
+    "static_graph": false,
+    "prefetch_factor": 4,
+    "max_grad_norm": 1.0,
+    "max_seq_len": 384,
+    "doc_stride": 128,
+    "max_answer_length": 30,
+    "n_best_size": 100,
+    "null_score_diff_threshold": 0.0,
+    "prescale": false,
+    "bucket_cap_mb": null,
+    "straggle_points": 0,
+    "straggle_prob": 0,
+    "straggle_ranks": [],
+    "straggle_amount": 0,
+    "straggle_multiply": [
+      1.0,
+      1.0
+    ],
+    "straggle_verbose": false,
+    "local_rank": 0
+  },
+  "epochs": {},
+  "minival": {
+    "0": {
+      "0150": {
+        "mini_val_em": 44.84587338415645,
+        "mini_val_f1": 45.416561332586305,
+        "lr": 4.0946314831665145e-06
+      },
+      "0300": {
+        "mini_val_em": 53.23168710639708,
+        "mini_val_f1": 56.89083778921702,
+        "lr": 8.189262966333029e-06
+      }
+    }
+  }
+}
