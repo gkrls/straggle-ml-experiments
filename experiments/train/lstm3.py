@@ -136,6 +136,69 @@ class BiLSTMPool(nn.Module):
         logits = self.fc(self.dropout(max_pool))
         return logits
 
+class BiLSTMMeanMax(nn.Module):
+    """
+    Simple, robust baseline:
+    2-layer BiLSTM -> [mean-pool || max-pool] -> LayerNorm -> MLP head.
+    """
+    def __init__(self, vocab_size, num_classes=2,
+                 embed_dim=300, hidden_dim=768, num_layers=2,
+                 lstm_dropout=0.5, head_dropout=0.5):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=PAD_ID)
+        self.emb_drop  = nn.Dropout(EMB_DROPOUT_P)
+
+        self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=num_layers, batch_first=True,
+                            bidirectional=True, dropout=lstm_dropout if num_layers > 1 else 0.0)
+
+        # init: Xavier + forget gate bias = 1.0 (stability)
+        for name, p in self.lstm.named_parameters():
+            if "weight_ih" in name or "weight_hh" in name:
+                nn.init.xavier_uniform_(p)
+            elif "bias_ih" in name or "bias_hh" in name:
+                nn.init.zeros_(p)
+                q = p.shape[0] // 4
+                p.data[q:2*q].fill_(1.0)
+
+        self.norm = nn.LayerNorm(hidden_dim * 2 * 2)   # concat(mean, max) -> 4H
+        self.dropout = nn.Dropout(head_dropout)
+        self.head = nn.Sequential(
+            nn.Linear(hidden_dim * 2 * 2, 512),
+            nn.GELU(),
+            nn.Dropout(0.4),      # a touch more reg than 0.2
+            nn.Linear(512, num_classes),
+        )
+
+    def forward(self, x, lengths: Optional[torch.Tensor] = None):
+        # keep WORD_DROPOUT_P = 0.0 for stability on SST-2
+        emb = self.emb_drop(self.embedding(x))
+
+        if lengths is not None:
+            packed = nn.utils.rnn.pack_padded_sequence(emb, lengths.cpu(), batch_first=True, enforce_sorted=False)
+            out, _ = self.lstm(packed)
+            out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)  # (B, T, 2H)
+            T = out.size(1)
+            mask = (torch.arange(T, device=out.device).unsqueeze(0) < lengths.to(out.device).unsqueeze(1)).unsqueeze(-1)  # (B,T,1)
+        else:
+            out, _ = self.lstm(emb)
+            mask = torch.ones_like(out[..., :1], dtype=torch.bool)
+
+        # mean pool (masked)
+        out_masked = out.masked_fill(~mask, 0.0)
+        sum_pool = out_masked.sum(dim=1)
+        len_pool = mask.sum(dim=1).clamp(min=1)
+        mean_pool = sum_pool / len_pool
+
+        # max pool (masked)
+        out_neg_inf = out.masked_fill(~mask, float("-inf"))
+        max_pool, _ = out_neg_inf.max(dim=1)
+        max_pool[max_pool == float("-inf")] = 0.0
+
+        feat = torch.cat([mean_pool, max_pool], dim=1)   # (B, 4H)
+        feat = self.norm(feat)
+        return self.head(self.dropout(feat))
+
+
 # ------------------------- Scheduler ----------------------------------
 def build_per_step_cosine(optimizer, total_steps: int, warmup_steps: int, min_lr_mult: float = 0.0):
     def lr_lambda(step):
@@ -268,7 +331,7 @@ def train(args):
     train_loader, val_loader = get_dataloaders(args, vocab)
 
     # Model
-    model = BiLSTMPool(vocab_size=len(vocab), num_classes=args.num_classes,
+    model = BiLSTMMeanMax(vocab_size=len(vocab), num_classes=args.num_classes,
                        embed_dim=300, hidden_dim=args.hidden_dim, num_layers=2, lstm_dropout=0.5, head_dropout=0.5).to(device)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
