@@ -86,7 +86,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-sudo -E $(which python) experiments/train/lstm3.py \
+sudo -E $(which python) experiments/train/lstm.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -94,18 +94,22 @@ sudo -E $(which python) experiments/train/lstm3.py \
   --master_port "$MASTER_PORT" \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
-  --epochs 10 \
-  --batch_size 64 \
-  --learning_rate 0.0015 \
-  --weight_decay 1e-05 \
-  --label_smoothing 0.0 \
-  --cosine_min_lr_mult 0.0 \
-  --max_len 96 \
-  --max_vocab 60000 \
-  --hidden_dim 768 \
   --workers 4 \
   --prefetch_factor 4 \
   --hint_tensor_size 100000000 \
   --hint_tensor_count 5 \
   --json experiments/train/lstm.json \
+  --deterministic \
+  --epochs 12 \
+  --batch_size 32 \
   "$@"
+
+
+  # --learning_rate 0.0015 \
+  # --weight_decay 1e-05 \
+  # --label_smoothing 0.0 \
+  # --cosine_min_lr_mult 0.0 \
+  # --max_len 96 \
+  # --max_vocab 60000 \
+  # --hidden_dim 768 \
+  # "$@"

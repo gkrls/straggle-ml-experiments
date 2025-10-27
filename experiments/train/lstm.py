@@ -288,7 +288,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
 
     # epoch duration
     if device.type == 'cuda':
-        e_end.record(); e_end.synchronize()
+        e_end.record()
+        e_end.synchronize()
         duration = e_start.elapsed_time(e_end) / 1000.0
     else:
         duration = time.perf_counter() - e_wall
