@@ -101,6 +101,11 @@ sudo -E $(which python) experiments/train/lstm.py \
   --hint_tensor_size 100000000 \
   --hint_tensor_count 5 \
   --json experiments/train/lstm.json \
+  --straggle_points 3 \
+  --straggle_prob 16 \
+  --straggle_ranks 1 \
+  --straggle_amount 0.05 \
+  --straggle_multiply 0.5 2 \
   --deterministic \
   --epochs 12 \
   --batch_size 64 \
