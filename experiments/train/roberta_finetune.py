@@ -521,7 +521,23 @@ def main():
     p.add_argument("--max_seq_len", type=int, default=384); p.add_argument("--doc_stride", type=int, default=128)
     p.add_argument("--max_answer_length", type=int, default=30); p.add_argument("--n_best_size", type=int, default=20)
     p.add_argument("--null_score_diff_threshold", type=float, default=0.0)
-    p.add_argument("--prescale", action="store_true"); p.add_argument("--bucket_cap_mb", type=int, default=None)
+
+    p.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
+    p.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
+
+        # Straggle
+    def csv_ints(s: str) -> List[int]:
+        if not s: return []
+        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
+        except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
+    p.add_argument("--straggle_points", type=int, help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
+    p.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
+    p.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
+    p.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=0)
+    p.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
+    p.add_argument("--straggle_verbose", action='store_true')
+
+
     args = p.parse_args()
 
     os.environ["TOKENIZERS_PARALLELISM"] = "0"
