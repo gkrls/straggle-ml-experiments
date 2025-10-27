@@ -37,7 +37,6 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
-        -DDPA_TORCH_PINNEDPOOL_PRETOUCH=OFF \
         -DDPA_TORCH_WORKSTEALING=ON ..
   make -j4 install
 
@@ -86,37 +85,25 @@ set -x
 
 GDB='gdb -ex run --args'
 
-sudo -E $(which python) experiments/train/lstm.py \
+set -x
+sudo -E $(which python) experiments/train/roberta_finetune.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --dpa_conf $DPA_CONF \
   --backend $BACKEND \
+  --dpa_conf $DPA_CONF \
+  --data ~/datasets/squad_v1 \
+  --squad_version v1 \
+  --n_best_size 100 \
+  --epochs 4 \
+  --batch_size 32 \
+  --learning_rate 5e-5 \
+  --warmup_ratio 0.1 \
+  --deterministic \
   --workers 4 \
   --prefetch_factor 4 \
-  --learning_rate 0.0015 \
-  --weight_decay 1e-05 \
-  --hint_tensor_size 100000000 \
-  --hint_tensor_count 5 \
-  --json experiments/train/lstm_straggle_16.json \
-  --straggle_points 3 \
-  --straggle_prob 16 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.05 \
-  --straggle_multiply 0.5 2 \
-  --deterministic \
-  --epochs 12 \
-  --batch_size 64 \
+  --log_interval 10 \
+  --json experiments/train/roberta_finetune.json \
   "$@"
-
-
-  # --learning_rate 0.0015 \
-  # --weight_decay 1e-05 \
-  # --label_smoothing 0.0 \
-  # --cosine_min_lr_mult 0.0 \
-  # --max_len 96 \
-  # --max_vocab 60000 \
-  # --hidden_dim 768 \
-  # "$@"
