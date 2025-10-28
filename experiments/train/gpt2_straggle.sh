@@ -28,7 +28,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
-        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_BUILD_TYPE=Release \
         -DDPA_TRACE=OFF \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
@@ -88,7 +88,7 @@ GDB='gdb -ex run --args'
 
 # Standard settings for GPT2 on a 16GB GPU
 # Consumes around ~15.3GB of memory with AMP
-sudo -E $(which python) experiments/train/gpt22.py \
+sudo -E $(which python) experiments/train/gpt2-2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -116,5 +116,4 @@ sudo -E $(which python) experiments/train/gpt22.py \
   --straggle_amount 1.68 \
   --straggle_multiply 0.5 2 \
   --straggle_k 5 \
-  --straggle_verbose \
   "$@"
