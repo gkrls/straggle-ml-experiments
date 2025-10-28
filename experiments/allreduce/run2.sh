@@ -83,7 +83,7 @@ PERF="perf stat -d --"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 25000000 -w 10 -i 100 --dpa_avg \
-  --gloo_socket_ifname=$IFACE --global_stats --pattern 3 --straggle_k 6 --straggle_rank 0 --straggle_ms 10000 --straggle_num 2
+  --gloo_socket_ifname=$IFACE --global_stats --pattern 3 --straggle_k 5 --straggle_rank 0 --straggle_ms 5000 --straggle_num 2
   # --batch #--verify
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \

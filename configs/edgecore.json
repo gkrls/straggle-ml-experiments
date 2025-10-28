@@ -79,7 +79,7 @@
     "port" : 4242,
     "async": true,
     "drain_queues": true,
-    "timeout_us": 500,
+    "timeout_us": 1200,
     "threads": 2,
     "window": 512,
     "tx_burst": 256,

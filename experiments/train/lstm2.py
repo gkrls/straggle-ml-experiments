@@ -381,7 +381,7 @@ def train(args):
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
-        model = dpa.DDPWrapper(model, pipes=1, straggle = args.straggle_k if args.straggle_k > 0 else args.world_size, prescale=args.prescale)
+        model = dpa.DDPWrapper(model, pipes=2, straggle = args.straggle_k if args.straggle_k > 0 else args.world_size, prescale=args.prescale)
 
 
     # Straggle sim
