@@ -497,7 +497,7 @@ def train(args):
         bucket_cap_mb=args.bucket_cap_mb,
         gradient_as_bucket_view=True,
         find_unused_parameters=False,
-        static_graph=True)
+        static_graph=False)
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
