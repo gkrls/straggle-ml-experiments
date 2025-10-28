@@ -324,33 +324,33 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 micro_time_win = w_micro_time / max(1, w_step_count * GA)  # per-micro avg
                 tok_per_s = w_tokens / elapsed
 
-                # if args.rank == 0:
-                print(
-                    f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] global_step={global_step} "
-                    f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
-                    f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
-                    f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s",
-                    flush=True
-                )
-                if args.json:
-                    try:
-                        with open(args.json, "r") as f:
-                            log = json.load(f)
-                        updates = log.setdefault("updates", {})
-                        ep = updates.setdefault(str(epoch), {})
-                        ep[f"{step_count:04d}"] = {
-                            "global_step": int(global_step),
-                            "train_loss": float(train_loss),
-                            "train_ppl":  float(train_ppl),
-                            "lr": float(lr),
-                            "step_time":       float(step_time_win),
-                            "micro_step_time": float(micro_time_win),
-                            "throughput":      float(tok_per_s),
-                            "tokens":          int(w_tokens),
-                        }
-                        save_log(args.json, log)
-                    except Exception as e:
-                        print(f"[{now()}][Warning] Failed to update JSON log: {e}", flush=True)
+                if args.rank == 0:
+                    print(
+                        f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] global_step={global_step} "
+                        f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
+                        f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
+                        f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s",
+                        flush=True
+                    )
+                    if args.json:
+                        try:
+                            with open(args.json, "r") as f:
+                                log = json.load(f)
+                            updates = log.setdefault("updates", {})
+                            ep = updates.setdefault(str(epoch), {})
+                            ep[f"{step_count:04d}"] = {
+                                "global_step": int(global_step),
+                                "train_loss": float(train_loss),
+                                "train_ppl":  float(train_ppl),
+                                "lr": float(lr),
+                                "step_time":       float(step_time_win),
+                                "micro_step_time": float(micro_time_win),
+                                "throughput":      float(tok_per_s),
+                                "tokens":          int(w_tokens),
+                            }
+                            save_log(args.json, log)
+                        except Exception as e:
+                            print(f"[{now()}][Warning] Failed to update JSON log: {e}", flush=True)
 
                 # reset window
                 w_start = time.perf_counter()
@@ -489,11 +489,15 @@ def train(args):
     model.config.use_cache = False
 
     # DDP
-    # model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False,
+    # model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
     #             bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False,
-                bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=True)
-    
+    model = DDP(model,
+        device_ids=[args.local_rank] if device.type == "cuda" else None,
+        broadcast_buffers=False,
+        bucket_cap_mb=args.bucket_cap_mb,
+        gradient_as_bucket_view=True,
+        find_unused_parameters=False,
+        static_graph=True)
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
@@ -512,15 +516,15 @@ def train(args):
     # if straggle_sim.attach(model): print(f"Straggle sim initialized with {straggle_sim}")
     # else: print(f"Straggle sim inactive")
 
-    # if args.rank == 0:
-    n_tr = len(ds_train); n_va = len(ds_val)
-    n_params = sum(p.numel() for p in model.parameters())
-    print(f"\n[{now()}] DATA ROOT: {data_root}")
-    print(f"  Train docs: {n_tr:,} | Val docs: {n_va:,}")
-    print(f"  Vocab size: {vocab_size:,} | Seq len: {args.seq_len}")
-    print(f"[{now()}] Model: GPT-2 small | Params: {n_params:,}")
-    print(f"  LR: {args.learning_rate} | Batch/GPU: {args.batch_size} | GA: {args.gradient_accumulation_steps}")
-    print("=" * 60, flush=True)
+    if args.rank == 0:
+        n_tr = len(ds_train); n_va = len(ds_val)
+        n_params = sum(p.numel() for p in model.parameters())
+        print(f"\n[{now()}] DATA ROOT: {data_root}")
+        print(f"  Train docs: {n_tr:,} | Val docs: {n_va:,}")
+        print(f"  Vocab size: {vocab_size:,} | Seq len: {args.seq_len}")
+        print(f"[{now()}] Model: GPT-2 small | Params: {n_params:,}")
+        print(f"  LR: {args.learning_rate} | Batch/GPU: {args.batch_size} | GA: {args.gradient_accumulation_steps}")
+        print("=" * 60, flush=True)
 
     # param groups
     decay_params, nodecay_params = [], []
@@ -543,7 +547,7 @@ def train(args):
     adj_micro_steps_per_epoch = (orig_micro_steps_per_epoch // GA) * GA
     if adj_micro_steps_per_epoch <= 0:
         raise ValueError("micro_steps_per_epoch must be at least gradient_accumulation_steps.")
-    if adj_micro_steps_per_epoch != orig_micro_steps_per_epoch:
+    if args.rank == 0 and adj_micro_steps_per_epoch != orig_micro_steps_per_epoch:
         print(
             f"[{now()}][Note] micro_steps_per_epoch adjusted from {orig_micro_steps_per_epoch} "
             f"to {adj_micro_steps_per_epoch} to be a multiple of GA={GA}.",
@@ -604,7 +608,6 @@ def train(args):
     global_step = 0  # cumulative optimizer steps so far
 
     for epoch in range(args.epochs):
-        # dist.barrier()
         print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
         
         epoch_start = time.time()
