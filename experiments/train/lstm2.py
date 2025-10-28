@@ -225,7 +225,7 @@ def validate(model, loader, device, args, num_classes: int):
             top5.update(a5[0].item(), bs)
 
     run_validation(loader)
-    top1.all_reduce(); top5.all_reduce(); losses.all_reduce()
+    # top1.all_reduce(); top5.all_reduce(); losses.all_reduce()
 
     # Leftover handling 
     if hasattr(loader, "sampler") and len(loader.sampler) * args.world_size < len(loader.dataset):
@@ -300,7 +300,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
 
     # global loss average
     t = torch.tensor([losses.sum, losses.count], device=device, dtype=torch.float64)
-    dist.all_reduce(t, op=dist.ReduceOp.SUM)
+    # dist.all_reduce(t, op=dist.ReduceOp.SUM)
     loss_global = (t[0] / torch.clamp(t[1], min=1.0)).item()
 
     return {
@@ -381,7 +381,7 @@ def train(args):
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
-        model = dpa.DDPWrapper(model, straggle = args.straggle_k if args.straggle_k > 0 else args.world_size, prescale=args.prescale)
+        model = dpa.DDPWrapper(model, pipes=1, straggle = args.straggle_k if args.straggle_k > 0 else args.world_size, prescale=args.prescale)
 
 
     # Straggle sim

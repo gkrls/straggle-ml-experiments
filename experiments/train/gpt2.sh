@@ -29,7 +29,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
         -DCMAKE_BUILD_TYPE=Debug \
-        -DDPA_TRACE=OFF \
+        -DDPA_TRACE=ON \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \

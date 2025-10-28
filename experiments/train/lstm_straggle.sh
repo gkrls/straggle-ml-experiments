@@ -29,7 +29,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
         -DCMAKE_BUILD_TYPE=Release \
-        -DDPA_TRACE=OFF \
+        -DDPA_TRACE=ON \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
@@ -108,8 +108,8 @@ sudo -E $(which python) experiments/train/lstm2.py \
   --batch_size 64 \
   --straggle_points 3 \
   --straggle_prob 16 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.05 \
+  --straggle_ranks 0 \
+  --straggle_amount 3 \
   --straggle_multiply 0.5 2 \
   --straggle_verbose \
   --straggle_k 5 \
