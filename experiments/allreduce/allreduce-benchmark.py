@@ -414,7 +414,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
     parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle before each allreduce call")
-    parser.add_argument("--straggle_num", type=int, default=None, help="Number of straggles")
+    parser.add_argument("--straggle_num", type=int, default=0, help="Number of straggles")
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
     
     args = parser.parse_args()
