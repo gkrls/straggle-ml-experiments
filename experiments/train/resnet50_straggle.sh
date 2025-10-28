@@ -103,7 +103,8 @@ sudo -E $(which python) experiments/train/resnet.py \
   --json experiments/train/resnet50_straggle_16.json \
   --straggle_points 3 \
   --straggle_prob 16 \
-  --straggle_ranks 1 \
+  --straggle_ranks 0 \
+  --straggle_k 5 \
   --straggle_amount 0.65 \
   --straggle_multiply 0.5 2 \
   --straggle_verbose \
