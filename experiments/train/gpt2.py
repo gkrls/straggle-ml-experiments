@@ -602,7 +602,7 @@ def train(args):
     global_step = 0  # cumulative optimizer steps so far
 
     for epoch in range(args.epochs):
-        dist.barrier()
+        # dist.barrier()
         print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
         
         epoch_start = time.time()
