@@ -364,27 +364,25 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                     and step_count % args.mini_val_every_steps == 0):
                 val_metrics = validate(model, val_loader, device, args, max_batches=getattr(args, "mini_val_max_batches", 64))
                 model.train()
-                if args.rank == 0:
-                    print(
-                        f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
-                        f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
-                        flush=True
-                    )
-                    if args.json:
-                        try:
-                            with open(args.json, "r") as f:
-                                log = json.load(f)
-                                updates_minival = log.setdefault("minival", {})
-                                epm = updates_minival.setdefault(str(epoch), {})
-                                epm[f"{step_count:04d}"] = {
-                                    "global_step": int(global_step),
-                                    "mini_val_loss": float(val_metrics['loss']),
-                                    "mini_val_ppl":  float(val_metrics['ppl']),
-                                    "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
-                                }
-                            save_log(args.json, log)
-                        except Exception as e:
-                            print(f"[{now()}][Warning] Failed to update JSON log (mini-val): {e}", flush=True)
+                # if args.rank == 0:
+                print(f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
+                      f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
+                      flush=True)
+                if args.json:
+                    try:
+                        with open(args.json, "r") as f:
+                            log = json.load(f)
+                            updates_minival = log.setdefault("minival", {})
+                            epm = updates_minival.setdefault(str(epoch), {})
+                            epm[f"{step_count:04d}"] = {
+                                "global_step": int(global_step),
+                                "mini_val_loss": float(val_metrics['loss']),
+                                "mini_val_ppl":  float(val_metrics['ppl']),
+                                "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
+                            }
+                        save_log(args.json, log)
+                    except Exception as e:
+                        print(f"[{now()}][Warning] Failed to update JSON log (mini-val): {e}", flush=True)
 
         # optional epoch cap by micro-steps
         if args.micro_steps_per_epoch and micro_count >= args.micro_steps_per_epoch:
@@ -491,19 +489,25 @@ def train(args):
     model.config.use_cache = False
 
     # DDP
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
-                bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    
+    # model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
+    #             bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
+    model = DDP(model,
+        device_ids=[args.local_rank] if device.type == "cuda" else None,
+        broadcast_buffers=False,
+        bucket_cap_mb=args.bucket_cap_mb,
+        gradient_as_bucket_view=True,
+        find_unused_parameters=False,
+        static_graph=True)
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
-        model = dpa.DDPWrapper(model, straggle = args.world_size, prescale=args.prescale)
+        model = dpa.DDPWrapper(model, straggle = args.straggle_k if args.straggle_k > 0 else args.world_size, prescale=args.prescale)
 
     # Straggle sim
     # straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)
 
-    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                  ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)        
+    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks, 
+                                  multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)        
     if straggle.attach(model): print(f"{straggle} created and active for rank {args.rank}")
     else: print(f"{straggle} created but inactive for rank {args.rank}")
     # straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
@@ -559,46 +563,46 @@ def train(args):
     lr_decay_iters = args.lr_decay_iters if args.lr_decay_iters > 0 else total_steps_planned
     warmup_steps = args.warmup_steps if args.warmup_steps >= 0 else min(1000, max(1, total_steps_planned // 10))
 
-    if args.rank == 0:
-        print(
-            f"[{now()}] Plan: epochs={args.epochs}, micro_steps/epoch={args.micro_steps_per_epoch} "
-            f"(GA={GA} → steps/epoch={steps_per_epoch}), total_steps_planned={total_steps_planned}"
-        )
-        print(f"[{now()}] LR schedule: warmup {warmup_steps} steps, cosine decay to {lr_decay_iters} (min_lr={args.min_lr}).")
+    # if args.rank == 0:
+    print(
+        f"[{now()}] Plan: epochs={args.epochs}, micro_steps/epoch={args.micro_steps_per_epoch} "
+        f"(GA={GA} → steps/epoch={steps_per_epoch}), total_steps_planned={total_steps_planned}"
+    )
+    print(f"[{now()}] LR schedule: warmup {warmup_steps} steps, cosine decay to {lr_decay_iters} (min_lr={args.min_lr}).")
 
-        # Window logging info
-        if args.log_every_steps > 0:
-            if steps_per_epoch >= args.log_every_steps:
-                n_logs_per_epoch = steps_per_epoch // args.log_every_steps
-                print(f"[{now()}] Periodic logging: every {args.log_every_steps} steps (~{n_logs_per_epoch} times per epoch)")
-            else:
-                print(f"[{now()}] Periodic logging: disabled (epoch too short: {steps_per_epoch} < {args.log_every_steps})")
+    # Window logging info
+    if args.log_every_steps > 0:
+        if steps_per_epoch >= args.log_every_steps:
+            n_logs_per_epoch = steps_per_epoch // args.log_every_steps
+            print(f"[{now()}] Periodic logging: every {args.log_every_steps} steps (~{n_logs_per_epoch} times per epoch)")
         else:
-            print(f"[{now()}] Periodic logging: disabled")
+            print(f"[{now()}] Periodic logging: disabled (epoch too short: {steps_per_epoch} < {args.log_every_steps})")
+    else:
+        print(f"[{now()}] Periodic logging: disabled")
 
     # init JSON log
-    if args.rank == 0:
-        if args.json is None: args.json = "gpt2_training.json"
-        log = {
-            "time": now(),
-            "data_root": str(data_root),
-            "cache_dir": str(cache_dir),
-            "config": vars(args),
-            "plan": {
-                "ga": GA,
-                "micro_steps_per_epoch_original": int(orig_micro_steps_per_epoch),
-                "micro_steps_per_epoch": int(args.micro_steps_per_epoch),
-                "steps_per_epoch": int(steps_per_epoch),             # optimizer steps per epoch
-                "total_steps_planned": int(total_steps_planned),     # total optimizer steps planned
-                "lr_decay_iters": int(lr_decay_iters),
-                "warmup_steps": int(warmup_steps),
-            },
-            "vocab_size": vocab_size,
-            "epochs": {},
-            "updates": {},  # window logs keyed during training
-        }
-        save_log(args.json, log)
-        print(f"[{now()}] Logging to {args.json}")
+    # if args.rank == 0:
+    if args.json is None: args.json = "gpt2_training.json"
+    log = {
+        "time": now(),
+        "data_root": str(data_root),
+        "cache_dir": str(cache_dir),
+        "config": vars(args),
+        "plan": {
+            "ga": GA,
+            "micro_steps_per_epoch_original": int(orig_micro_steps_per_epoch),
+            "micro_steps_per_epoch": int(args.micro_steps_per_epoch),
+            "steps_per_epoch": int(steps_per_epoch),             # optimizer steps per epoch
+            "total_steps_planned": int(total_steps_planned),     # total optimizer steps planned
+            "lr_decay_iters": int(lr_decay_iters),
+            "warmup_steps": int(warmup_steps),
+        },
+        "vocab_size": vocab_size,
+        "epochs": {},
+        "updates": {},  # window logs keyed during training
+    }
+    save_log(args.json, log)
+    print(f"[{now()}] Logging to {args.json}")
 
     best_ppl = float('inf')
     global_step = 0  # cumulative optimizer steps so far
@@ -622,57 +626,57 @@ def train(args):
 
         epoch_time = time.time() - epoch_start
         # stdout per-epoch
-        if args.rank == 0:
-            print(
-                f"[{now()}][Epoch {epoch:03d}] "
-                f"global_step={global_step} ",
-                f"train_loss={train_metrics['loss']:.4f} "
-                f"train_ppl={train_metrics['ppl']:.2f} "
-                f"val_ppl={val_metrics['ppl']:.2f} "
-                f"micro_steps={train_metrics['micro_steps']} "
-                f"micro_time={train_metrics['micro_step_time']:.3f}s "
-                f"steps={train_metrics['steps']} "
-                f"step_time={train_metrics['step_time']:.3f}s "
-                f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
-                f"epoch_time={epoch_time:.3f}s "
-                f"tp={train_metrics['throughput']:.0f} tok/s "
-                f"straggle_events={straggle.get_stats()['num_straggle_events']}", flush=True
-            )
+        # if args.rank == 0:
+        print(
+            f"[{now()}][Epoch {epoch:03d}] "
+            f"global_step={global_step} ",
+            f"train_loss={train_metrics['loss']:.4f} "
+            f"train_ppl={train_metrics['ppl']:.2f} "
+            f"val_ppl={val_metrics['ppl']:.2f} "
+            f"micro_steps={train_metrics['micro_steps']} "
+            f"micro_time={train_metrics['micro_step_time']:.3f}s "
+            f"steps={train_metrics['steps']} "
+            f"step_time={train_metrics['step_time']:.3f}s "
+            f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
+            f"epoch_time={epoch_time:.3f}s "
+            f"tp={train_metrics['throughput']:.0f} tok/s "
+            f"straggle_events={straggle.get_stats()['num_straggle_events']}", flush=True
+        )
 
-            # JSON epoch log
-            epoch_metrics = {
-                "train_loss": float(train_metrics['loss']),
-                "train_ppl":  float(train_metrics['ppl']),
-                "val_loss":   float(val_metrics['loss']),
-                "val_ppl":    float(val_metrics['ppl']),
-                "lr":         float(current_lr),
+        # JSON epoch log
+        epoch_metrics = {
+            "train_loss": float(train_metrics['loss']),
+            "train_ppl":  float(train_metrics['ppl']),
+            "val_loss":   float(val_metrics['loss']),
+            "val_ppl":    float(val_metrics['ppl']),
+            "lr":         float(current_lr),
 
-                "micro_steps": int(train_metrics['micro_steps']),
-                "steps":       int(train_metrics['steps']),        # optimizer steps this epoch
-                "global_step": int(global_step),                   # cumulative optimizer steps
-                "tokens":      int(train_metrics['tokens']),
+            "micro_steps": int(train_metrics['micro_steps']),
+            "steps":       int(train_metrics['steps']),        # optimizer steps this epoch
+            "global_step": int(global_step),                   # cumulative optimizer steps
+            "tokens":      int(train_metrics['tokens']),
 
-                "micro_step_time":        float(train_metrics['micro_step_time']),
-                "micro_step_time_min":    float(train_metrics['micro_step_time_min']),
-                "micro_step_time_max":    float(train_metrics['micro_step_time_max']),
-                "step_time":              float(train_metrics['step_time']),
-                "step_time_min":          float(train_metrics['step_time_min']),
-                "step_time_max":          float(train_metrics['step_time_max']),
-                "epoch_time":             float(epoch_time),
-                "epoch_train_time":       float(train_metrics['epoch_time']),
-                "epoch_train_throughput": float(train_metrics['throughput']),
+            "micro_step_time":        float(train_metrics['micro_step_time']),
+            "micro_step_time_min":    float(train_metrics['micro_step_time_min']),
+            "micro_step_time_max":    float(train_metrics['micro_step_time_max']),
+            "step_time":              float(train_metrics['step_time']),
+            "step_time_min":          float(train_metrics['step_time_min']),
+            "step_time_max":          float(train_metrics['step_time_max']),
+            "epoch_time":             float(epoch_time),
+            "epoch_train_time":       float(train_metrics['epoch_time']),
+            "epoch_train_throughput": float(train_metrics['throughput']),
 
-                # straggle-sim
-                "straggle" : straggle.get_stats() if straggle.active else {}
-            }
-            with open(args.json, "r") as f:
-                log = json.load(f)
-            log["epochs"][str(epoch)] = epoch_metrics
-            save_log(args.json, log)
+            # straggle-sim
+            "straggle" : straggle.get_stats() if straggle.active else {}
+        }
+        with open(args.json, "r") as f:
+            log = json.load(f)
+        log["epochs"][str(epoch)] = epoch_metrics
+        save_log(args.json, log)
 
-            if val_metrics['ppl'] < best_ppl:
-                best_ppl = val_metrics['ppl']
-                print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
+        if val_metrics['ppl'] < best_ppl:
+            best_ppl = val_metrics['ppl']
+            print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
 
     if args.rank == 0:
         print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
@@ -780,10 +784,17 @@ def main():
     parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=0)
     parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
     parser.add_argument("--straggle_verbose", action='store_true')
+    parser.add_argument("--straggle_k", type=int, default=0)
 
 
 
     args = parser.parse_args()
+    args.seed = args.seed + args.rank * 1000
+
+    if args.straggle_k:
+        print(f"!! Straggler mitigation ENABLED with straggle_k={args.straggle_k} !!")
+    else:
+        print(f"!! Straggler mitigation ENABLED !!")
 
     # Determinism & CUDA opts
     if args.deterministic:
@@ -791,11 +802,11 @@ def main():
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        random.seed(args.seed + args.rank)
-        np.random.seed(args.seed + args.rank)
-        torch.manual_seed(args.seed + args.rank)
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
         if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(args.seed + args.seed)
+            torch.cuda.manual_seed_all(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
 
