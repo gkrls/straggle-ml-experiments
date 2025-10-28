@@ -111,7 +111,9 @@ sudo -E $(which python) experiments/train/lstm2.py \
   --straggle_ranks 1 \
   --straggle_amount 0.05 \
   --straggle_multiply 0.5 2 \
-  --straggle_k $WORLD_K \
+  --straggle_verbose \
+  --straggle_k 5 \
+  # --straggle_k $WORLD_K \
   "$@"
 
 

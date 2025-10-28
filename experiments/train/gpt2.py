@@ -495,13 +495,13 @@ def train(args):
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
-        model = dpa.DDPWrapper(model, straggle = args.world_size, prescale=args.prescale)
+        model = dpa.DDPWrapper(model, straggle = args.straggle_k if args.straggle_k > 0 else args.world_size, prescale=args.prescale)
 
     # Straggle sim
     # straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)
 
-    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
-                                  ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)        
+    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks, 
+                                  multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)        
     if straggle.attach(model): print(f"{straggle} created and active for rank {args.rank}")
     else: print(f"{straggle} created but inactive for rank {args.rank}")
     # straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
@@ -778,10 +778,17 @@ def main():
     parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=0)
     parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
     parser.add_argument("--straggle_verbose", action='store_true')
+    parser.add_argument("--straggle_k", type=int, default=0)
 
 
 
     args = parser.parse_args()
+    args.seed = args.seed + args.rank * 1000
+
+    if args.straggle_k:
+        print(f"!! Straggler mitigation ENABLED with straggle_k={args.straggle_k} !!")
+    else:
+        print(f"!! Straggler mitigation ENABLED !!")
 
     # Determinism & CUDA opts
     if args.deterministic:
@@ -789,11 +796,11 @@ def main():
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        random.seed(args.seed + args.rank)
-        np.random.seed(args.seed + args.rank)
-        torch.manual_seed(args.seed + args.rank)
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
         if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(args.seed + args.seed)
+            torch.cuda.manual_seed_all(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
 
