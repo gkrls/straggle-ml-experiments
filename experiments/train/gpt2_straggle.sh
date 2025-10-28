@@ -115,6 +115,4 @@ sudo -E $(which python) experiments/train/gpt2.py \
   --straggle_ranks 1 \
   --straggle_amount 1.68 \
   --straggle_multiply 0.5 2 \
-  --straggle_verbose \
-  --straggle_k 5 \
   "$@"

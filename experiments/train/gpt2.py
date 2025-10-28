@@ -492,7 +492,7 @@ def train(args):
 
     # DDP
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
-                bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=True, static_graph=args.static_graph)
+                bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
     
 
     # Wrap the model if DPA backend is requested
