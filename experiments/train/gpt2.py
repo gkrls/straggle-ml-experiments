@@ -489,7 +489,7 @@ def train(args):
     model.config.use_cache = False
 
     # DDP
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False,
                 bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
     
 
