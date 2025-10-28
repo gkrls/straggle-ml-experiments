@@ -88,7 +88,7 @@ GDB='gdb -ex run --args'
 
 # Standard settings for GPT2 on a 16GB GPU
 # Consumes around ~15.3GB of memory with AMP
-sudo -E $(which python) experiments/train/gpt2.py \
+sudo -E $(which python) experiments/train/gpt22.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -115,4 +115,6 @@ sudo -E $(which python) experiments/train/gpt2.py \
   --straggle_ranks 1 \
   --straggle_amount 1.68 \
   --straggle_multiply 0.5 2 \
+  --straggle_k 5 \
+  --straggle_verbose \
   "$@"
