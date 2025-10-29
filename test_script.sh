@@ -1,1 +1,0 @@
-echo "IT IS WORKING"

@@ -138,8 +138,7 @@ class GPT2Windows(IterableDataset):
         buf = []
 
         for i in self._index_permutation(n, rng):
-            if (i % consumers) != consumer_id:
-                continue
+            if (i % consumers) != consumer_id: continue
             ex = self.ds[i]
             toks = self._encode_line(ex["text"])
             buf.extend(toks)
@@ -156,11 +155,9 @@ class GPT2Windows(IterableDataset):
 # ------------------------- schedule -------------------------
 def get_lr(update_idx, warmup_steps, learning_rate, lr_decay_iters, min_lr):
     # Linear warmup
-    if update_idx < warmup_steps:
-        return learning_rate * (update_idx + 1) / max(1, warmup_steps)
+    if update_idx < warmup_steps: return learning_rate * (update_idx + 1) / max(1, warmup_steps)
     # After decay iters, return min LR
-    if update_idx > lr_decay_iters:
-        return min_lr
+    if update_idx > lr_decay_iters: return min_lr
     # Cosine decay
     decay_ratio = (update_idx - warmup_steps) / max(1, (lr_decay_iters - warmup_steps))
     decay_ratio = min(max(decay_ratio, 0.0), 1.0)
@@ -176,8 +173,7 @@ def validate(model, loader, device, args, max_batches=200):
     step_start = time.perf_counter()
     for batch_idx, inputs in enumerate(loader):
         if batch_idx >= max_batches: break
-        if inputs.size(1) != args.seq_len + 1:
-            continue
+        if inputs.size(1) != args.seq_len + 1: continue
         x = inputs[:, :-1].contiguous().to(device, non_blocking=True)
         y = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
@@ -187,7 +183,7 @@ def validate(model, loader, device, args, max_batches=200):
             B, T, V = logits.shape
             loss = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
         losses.update(loss.item(), B*T)
-    losses.all_reduce()
+    # losses.all_reduce()
     val_loss = losses.avg
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
     return {'loss': val_loss, 'ppl': val_ppl, 'time': time.perf_counter() - step_start}
@@ -325,13 +321,10 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 tok_per_s = w_tokens / elapsed
 
                 # if args.rank == 0:
-                print(
-                    f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] global_step={global_step} "
-                    f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
-                    f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
-                    f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s",
-                    flush=True
-                )
+                print(f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] global_step={global_step} "
+                      f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
+                      f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
+                      f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s",flush=True)
                 if args.json:
                     try:
                         with open(args.json, "r") as f:
@@ -491,13 +484,8 @@ def train(args):
     # DDP
     # model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
     #             bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    model = DDP(model,
-        device_ids=[args.local_rank] if device.type == "cuda" else None,
-        broadcast_buffers=False,
-        bucket_cap_mb=args.bucket_cap_mb,
-        gradient_as_bucket_view=True,
-        find_unused_parameters=False,
-        static_graph=False)
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False, bucket_cap_mb=args.bucket_cap_mb, 
+                gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=False)
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
@@ -532,11 +520,8 @@ def train(args):
         if not p.requires_grad: continue
         (decay_params if p.ndim >= 2 else nodecay_params).append(p)
 
-    optimizer = AdamW(
-        [{"params": decay_params, "weight_decay": args.weight_decay},
-         {"params": nodecay_params, "weight_decay": 0.0}],
-        lr=args.learning_rate, betas=(0.9, 0.95), eps=1e-8
-    )
+    optimizer = AdamW([{"params": decay_params, "weight_decay": args.weight_decay}, {"params": nodecay_params, "weight_decay": 0.0}], 
+                      lr=args.learning_rate, betas=(0.9, 0.95), eps=1e-8)
     scaler = torch.amp.GradScaler('cuda', enabled=(device.type == "cuda" and args.amp))
 
     # -------- schedule planning (auto) --------
@@ -564,10 +549,8 @@ def train(args):
     warmup_steps = args.warmup_steps if args.warmup_steps >= 0 else min(1000, max(1, total_steps_planned // 10))
 
     # if args.rank == 0:
-    print(
-        f"[{now()}] Plan: epochs={args.epochs}, micro_steps/epoch={args.micro_steps_per_epoch} "
-        f"(GA={GA} → steps/epoch={steps_per_epoch}), total_steps_planned={total_steps_planned}"
-    )
+    print(f"[{now()}] Plan: epochs={args.epochs}, micro_steps/epoch={args.micro_steps_per_epoch} "
+          f"(GA={GA} → steps/epoch={steps_per_epoch}), total_steps_planned={total_steps_planned}")
     print(f"[{now()}] LR schedule: warmup {warmup_steps} steps, cosine decay to {lr_decay_iters} (min_lr={args.min_lr}).")
 
     # Window logging info

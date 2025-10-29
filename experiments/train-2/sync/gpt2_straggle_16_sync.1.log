@@ -1,0 +1,892 @@
+[gpt2_straggle.sh.53063] iface=ens4f1 ip=42.0.1.2 rank=1 world_size=6 master=42.0.1.1:29500 backend=dpa_dpdk
++ GDB='gdb -ex run --args'
+++ which python
++ sudo -E /home/gks/straggle-ml-experiments/venv/bin/python experiments/train/gpt2-2.py --rank 1 --world_size 6 --iface ens4f1 --master_addr 42.0.1.1 --master_port 29500 --dpa_conf /home/gks/straggle-ml-experiments/configs/edgecore.json --backend dpa_dpdk --workers 4 --epochs 6 --steps_per_epoch 6000 --mini_val_every_steps 300 --gradient_accumulation_steps 5 --batch_size 12 --seq_len 1024 --amp --deterministic --prefetch_factor 4 --log_every_steps 10 --json experiments/train/gpt2_straggle_16.json --data /home/gks/datasets/openwebtext --cach
+e_dir /home/gks/datasets/openwebtext/cache --straggle_points 3 --straggle_prob 16 --straggle_ranks 1 --straggle_amount 1.68 --straggle_multiply 0.5 2 --straggle_k 5
+!! Straggler mitigation ENABLED with straggle_k=5 !!
+dpa: reading DPDK backend options from config.json: /home/gks/straggle-ml-experiments/configs/edgecore.json
+dpa: [warn] session.pool.seqnums not supplied => assuming 1,1,1...
+dpa: Using address '42.0.1.2', inferred from iface 'ens4f1'
+dpa: ====================================================================================================
+dpa: context: rank=1 world=6 build=0.1.0-Release avx=2
+dpa: device : edgecore-dcs810 42.0.1.0:4242 pipes=4 quants=1 reducers=32 mode=2 slots=16384 straggle_aware=true
+dpa:          session.1
+dpa:           slots_pool_alloc: 0-16384
+dpa:           starting_seqnums: 1,1,1,1 ... 1,1,1,1
+dpa:           straggle_timeout: 2.00 ms
+dpa:           gress_drops_prob: 0.00/0.00 %
+dpa: backend: dpa-dpdk 42.0.1.2:4242, iface 'ens4f1' threads 8 (async) window 64 subpool 0-1024 (15360 unused) loop_ns=no
+dpa:      max_outstanding: 512 packets
+dpa:          RTT timeout: 1200 usec
+dpa:          TX/RX intrv: 20/0 usec
+dpa:          TX/RX burst: 64/64
+dpa:          TX/RX rings: 1024/1024
+dpa:          TX/RX mpool: 65536/65536
+dpa:          TX/RX cache: 512/512
+dpa:             eal_port: 0000:41:00.1 (virtual=no)
+dpa:           eal_lcores: 0-8
+dpa:       eal_extra_args: n/a
+dpa: ====================================================================================================
+dpa: Using EAL args: dpa-dpdk -l 0-8 --main-lcore 0 --file-prefix dpa-dpdk -a 0000:41:00.1
+EAL: Detected CPU lcores: 24
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/dpa-dpdk/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: Probe PCI driver: mlx5_pci (15b3:101d) device: 0000:41:00.1 (socket -1)
+dpa: DPDK link status: UP, speed: 100000
+dpa: DPDK runtime ring size: RX=1024 TX=1024
+dpa: Promiscuous mode disabled: success
+dpa: Flow created: UDP dst=4242 -> queue 0
+dpa: Flow created: UDP dst=4243 -> queue 1
+dpa: Flow created: UDP dst=4244 -> queue 2
+dpa: Flow created: UDP dst=4245 -> queue 3
+dpa: Flow created: UDP dst=4246 -> queue 4
+dpa: Flow created: UDP dst=4247 -> queue 5
+dpa: Flow created: UDP dst=4248 -> queue 6
+dpa: Flow created: UDP dst=4249 -> queue 7
+Port configured with 8 RX queues and 8 TX queues
+dpa: DPDK device configured succefully. Port: 0, address 10:70:FD:DF:A4:27
+dpa: DPDK eth link up. Speed 100000 Mbps Full-duplex
+dpa.torch: pinned mempool enabled with 20 tensors of 200000000 bytes
+[2025-10-28 16:10:02][DDP] backend=dpa_dpdk world_size=6 master=42.0.1.1:29500 iface=ens4f1 local_rank=0
+[2025-10-28 16:10:02] Configuration:
+{
+  "rank": 1,
+  "world_size": 6,
+  "iface": "ens4f1",
+  "master_addr": "42.0.1.1",
+  "master_port": 29500,
+  "backend": "dpa_dpdk",
+  "dpa_conf": "/home/gks/straggle-ml-experiments/configs/edgecore.json",
+  "device": "cuda",
+  "deterministic": true,
+  "static_graph": false,
+  "workers": 4,
+  "seed": 1042,
+  "json": "experiments/train/gpt2_straggle_16.json",
+  "log_every_steps": 10,
+  "data": "/home/gks/datasets/openwebtext",
+  "cache_dir": "/home/gks/datasets/openwebtext/cache",
+  "val_fraction": 0.0005,
+  "tokenizer": "gpt2",
+  "epochs": 6,
+  "micro_steps_per_epoch": 6000,
+  "batch_size": 12,
+  "gradient_accumulation_steps": 5,
+  "learning_rate": 0.0006,
+  "min_lr": 6e-05,
+  "warmup_steps": -1,
+  "lr_decay_iters": -1,
+  "weight_decay": 0.1,
+  "grad_clip": 1.0,
+  "amp": true,
+  "prefetch_factor": 4,
+  "val_max_batches": 200,
+  "mini_val_every_steps": 300,
+  "mini_val_max_batches": 64,
+  "prescale": false,
+  "bucket_cap_mb": null,
+  "seq_len": 1024,
+  "straggle_points": 3,
+  "straggle_prob": 16.0,
+  "straggle_ranks": [
+    1
+  ],
+  "straggle_amount": 1.68,
+  "straggle_multiply": [
+    0.5,
+    2.0
+  ],
+  "straggle_verbose": false,
+  "straggle_k": 5,
+  "local_rank": 0
+}
+Resolving data files: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 27/27 [00:00<00:00, 377487.36it/s]
+Loading dataset shards: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 73/73 [00:00<00:00, 26127.16it/s]
+/home/gks/straggle-ml-experiments/venv/lib/python3.12/site-packages/torch/utils/data/dataloader.py:626: UserWarning: This DataLoader will create 4 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(
+/home/gks/straggle-ml-experiments/venv/lib/python3.12/site-packages/torch/utils/data/dataloader.py:626: UserWarning: This DataLoader will create 2 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(
+dpa.torch.py: DDP DPAState Object:  {'pipes': 0, 'straggle': 5, 'averaging': True, 'prescaled': False}
+[straggle_sim] on rank 1
+[straggle_sim] attached 3 straggle hooks to rank 1
+DDPStraggleSim(points=3, prob=16.0%, amount=1.68 sec, multiplier_range=[0.50,2.00], ranks=[1], active=True) created and active for rank 1
+
+[2025-10-28 16:10:21] DATA ROOT: /home/gks/datasets/openwebtext
+  Train docs: 7,934,153 | Val docs: 79,616
+  Vocab size: 50,257 | Seq len: 1024
+[2025-10-28 16:10:21] Model: GPT-2 small | Params: 124,439,808
+  LR: 0.0006 | Batch/GPU: 12 | GA: 5
+============================================================
+[2025-10-28 16:10:21] Plan: epochs=6, micro_steps/epoch=6000 (GA=5 → steps/epoch=1200), total_steps_planned=7200
+[2025-10-28 16:10:21] LR schedule: warmup 720 steps, cosine decay to 7200 (min_lr=6e-05).
+[2025-10-28 16:10:21] Periodic logging: every 10 steps (~120 times per epoch)
+[2025-10-28 16:10:21] Logging to experiments/train/gpt2_straggle_16.json
+[2025-10-28 16:10:21][Epoch 000] ...
+/home/gks/straggle-ml-experiments/venv/lib/python3.12/site-packages/torch/autograd/graph.py:824: UserWarning: Memory Efficient attention defaults to a non-deterministic algorithm. To explicitly enable determinism call torch.use_deterministic_algorithms(True, warn_only=False). (Triggered internally at /pytorch/aten/src/ATen/native/transformers/cuda/attention_backward.cu:752.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+RETURNING PINNED - need: 497759232 got: 200000000 !!!
+[2025-10-28 16:12:26][Epoch 000][Step 0010/1200] global_step=10 train_loss=10.5184 train_ppl=36990.59 lr=0.000008 step_time=12.384s step_time_min=9.421 step_time_max=14.532 micro_time=2.467s tp=4938 tok/s
+[2025-10-28 16:14:25][Epoch 000][Step 0020/1200] global_step=20 train_loss=9.6705 train_ppl=15843.67 lr=0.000017 step_time=11.949s step_time_min=8.651 step_time_max=15.472 micro_time=2.381s tp=5140 tok/s
+[2025-10-28 16:16:35][Epoch 000][Step 0030/1200] global_step=30 train_loss=9.4003 train_ppl=12091.78 lr=0.000025 step_time=12.968s step_time_min=8.292 step_time_max=20.760 micro_time=2.585s tp=4737 tok/s
+[2025-10-28 16:18:47][Epoch 000][Step 0040/1200] global_step=40 train_loss=9.0737 train_ppl=8723.01 lr=0.000033 step_time=13.198s step_time_min=8.292 step_time_max=20.760 micro_time=2.631s tp=4654 tok/s
+[2025-10-28 16:20:47][Epoch 000][Step 0050/1200] global_step=50 train_loss=8.7089 train_ppl=6056.30 lr=0.000042 step_time=12.017s step_time_min=8.292 step_time_max=20.823 micro_time=2.395s tp=5111 tok/s
+[2025-10-28 16:23:02][Epoch 000][Step 0060/1200] global_step=60 train_loss=8.3677 train_ppl=4305.79 lr=0.000050 step_time=13.450s step_time_min=8.292 step_time_max=20.823 micro_time=2.681s tp=4567 tok/s
+[2025-10-28 16:24:59][Epoch 000][Step 0070/1200] global_step=70 train_loss=8.1073 train_ppl=3318.71 lr=0.000058 step_time=11.753s step_time_min=8.292 step_time_max=20.823 micro_time=2.342s tp=5226 tok/s
+[2025-10-28 16:26:52][Epoch 000][Step 0080/1200] global_step=80 train_loss=7.7324 train_ppl=2281.17 lr=0.000067 step_time=11.270s step_time_min=8.292 step_time_max=20.823 micro_time=2.246s tp=5450 tok/s
+[2025-10-28 16:29:00][Epoch 000][Step 0090/1200] global_step=90 train_loss=7.4163 train_ppl=1662.85 lr=0.000075 step_time=12.804s step_time_min=8.292 step_time_max=20.823 micro_time=2.552s tp=4797 tok/s
+[2025-10-28 16:30:51][Epoch 000][Step 0100/1200] global_step=100 train_loss=7.2291 train_ppl=1379.02 lr=0.000083 step_time=11.113s step_time_min=8.292 step_time_max=20.823 micro_time=2.214s tp=5527 tok/s
+[2025-10-28 16:32:52][Epoch 000][Step 0110/1200] global_step=110 train_loss=7.1106 train_ppl=1224.93 lr=0.000092 step_time=12.032s step_time_min=8.292 step_time_max=20.823 micro_time=2.398s tp=5105 tok/s
+[2025-10-28 16:35:00][Epoch 000][Step 0120/1200] global_step=120 train_loss=6.9698 train_ppl=1064.03 lr=0.000100 step_time=12.869s step_time_min=8.292 step_time_max=20.823 micro_time=2.565s tp=4773 tok/s
+[2025-10-28 16:37:11][Epoch 000][Step 0130/1200] global_step=130 train_loss=6.9113 train_ppl=1003.60 lr=0.000108 step_time=13.013s step_time_min=8.292 step_time_max=20.823 micro_time=2.595s tp=4720 tok/s
+[2025-10-28 16:39:03][Epoch 000][Step 0140/1200] global_step=140 train_loss=6.9292 train_ppl=1021.69 lr=0.000117 step_time=11.215s step_time_min=8.292 step_time_max=20.823 micro_time=2.236s tp=5478 tok/s
+[2025-10-28 16:41:15][Epoch 000][Step 0150/1200] global_step=150 train_loss=6.7160 train_ppl=825.50 lr=0.000125 step_time=13.255s step_time_min=8.292 step_time_max=20.823 micro_time=2.644s tp=4634 tok/s
+[2025-10-28 16:43:22][Epoch 000][Step 0160/1200] global_step=160 train_loss=6.7185 train_ppl=827.54 lr=0.000133 step_time=12.711s step_time_min=8.273 step_time_max=20.823 micro_time=2.536s tp=4833 tok/s
+[2025-10-28 16:45:10][Epoch 000][Step 0170/1200] global_step=170 train_loss=6.6487 train_ppl=771.82 lr=0.000142 step_time=10.787s step_time_min=8.273 step_time_max=20.823 micro_time=2.150s tp=5694 tok/s
+[2025-10-28 16:47:18][Epoch 000][Step 0180/1200] global_step=180 train_loss=6.5989 train_ppl=734.28 lr=0.000150 step_time=12.800s step_time_min=8.273 step_time_max=20.823 micro_time=2.553s tp=4799 tok/s
+[2025-10-28 16:49:35][Epoch 000][Step 0190/1200] global_step=190 train_loss=6.5167 train_ppl=676.37 lr=0.000158 step_time=13.639s step_time_min=8.273 step_time_max=20.823 micro_time=2.721s tp=4504 tok/s
+[2025-10-28 16:51:47][Epoch 000][Step 0200/1200] global_step=200 train_loss=6.6203 train_ppl=750.19 lr=0.000167 step_time=13.207s step_time_min=8.273 step_time_max=20.823 micro_time=2.635s tp=4651 tok/s
+[2025-10-28 16:53:48][Epoch 000][Step 0210/1200] global_step=210 train_loss=6.4970 train_ppl=663.12 lr=0.000175 step_time=12.071s step_time_min=8.273 step_time_max=20.823 micro_time=2.407s tp=5089 tok/s
+[2025-10-28 16:56:07][Epoch 000][Step 0220/1200] global_step=220 train_loss=6.4272 train_ppl=618.42 lr=0.000183 step_time=13.957s step_time_min=8.273 step_time_max=20.823 micro_time=2.785s tp=4402 tok/s
+[2025-10-28 16:58:16][Epoch 000][Step 0230/1200] global_step=230 train_loss=6.4517 train_ppl=633.77 lr=0.000192 step_time=12.919s step_time_min=8.273 step_time_max=20.823 micro_time=2.577s tp=4755 tok/s
+[2025-10-28 17:00:36][Epoch 000][Step 0240/1200] global_step=240 train_loss=6.5236 train_ppl=681.02 lr=0.000200 step_time=13.948s step_time_min=8.273 step_time_max=20.823 micro_time=2.783s tp=4405 tok/s
+[2025-10-28 17:02:44][Epoch 000][Step 0250/1200] global_step=250 train_loss=6.3286 train_ppl=560.35 lr=0.000208 step_time=12.839s step_time_min=8.273 step_time_max=20.823 micro_time=2.561s tp=4785 tok/s
+[2025-10-28 17:05:15][Epoch 000][Step 0260/1200] global_step=260 train_loss=6.3418 train_ppl=567.83 lr=0.000217 step_time=15.085s step_time_min=8.273 step_time_max=20.823 micro_time=3.010s tp=4072 tok/s
+[2025-10-28 17:07:32][Epoch 000][Step 0270/1200] global_step=270 train_loss=6.2490 train_ppl=517.50 lr=0.000225 step_time=13.662s step_time_min=8.273 step_time_max=20.823 micro_time=2.725s tp=4497 tok/s
+[2025-10-28 17:09:39][Epoch 000][Step 0280/1200] global_step=280 train_loss=6.2378 train_ppl=511.71 lr=0.000233 step_time=12.748s step_time_min=8.273 step_time_max=20.823 micro_time=2.543s tp=4819 tok/s
+[2025-10-28 17:11:45][Epoch 000][Step 0290/1200] global_step=290 train_loss=6.3215 train_ppl=556.43 lr=0.000242 step_time=12.598s step_time_min=8.273 step_time_max=20.823 micro_time=2.513s tp=4876 tok/s
+[2025-10-28 17:13:34][Epoch 000][Step 0300/1200] global_step=300 train_loss=6.1904 train_ppl=488.05 lr=0.000250 step_time=10.880s step_time_min=8.273 step_time_max=20.823 micro_time=2.169s tp=5647 tok/s
+[2025-10-28 17:14:53][MiniVal][Epoch 000][Step 0300] val_loss=5.9910 val_ppl=399.81 val_time=78.49s
+[2025-10-28 17:17:00][Epoch 000][Step 0310/1200] global_step=310 train_loss=6.1978 train_ppl=491.68 lr=0.000258 step_time=12.715s step_time_min=8.273 step_time_max=20.823 micro_time=2.536s tp=2987 tok/s
+[2025-10-28 17:19:05][Epoch 000][Step 0320/1200] global_step=320 train_loss=6.3060 train_ppl=547.87 lr=0.000267 step_time=12.466s step_time_min=8.273 step_time_max=20.923 micro_time=2.487s tp=4928 tok/s
+[2025-10-28 17:21:24][Epoch 000][Step 0330/1200] global_step=330 train_loss=6.2556 train_ppl=520.92 lr=0.000275 step_time=13.964s step_time_min=8.273 step_time_max=20.923 micro_time=2.786s tp=4399 tok/s
+[2025-10-28 17:23:27][Epoch 000][Step 0340/1200] global_step=340 train_loss=6.1528 train_ppl=470.02 lr=0.000283 step_time=12.277s step_time_min=8.273 step_time_max=20.923 micro_time=2.449s tp=5004 tok/s
+[2025-10-28 17:25:25][Epoch 000][Step 0350/1200] global_step=350 train_loss=6.1750 train_ppl=480.57 lr=0.000292 step_time=11.762s step_time_min=8.273 step_time_max=20.923 micro_time=2.345s tp=5223 tok/s
+[2025-10-28 17:27:39][Epoch 000][Step 0360/1200] global_step=360 train_loss=6.2467 train_ppl=516.29 lr=0.000300 step_time=13.442s step_time_min=8.273 step_time_max=20.923 micro_time=2.682s tp=4570 tok/s
+[2025-10-28 17:30:05][Epoch 000][Step 0370/1200] global_step=370 train_loss=6.1608 train_ppl=473.79 lr=0.000308 step_time=14.572s step_time_min=8.273 step_time_max=20.923 micro_time=2.907s tp=4216 tok/s
+[2025-10-28 17:32:10][Epoch 000][Step 0380/1200] global_step=380 train_loss=6.0385 train_ppl=419.25 lr=0.000317 step_time=12.490s step_time_min=8.273 step_time_max=20.923 micro_time=2.491s tp=4918 tok/s
+[2025-10-28 17:34:08][Epoch 000][Step 0390/1200] global_step=390 train_loss=6.0938 train_ppl=443.08 lr=0.000325 step_time=11.849s step_time_min=8.273 step_time_max=20.923 micro_time=2.363s tp=5185 tok/s
+[2025-10-28 17:36:09][Epoch 000][Step 0400/1200] global_step=400 train_loss=6.0739 train_ppl=434.38 lr=0.000333 step_time=12.041s step_time_min=8.273 step_time_max=20.923 micro_time=2.401s tp=5102 tok/s
+[2025-10-28 17:38:28][Epoch 000][Step 0410/1200] global_step=410 train_loss=6.0522 train_ppl=425.05 lr=0.000342 step_time=13.922s step_time_min=8.273 step_time_max=20.923 micro_time=2.777s tp=4413 tok/s
+[2025-10-28 17:40:28][Epoch 000][Step 0420/1200] global_step=420 train_loss=5.9998 train_ppl=403.36 lr=0.000350 step_time=11.975s step_time_min=8.273 step_time_max=20.923 micro_time=2.388s tp=5130 tok/s
+[2025-10-28 17:42:39][Epoch 000][Step 0430/1200] global_step=430 train_loss=5.9905 train_ppl=399.63 lr=0.000358 step_time=13.098s step_time_min=8.273 step_time_max=20.923 micro_time=2.613s tp=4690 tok/s
+[2025-10-28 17:44:50][Epoch 000][Step 0440/1200] global_step=440 train_loss=6.0353 train_ppl=417.94 lr=0.000367 step_time=13.127s step_time_min=8.273 step_time_max=21.758 micro_time=2.619s tp=4680 tok/s
+[2025-10-28 17:46:47][Epoch 000][Step 0450/1200] global_step=450 train_loss=5.9806 train_ppl=395.68 lr=0.000375 step_time=11.686s step_time_min=8.273 step_time_max=21.758 micro_time=2.330s tp=5257 tok/s
+[2025-10-28 17:48:39][Epoch 000][Step 0460/1200] global_step=460 train_loss=6.0141 train_ppl=409.18 lr=0.000383 step_time=11.216s step_time_min=8.273 step_time_max=21.758 micro_time=2.236s tp=5477 tok/s
+[2025-10-28 17:50:37][Epoch 000][Step 0470/1200] global_step=470 train_loss=5.9385 train_ppl=379.36 lr=0.000392 step_time=11.739s step_time_min=8.273 step_time_max=21.758 micro_time=2.341s tp=5233 tok/s
+[2025-10-28 17:52:39][Epoch 000][Step 0480/1200] global_step=480 train_loss=5.8047 train_ppl=331.87 lr=0.000400 step_time=12.198s step_time_min=8.273 step_time_max=21.758 micro_time=2.433s tp=5036 tok/s
+[2025-10-28 17:54:32][Epoch 000][Step 0490/1200] global_step=490 train_loss=5.9395 train_ppl=379.74 lr=0.000408 step_time=11.295s step_time_min=8.273 step_time_max=21.758 micro_time=2.252s tp=5439 tok/s
+[2025-10-28 17:56:43][Epoch 000][Step 0500/1200] global_step=500 train_loss=5.8952 train_ppl=363.30 lr=0.000417 step_time=13.134s step_time_min=8.273 step_time_max=21.758 micro_time=2.620s tp=4677 tok/s
+[2025-10-28 17:58:36][Epoch 000][Step 0510/1200] global_step=510 train_loss=5.8995 train_ppl=364.85 lr=0.000425 step_time=11.275s step_time_min=8.273 step_time_max=21.758 micro_time=2.248s tp=5449 tok/s
+[2025-10-28 18:00:45][Epoch 000][Step 0520/1200] global_step=520 train_loss=5.8830 train_ppl=358.89 lr=0.000433 step_time=12.924s step_time_min=8.273 step_time_max=21.758 micro_time=2.578s tp=4753 tok/s
+[2025-10-28 18:02:48][Epoch 000][Step 0530/1200] global_step=530 train_loss=5.8235 train_ppl=338.16 lr=0.000442 step_time=12.276s step_time_min=8.273 step_time_max=21.758 micro_time=2.448s tp=5005 tok/s
+[2025-10-28 18:05:08][Epoch 000][Step 0540/1200] global_step=540 train_loss=5.8536 train_ppl=348.50 lr=0.000450 step_time=14.049s step_time_min=8.273 step_time_max=21.758 micro_time=2.803s tp=4373 tok/s
+[2025-10-28 18:07:17][Epoch 000][Step 0550/1200] global_step=550 train_loss=5.7915 train_ppl=327.51 lr=0.000458 step_time=12.873s step_time_min=8.273 step_time_max=21.758 micro_time=2.568s tp=4772 tok/s
+[2025-10-28 18:09:20][Epoch 000][Step 0560/1200] global_step=560 train_loss=5.7466 train_ppl=313.12 lr=0.000467 step_time=12.315s step_time_min=8.273 step_time_max=21.758 micro_time=2.456s tp=4988 tok/s
+[2025-10-28 18:11:28][Epoch 000][Step 0570/1200] global_step=570 train_loss=5.6901 train_ppl=295.91 lr=0.000475 step_time=12.798s step_time_min=8.273 step_time_max=21.758 micro_time=2.553s tp=4800 tok/s
+[2025-10-28 18:13:32][Epoch 000][Step 0580/1200] global_step=580 train_loss=5.7325 train_ppl=308.76 lr=0.000483 step_time=12.398s step_time_min=8.273 step_time_max=21.758 micro_time=2.473s tp=4955 tok/s
+[2025-10-28 18:15:58][Epoch 000][Step 0590/1200] global_step=590 train_loss=5.7322 train_ppl=308.65 lr=0.000492 step_time=14.599s step_time_min=8.273 step_time_max=22.745 micro_time=2.913s tp=4208 tok/s
+[2025-10-28 18:18:14][Epoch 000][Step 0600/1200] global_step=600 train_loss=5.7655 train_ppl=319.09 lr=0.000500 step_time=13.510s step_time_min=8.273 step_time_max=22.745 micro_time=2.695s tp=4547 tok/s
+[2025-10-28 18:19:31][MiniVal][Epoch 000][Step 0600] val_loss=5.2468 val_ppl=189.95 val_time=77.04s
+[2025-10-28 18:21:25][Epoch 000][Step 0610/1200] global_step=610 train_loss=5.7124 train_ppl=302.59 lr=0.000508 step_time=11.423s step_time_min=8.273 step_time_max=22.745 micro_time=2.278s tp=3212 tok/s
+[2025-10-28 18:23:20][Epoch 000][Step 0620/1200] global_step=620 train_loss=5.6772 train_ppl=292.13 lr=0.000517 step_time=11.491s step_time_min=8.273 step_time_max=22.745 micro_time=2.291s tp=5346 tok/s
+[2025-10-28 18:25:36][Epoch 000][Step 0630/1200] global_step=630 train_loss=5.6762 train_ppl=291.85 lr=0.000525 step_time=13.629s step_time_min=8.273 step_time_max=22.745 micro_time=2.719s tp=4508 tok/s
+[2025-10-28 18:27:48][Epoch 000][Step 0640/1200] global_step=640 train_loss=5.6197 train_ppl=275.79 lr=0.000533 step_time=13.227s step_time_min=8.273 step_time_max=22.745 micro_time=2.639s tp=4645 tok/s
+[2025-10-28 18:30:00][Epoch 000][Step 0650/1200] global_step=650 train_loss=5.6254 train_ppl=277.38 lr=0.000542 step_time=13.177s step_time_min=8.273 step_time_max=22.745 micro_time=2.628s tp=4662 tok/s
+[2025-10-28 18:32:04][Epoch 000][Step 0660/1200] global_step=660 train_loss=5.6324 train_ppl=279.32 lr=0.000550 step_time=12.374s step_time_min=8.273 step_time_max=22.745 micro_time=2.468s tp=4965 tok/s
+[2025-10-28 18:33:56][Epoch 000][Step 0670/1200] global_step=670 train_loss=5.6195 train_ppl=275.74 lr=0.000558 step_time=11.171s step_time_min=8.273 step_time_max=22.745 micro_time=2.227s tp=5499 tok/s
+[2025-10-28 18:35:53][Epoch 000][Step 0680/1200] global_step=680 train_loss=5.5892 train_ppl=267.52 lr=0.000567 step_time=11.702s step_time_min=8.273 step_time_max=22.745 micro_time=2.334s tp=5250 tok/s
+[2025-10-28 18:37:58][Epoch 000][Step 0690/1200] global_step=690 train_loss=5.5187 train_ppl=249.30 lr=0.000575 step_time=12.549s step_time_min=8.273 step_time_max=22.745 micro_time=2.503s tp=4895 tok/s
+[2025-10-28 18:39:49][Epoch 000][Step 0700/1200] global_step=700 train_loss=5.6587 train_ppl=286.77 lr=0.000583 step_time=11.094s step_time_min=8.273 step_time_max=22.745 micro_time=2.212s tp=5537 tok/s
+[2025-10-28 18:41:42][Epoch 000][Step 0710/1200] global_step=710 train_loss=5.5852 train_ppl=266.46 lr=0.000592 step_time=11.280s step_time_min=8.273 step_time_max=22.745 micro_time=2.249s tp=5445 tok/s
+[2025-10-28 18:43:42][Epoch 000][Step 0720/1200] global_step=720 train_loss=5.5949 train_ppl=269.04 lr=0.000600 step_time=12.018s step_time_min=8.273 step_time_max=22.745 micro_time=2.397s tp=5112 tok/s
+[2025-10-28 18:45:51][Epoch 000][Step 0730/1200] global_step=730 train_loss=5.5534 train_ppl=258.11 lr=0.000600 step_time=12.830s step_time_min=8.273 step_time_max=22.745 micro_time=2.559s tp=4788 tok/s
+[2025-10-28 18:48:12][Epoch 000][Step 0740/1200] global_step=740 train_loss=5.5378 train_ppl=254.13 lr=0.000600 step_time=14.150s step_time_min=8.273 step_time_max=22.745 micro_time=2.823s tp=4341 tok/s
+[2025-10-28 18:50:24][Epoch 000][Step 0750/1200] global_step=750 train_loss=5.4517 train_ppl=233.14 lr=0.000600 step_time=13.132s step_time_min=8.273 step_time_max=22.745 micro_time=2.619s tp=4678 tok/s
+[2025-10-28 18:52:37][Epoch 000][Step 0760/1200] global_step=760 train_loss=5.4952 train_ppl=243.53 lr=0.000600 step_time=13.309s step_time_min=8.273 step_time_max=22.745 micro_time=2.655s tp=4616 tok/s
+[2025-10-28 18:54:36][Epoch 000][Step 0770/1200] global_step=770 train_loss=5.4243 train_ppl=226.86 lr=0.000600 step_time=11.934s step_time_min=8.273 step_time_max=22.745 micro_time=2.380s tp=5148 tok/s
+[2025-10-28 18:56:39][Epoch 000][Step 0780/1200] global_step=780 train_loss=5.3783 train_ppl=216.65 lr=0.000600 step_time=12.264s step_time_min=8.273 step_time_max=22.745 micro_time=2.446s tp=5009 tok/s
+[2025-10-28 18:58:32][Epoch 000][Step 0790/1200] global_step=790 train_loss=5.4545 train_ppl=233.82 lr=0.000600 step_time=11.302s step_time_min=8.273 step_time_max=22.745 micro_time=2.254s tp=5435 tok/s
+[2025-10-28 19:00:42][Epoch 000][Step 0800/1200] global_step=800 train_loss=5.3891 train_ppl=219.00 lr=0.000600 step_time=13.049s step_time_min=8.273 step_time_max=22.745 micro_time=2.603s tp=4708 tok/s
+[2025-10-28 19:02:48][Epoch 000][Step 0810/1200] global_step=810 train_loss=5.3772 train_ppl=216.42 lr=0.000600 step_time=12.520s step_time_min=8.273 step_time_max=22.745 micro_time=2.497s tp=4907 tok/s
+[2025-10-28 19:04:56][Epoch 000][Step 0820/1200] global_step=820 train_loss=5.3298 train_ppl=206.40 lr=0.000600 step_time=12.857s step_time_min=8.273 step_time_max=22.745 micro_time=2.565s tp=4778 tok/s
+[2025-10-28 19:07:04][Epoch 000][Step 0830/1200] global_step=830 train_loss=5.3483 train_ppl=210.24 lr=0.000600 step_time=12.765s step_time_min=8.273 step_time_max=22.745 micro_time=2.546s tp=4812 tok/s
+[2025-10-28 19:09:25][Epoch 000][Step 0840/1200] global_step=840 train_loss=5.2708 train_ppl=194.57 lr=0.000600 step_time=14.122s step_time_min=8.273 step_time_max=22.745 micro_time=2.818s tp=4350 tok/s
+[2025-10-28 19:11:24][Epoch 000][Step 0850/1200] global_step=850 train_loss=5.3399 train_ppl=208.49 lr=0.000599 step_time=11.888s step_time_min=8.273 step_time_max=22.745 micro_time=2.370s tp=5168 tok/s
+[2025-10-28 19:13:25][Epoch 000][Step 0860/1200] global_step=860 train_loss=5.3201 train_ppl=204.41 lr=0.000599 step_time=12.074s step_time_min=8.273 step_time_max=22.745 micro_time=2.408s tp=5088 tok/s
+[2025-10-28 19:15:25][Epoch 000][Step 0870/1200] global_step=870 train_loss=5.2119 train_ppl=183.45 lr=0.000599 step_time=11.997s step_time_min=8.273 step_time_max=22.745 micro_time=2.392s tp=5121 tok/s
+[2025-10-28 19:17:14][Epoch 000][Step 0880/1200] global_step=880 train_loss=5.2764 train_ppl=195.66 lr=0.000599 step_time=10.866s step_time_min=8.273 step_time_max=22.745 micro_time=2.166s tp=5654 tok/s
+[2025-10-28 19:19:17][Epoch 000][Step 0890/1200] global_step=890 train_loss=5.2247 train_ppl=185.81 lr=0.000599 step_time=12.390s step_time_min=8.273 step_time_max=22.745 micro_time=2.471s tp=4959 tok/s
+[2025-10-28 19:21:28][Epoch 000][Step 0900/1200] global_step=900 train_loss=5.1789 train_ppl=177.49 lr=0.000599 step_time=13.038s step_time_min=8.273 step_time_max=22.745 micro_time=2.600s tp=4712 tok/s
+[2025-10-28 19:22:30][MiniVal][Epoch 000][Step 0900] val_loss=4.6496 val_ppl=104.54 val_time=62.46s
+[2025-10-28 19:24:34][Epoch 000][Step 0910/1200] global_step=910 train_loss=5.2123 train_ppl=183.52 lr=0.000599 step_time=12.368s step_time_min=8.273 step_time_max=22.745 micro_time=2.467s tp=3300 tok/s
+[2025-10-28 19:26:47][Epoch 000][Step 0920/1200] global_step=920 train_loss=5.2839 train_ppl=197.15 lr=0.000599 step_time=13.247s step_time_min=8.273 step_time_max=22.745 micro_time=2.642s tp=4637 tok/s
+[2025-10-28 19:28:48][Epoch 000][Step 0930/1200] global_step=930 train_loss=5.2594 train_ppl=192.37 lr=0.000599 step_time=12.164s step_time_min=8.273 step_time_max=22.745 micro_time=2.426s tp=5050 tok/s
+[2025-10-28 19:30:45][Epoch 000][Step 0940/1200] global_step=940 train_loss=5.2408 train_ppl=188.82 lr=0.000598 step_time=11.638s step_time_min=8.273 step_time_max=22.745 micro_time=2.321s tp=5278 tok/s
+[2025-10-28 19:32:50][Epoch 000][Step 0950/1200] global_step=950 train_loss=5.2431 train_ppl=189.26 lr=0.000598 step_time=12.498s step_time_min=8.273 step_time_max=22.745 micro_time=2.493s tp=4915 tok/s
+[2025-10-28 19:34:57][Epoch 000][Step 0960/1200] global_step=960 train_loss=5.2481 train_ppl=190.21 lr=0.000598 step_time=12.687s step_time_min=8.273 step_time_max=22.745 micro_time=2.530s tp=4842 tok/s
+[2025-10-28 19:36:52][Epoch 000][Step 0970/1200] global_step=970 train_loss=5.1983 train_ppl=180.97 lr=0.000598 step_time=11.517s step_time_min=8.273 step_time_max=22.745 micro_time=2.297s tp=5334 tok/s
+[2025-10-28 19:39:04][Epoch 000][Step 0980/1200] global_step=980 train_loss=5.1544 train_ppl=173.20 lr=0.000598 step_time=13.215s step_time_min=8.273 step_time_max=22.745 micro_time=2.636s tp=4649 tok/s
+[2025-10-28 19:41:06][Epoch 000][Step 0990/1200] global_step=990 train_loss=5.1387 train_ppl=170.50 lr=0.000598 step_time=12.213s step_time_min=8.273 step_time_max=22.745 micro_time=2.435s tp=5030 tok/s
+[2025-10-28 19:43:06][Epoch 000][Step 1000/1200] global_step=1000 train_loss=5.1779 train_ppl=177.31 lr=0.000598 step_time=11.986s step_time_min=8.273 step_time_max=22.745 micro_time=2.390s tp=5125 tok/s
+[2025-10-28 19:45:00][Epoch 000][Step 1010/1200] global_step=1010 train_loss=5.1603 train_ppl=174.21 lr=0.000597 step_time=11.400s step_time_min=8.273 step_time_max=22.745 micro_time=2.273s tp=5388 tok/s
+[2025-10-28 19:47:01][Epoch 000][Step 1020/1200] global_step=1020 train_loss=5.0997 train_ppl=163.98 lr=0.000597 step_time=12.116s step_time_min=8.273 step_time_max=22.745 micro_time=2.416s tp=5070 tok/s
+[2025-10-28 19:49:09][Epoch 000][Step 1030/1200] global_step=1030 train_loss=5.1136 train_ppl=166.27 lr=0.000597 step_time=12.774s step_time_min=8.273 step_time_max=22.745 micro_time=2.548s tp=4809 tok/s
+[2025-10-28 19:51:27][Epoch 000][Step 1040/1200] global_step=1040 train_loss=5.1306 train_ppl=169.12 lr=0.000597 step_time=13.798s step_time_min=8.273 step_time_max=22.745 micro_time=2.752s tp=4452 tok/s
+[2025-10-28 19:53:30][Epoch 000][Step 1050/1200] global_step=1050 train_loss=5.0596 train_ppl=157.52 lr=0.000597 step_time=12.248s step_time_min=8.273 step_time_max=22.745 micro_time=2.443s tp=5016 tok/s
+[2025-10-28 19:55:30][Epoch 000][Step 1060/1200] global_step=1060 train_loss=5.0944 train_ppl=163.10 lr=0.000596 step_time=12.030s step_time_min=8.273 step_time_max=22.745 micro_time=2.399s tp=5106 tok/s
+[2025-10-28 19:57:31][Epoch 000][Step 1070/1200] global_step=1070 train_loss=5.0508 train_ppl=156.14 lr=0.000596 step_time=12.060s step_time_min=8.273 step_time_max=22.745 micro_time=2.405s tp=5093 tok/s
+[2025-10-28 19:59:37][Epoch 000][Step 1080/1200] global_step=1080 train_loss=5.0548 train_ppl=156.77 lr=0.000596 step_time=12.676s step_time_min=8.273 step_time_max=22.745 micro_time=2.528s tp=4846 tok/s
+[2025-10-28 20:01:39][Epoch 000][Step 1090/1200] global_step=1090 train_loss=5.1383 train_ppl=170.42 lr=0.000596 step_time=12.184s step_time_min=8.273 step_time_max=22.745 micro_time=2.430s tp=5042 tok/s
+[2025-10-28 20:03:48][Epoch 000][Step 1100/1200] global_step=1100 train_loss=5.0707 train_ppl=159.28 lr=0.000595 step_time=12.905s step_time_min=8.273 step_time_max=22.745 micro_time=2.574s tp=4760 tok/s
+[2025-10-28 20:05:52][Epoch 000][Step 1110/1200] global_step=1110 train_loss=5.0166 train_ppl=150.90 lr=0.000595 step_time=12.398s step_time_min=8.273 step_time_max=22.745 micro_time=2.473s tp=4955 tok/s
+[2025-10-28 20:08:02][Epoch 000][Step 1120/1200] global_step=1120 train_loss=5.2782 train_ppl=196.02 lr=0.000595 step_time=12.967s step_time_min=8.273 step_time_max=22.745 micro_time=2.586s tp=4738 tok/s
+[2025-10-28 20:10:00][Epoch 000][Step 1130/1200] global_step=1130 train_loss=5.0871 train_ppl=161.92 lr=0.000595 step_time=11.804s step_time_min=8.273 step_time_max=22.745 micro_time=2.354s tp=5204 tok/s
+[2025-10-28 20:12:11][Epoch 000][Step 1140/1200] global_step=1140 train_loss=5.1001 train_ppl=164.04 lr=0.000594 step_time=13.108s step_time_min=8.273 step_time_max=22.745 micro_time=2.615s tp=4687 tok/s
+[2025-10-28 20:14:27][Epoch 000][Step 1150/1200] global_step=1150 train_loss=5.0824 train_ppl=161.15 lr=0.000594 step_time=13.569s step_time_min=8.273 step_time_max=22.745 micro_time=2.707s tp=4527 tok/s
+[2025-10-28 20:16:33][Epoch 000][Step 1160/1200] global_step=1160 train_loss=5.0134 train_ppl=150.41 lr=0.000594 step_time=12.612s step_time_min=8.273 step_time_max=22.745 micro_time=2.515s tp=4871 tok/s
+[2025-10-28 20:18:34][Epoch 000][Step 1170/1200] global_step=1170 train_loss=5.0658 train_ppl=158.51 lr=0.000594 step_time=12.044s step_time_min=8.273 step_time_max=22.745 micro_time=2.402s tp=5101 tok/s
+[2025-10-28 20:20:36][Epoch 000][Step 1180/1200] global_step=1180 train_loss=5.0167 train_ppl=150.92 lr=0.000593 step_time=12.280s step_time_min=8.273 step_time_max=22.745 micro_time=2.449s tp=5002 tok/s
+[2025-10-28 20:22:40][Epoch 000][Step 1190/1200] global_step=1190 train_loss=4.9948 train_ppl=147.65 lr=0.000593 step_time=12.369s step_time_min=8.273 step_time_max=22.745 micro_time=2.466s tp=4967 tok/s
+[2025-10-28 20:24:44][Epoch 000][Step 1200/1200] global_step=1200 train_loss=5.0938 train_ppl=163.00 lr=0.000593 step_time=12.437s step_time_min=8.273 step_time_max=22.745 micro_time=2.481s tp=4940 tok/s
+[2025-10-28 20:25:59][MiniVal][Epoch 000][Step 1200] val_loss=4.3131 val_ppl=74.67 val_time=74.11s
+[2025-10-28 20:29:45][Epoch 000] global_step=1200  train_loss=5.0938 train_ppl=163.00 val_ppl=73.76 micro_steps=6000 micro_time=2.500s steps=1200 step_time=12.534s epoch_train_time=15337.506s  epoch_time=15563.418s tp=4807 tok/s straggle_events=3005
+[2025-10-28 20:29:45] New best validation perplexity: 73.76
+[2025-10-28 20:29:45][Epoch 001] ...
+[2025-10-28 20:31:52][Epoch 001][Step 0010/1200] global_step=1210 train_loss=5.0033 train_ppl=148.90 lr=0.000592 step_time=12.707s step_time_min=8.772 step_time_max=20.209 micro_time=2.533s tp=4825 tok/s
+[2025-10-28 20:33:54][Epoch 001][Step 0020/1200] global_step=1220 train_loss=4.9998 train_ppl=148.38 lr=0.000592 step_time=12.187s step_time_min=8.327 step_time_max=20.209 micro_time=2.429s tp=5040 tok/s
+[2025-10-28 20:35:55][Epoch 001][Step 0030/1200] global_step=1230 train_loss=5.0380 train_ppl=154.17 lr=0.000592 step_time=12.124s step_time_min=8.327 step_time_max=20.209 micro_time=2.416s tp=5066 tok/s
+[2025-10-28 20:38:23][Epoch 001][Step 0040/1200] global_step=1240 train_loss=4.9233 train_ppl=137.45 lr=0.000591 step_time=14.809s step_time_min=8.327 step_time_max=20.695 micro_time=2.953s tp=4148 tok/s
+[2025-10-28 20:40:29][Epoch 001][Step 0050/1200] global_step=1250 train_loss=4.9290 train_ppl=138.24 lr=0.000591 step_time=12.588s step_time_min=8.327 step_time_max=20.695 micro_time=2.509s tp=4879 tok/s
+[2025-10-28 20:42:41][Epoch 001][Step 0060/1200] global_step=1260 train_loss=4.9107 train_ppl=135.73 lr=0.000591 step_time=13.137s step_time_min=8.327 step_time_max=20.695 micro_time=2.619s tp=4675 tok/s
+[2025-10-28 20:45:02][Epoch 001][Step 0070/1200] global_step=1270 train_loss=4.9899 train_ppl=146.92 lr=0.000590 step_time=14.116s step_time_min=8.327 step_time_max=20.695 micro_time=2.814s tp=4351 tok/s
+[2025-10-28 20:47:08][Epoch 001][Step 0080/1200] global_step=1280 train_loss=4.8873 train_ppl=132.59 lr=0.000590 step_time=12.633s step_time_min=8.327 step_time_max=20.695 micro_time=2.518s tp=4862 tok/s
+[2025-10-28 20:49:20][Epoch 001][Step 0090/1200] global_step=1290 train_loss=4.8673 train_ppl=129.98 lr=0.000590 step_time=13.216s step_time_min=8.327 step_time_max=20.695 micro_time=2.635s tp=4648 tok/s
+[2025-10-28 20:51:33][Epoch 001][Step 0100/1200] global_step=1300 train_loss=4.8672 train_ppl=129.95 lr=0.000589 step_time=13.270s step_time_min=8.327 step_time_max=20.695 micro_time=2.645s tp=4629 tok/s
+[2025-10-28 20:53:37][Epoch 001][Step 0110/1200] global_step=1310 train_loss=4.8696 train_ppl=130.26 lr=0.000589 step_time=12.367s step_time_min=8.327 step_time_max=20.695 micro_time=2.465s tp=4966 tok/s
+[2025-10-28 20:55:56][Epoch 001][Step 0120/1200] global_step=1320 train_loss=4.8286 train_ppl=125.03 lr=0.000589 step_time=13.899s step_time_min=8.327 step_time_max=20.695 micro_time=2.771s tp=4419 tok/s
+[2025-10-28 20:58:14][Epoch 001][Step 0130/1200] global_step=1330 train_loss=4.8364 train_ppl=126.02 lr=0.000588 step_time=13.776s step_time_min=8.327 step_time_max=20.695 micro_time=2.747s tp=4459 tok/s
+[2025-10-28 21:00:15][Epoch 001][Step 0140/1200] global_step=1340 train_loss=4.8735 train_ppl=130.77 lr=0.000588 step_time=12.099s step_time_min=8.327 step_time_max=20.695 micro_time=2.411s tp=5076 tok/s
+[2025-10-28 21:02:22][Epoch 001][Step 0150/1200] global_step=1350 train_loss=4.7914 train_ppl=120.48 lr=0.000588 step_time=12.701s step_time_min=8.327 step_time_max=21.112 micro_time=2.531s tp=4836 tok/s
+[2025-10-28 21:04:26][Epoch 001][Step 0160/1200] global_step=1360 train_loss=4.8546 train_ppl=128.33 lr=0.000587 step_time=12.454s step_time_min=8.327 step_time_max=21.112 micro_time=2.482s tp=4932 tok/s
+[2025-10-28 21:06:37][Epoch 001][Step 0170/1200] global_step=1370 train_loss=4.7977 train_ppl=121.23 lr=0.000587 step_time=13.029s step_time_min=8.327 step_time_max=21.112 micro_time=2.597s tp=4714 tok/s
+[2025-10-28 21:08:36][Epoch 001][Step 0180/1200] global_step=1380 train_loss=4.8230 train_ppl=124.33 lr=0.000586 step_time=11.955s step_time_min=8.327 step_time_max=21.112 micro_time=2.382s tp=5137 tok/s
+[2025-10-28 21:10:40][Epoch 001][Step 0190/1200] global_step=1390 train_loss=4.7829 train_ppl=119.45 lr=0.000586 step_time=12.388s step_time_min=8.327 step_time_max=21.112 micro_time=2.469s tp=4958 tok/s
+[2025-10-28 21:12:40][Epoch 001][Step 0200/1200] global_step=1400 train_loss=4.8529 train_ppl=128.11 lr=0.000586 step_time=11.909s step_time_min=8.320 step_time_max=21.112 micro_time=2.373s tp=5158 tok/s
+[2025-10-28 21:14:41][Epoch 001][Step 0210/1200] global_step=1410 train_loss=4.8271 train_ppl=124.85 lr=0.000585 step_time=12.142s step_time_min=8.320 step_time_max=21.112 micro_time=2.420s tp=5058 tok/s
+[2025-10-28 21:16:31][Epoch 001][Step 0220/1200] global_step=1420 train_loss=4.7721 train_ppl=118.16 lr=0.000585 step_time=10.964s step_time_min=8.320 step_time_max=21.112 micro_time=2.184s tp=5602 tok/s
+[2025-10-28 21:18:38][Epoch 001][Step 0230/1200] global_step=1430 train_loss=4.8019 train_ppl=121.74 lr=0.000584 step_time=12.695s step_time_min=8.320 step_time_max=21.112 micro_time=2.530s tp=4838 tok/s
+[2025-10-28 21:20:41][Epoch 001][Step 0240/1200] global_step=1440 train_loss=4.9046 train_ppl=134.91 lr=0.000584 step_time=12.300s step_time_min=8.320 step_time_max=21.112 micro_time=2.451s tp=4994 tok/s
+[2025-10-28 21:22:50][Epoch 001][Step 0250/1200] global_step=1450 train_loss=4.7824 train_ppl=119.39 lr=0.000583 step_time=12.911s step_time_min=8.320 step_time_max=21.112 micro_time=2.574s tp=4757 tok/s
+[2025-10-28 21:24:41][Epoch 001][Step 0260/1200] global_step=1460 train_loss=4.8011 train_ppl=121.64 lr=0.000583 step_time=11.071s step_time_min=8.320 step_time_max=21.112 micro_time=2.205s tp=5548 tok/s
+[2025-10-28 21:26:44][Epoch 001][Step 0270/1200] global_step=1470 train_loss=4.7055 train_ppl=110.55 lr=0.000582 step_time=12.336s step_time_min=8.320 step_time_max=21.112 micro_time=2.459s tp=4980 tok/s
+[2025-10-28 21:28:49][Epoch 001][Step 0280/1200] global_step=1480 train_loss=4.6737 train_ppl=107.09 lr=0.000582 step_time=12.453s step_time_min=8.320 step_time_max=21.112 micro_time=2.482s tp=4932 tok/s
+[2025-10-28 21:31:00][Epoch 001][Step 0290/1200] global_step=1490 train_loss=4.7399 train_ppl=114.43 lr=0.000581 step_time=13.158s step_time_min=8.320 step_time_max=21.112 micro_time=2.623s tp=4668 tok/s
+[2025-10-28 21:33:12][Epoch 001][Step 0300/1200] global_step=1500 train_loss=4.7273 train_ppl=112.99 lr=0.000581 step_time=13.166s step_time_min=8.320 step_time_max=21.112 micro_time=2.625s tp=4665 tok/s
+[2025-10-28 21:34:21][MiniVal][Epoch 001][Step 0300] val_loss=4.1097 val_ppl=60.93 val_time=68.56s
+[2025-10-28 21:36:20][Epoch 001][Step 0310/1200] global_step=1510 train_loss=4.5030 train_ppl=90.29 lr=0.000580 step_time=11.947s step_time_min=8.320 step_time_max=21.112 micro_time=2.381s tp=3267 tok/s
+[2025-10-28 21:38:27][Epoch 001][Step 0320/1200] global_step=1520 train_loss=4.7273 train_ppl=112.99 lr=0.000580 step_time=12.722s step_time_min=8.320 step_time_max=21.112 micro_time=2.536s tp=4828 tok/s
+[2025-10-28 21:40:24][Epoch 001][Step 0330/1200] global_step=1530 train_loss=4.7536 train_ppl=116.00 lr=0.000579 step_time=11.701s step_time_min=8.320 step_time_max=21.112 micro_time=2.332s tp=5249 tok/s
+[2025-10-28 21:42:48][Epoch 001][Step 0340/1200] global_step=1540 train_loss=4.6749 train_ppl=107.23 lr=0.000579 step_time=14.389s step_time_min=8.320 step_time_max=21.112 micro_time=2.869s tp=4269 tok/s
+[2025-10-28 21:45:06][Epoch 001][Step 0350/1200] global_step=1550 train_loss=4.7058 train_ppl=110.58 lr=0.000578 step_time=13.721s step_time_min=8.320 step_time_max=21.768 micro_time=2.735s tp=4476 tok/s
+[2025-10-28 21:47:13][Epoch 001][Step 0360/1200] global_step=1560 train_loss=4.8129 train_ppl=123.08 lr=0.000578 step_time=12.680s step_time_min=8.320 step_time_max=21.768 micro_time=2.527s tp=4844 tok/s
+[2025-10-28 21:49:21][Epoch 001][Step 0370/1200] global_step=1570 train_loss=4.7433 train_ppl=114.82 lr=0.000577 step_time=12.866s step_time_min=8.320 step_time_max=21.768 micro_time=2.564s tp=4774 tok/s
+[2025-10-28 21:51:36][Epoch 001][Step 0380/1200] global_step=1580 train_loss=4.6652 train_ppl=106.19 lr=0.000577 step_time=13.434s step_time_min=8.320 step_time_max=21.768 micro_time=2.678s tp=4572 tok/s
+[2025-10-28 21:53:46][Epoch 001][Step 0390/1200] global_step=1590 train_loss=4.6778 train_ppl=107.54 lr=0.000576 step_time=13.036s step_time_min=8.320 step_time_max=21.768 micro_time=2.598s tp=4712 tok/s
+[2025-10-28 21:55:47][Epoch 001][Step 0400/1200] global_step=1600 train_loss=4.6662 train_ppl=106.29 lr=0.000576 step_time=12.038s step_time_min=8.320 step_time_max=21.768 micro_time=2.399s tp=5102 tok/s
+[2025-10-28 21:57:47][Epoch 001][Step 0410/1200] global_step=1610 train_loss=4.6699 train_ppl=106.69 lr=0.000575 step_time=12.075s step_time_min=8.320 step_time_max=21.768 micro_time=2.406s tp=5087 tok/s
+[2025-10-28 21:59:58][Epoch 001][Step 0420/1200] global_step=1620 train_loss=4.6200 train_ppl=101.50 lr=0.000575 step_time=13.098s step_time_min=8.320 step_time_max=21.768 micro_time=2.611s tp=4690 tok/s
+[2025-10-28 22:01:59][Epoch 001][Step 0430/1200] global_step=1630 train_loss=4.6061 train_ppl=100.09 lr=0.000574 step_time=12.019s step_time_min=8.320 step_time_max=21.768 micro_time=2.395s tp=5111 tok/s
+[2025-10-28 22:03:52][Epoch 001][Step 0440/1200] global_step=1640 train_loss=4.6333 train_ppl=102.85 lr=0.000574 step_time=11.378s step_time_min=8.320 step_time_max=21.768 micro_time=2.267s tp=5398 tok/s
+[2025-10-28 22:05:49][Epoch 001][Step 0450/1200] global_step=1650 train_loss=4.6113 train_ppl=100.61 lr=0.000573 step_time=11.687s step_time_min=8.320 step_time_max=21.768 micro_time=2.329s tp=5255 tok/s
+[2025-10-28 22:07:36][Epoch 001][Step 0460/1200] global_step=1660 train_loss=4.6060 train_ppl=100.08 lr=0.000573 step_time=10.685s step_time_min=8.320 step_time_max=21.768 micro_time=2.129s tp=5748 tok/s
+[2025-10-28 22:09:44][Epoch 001][Step 0470/1200] global_step=1670 train_loss=4.5858 train_ppl=98.09 lr=0.000572 step_time=12.813s step_time_min=8.320 step_time_max=21.768 micro_time=2.554s tp=4793 tok/s
+[2025-10-28 22:11:47][Epoch 001][Step 0480/1200] global_step=1680 train_loss=4.5241 train_ppl=92.21 lr=0.000571 step_time=12.246s step_time_min=8.320 step_time_max=21.768 micro_time=2.441s tp=5016 tok/s
+[2025-10-28 22:14:07][Epoch 001][Step 0490/1200] global_step=1690 train_loss=4.5886 train_ppl=98.35 lr=0.000571 step_time=13.974s step_time_min=8.320 step_time_max=21.768 micro_time=2.786s tp=4396 tok/s
+[2025-10-28 22:16:13][Epoch 001][Step 0500/1200] global_step=1700 train_loss=4.5997 train_ppl=99.45 lr=0.000570 step_time=12.641s step_time_min=8.320 step_time_max=21.768 micro_time=2.520s tp=4859 tok/s
+[2025-10-28 22:18:29][Epoch 001][Step 0510/1200] global_step=1710 train_loss=4.5840 train_ppl=97.90 lr=0.000570 step_time=13.607s step_time_min=8.320 step_time_max=21.768 micro_time=2.713s tp=4514 tok/s
+[2025-10-28 22:20:25][Epoch 001][Step 0520/1200] global_step=1720 train_loss=4.5873 train_ppl=98.23 lr=0.000569 step_time=11.510s step_time_min=8.320 step_time_max=21.768 micro_time=2.293s tp=5336 tok/s
+[2025-10-28 22:22:47][Epoch 001][Step 0530/1200] global_step=1730 train_loss=4.5617 train_ppl=95.75 lr=0.000568 step_time=14.253s step_time_min=8.320 step_time_max=21.768 micro_time=2.842s tp=4309 tok/s
+[2025-10-28 22:25:07][Epoch 001][Step 0540/1200] global_step=1740 train_loss=4.5814 train_ppl=97.65 lr=0.000568 step_time=13.966s step_time_min=8.320 step_time_max=21.768 micro_time=2.784s tp=4398 tok/s
+[2025-10-28 22:27:08][Epoch 001][Step 0550/1200] global_step=1750 train_loss=4.5830 train_ppl=97.81 lr=0.000567 step_time=12.124s step_time_min=8.320 step_time_max=21.768 micro_time=2.416s tp=5066 tok/s
+[2025-10-28 22:29:11][Epoch 001][Step 0560/1200] global_step=1760 train_loss=4.5402 train_ppl=93.71 lr=0.000566 step_time=12.261s step_time_min=8.320 step_time_max=21.768 micro_time=2.444s tp=5009 tok/s
+[2025-10-28 22:31:09][Epoch 001][Step 0570/1200] global_step=1770 train_loss=4.5035 train_ppl=90.33 lr=0.000566 step_time=11.786s step_time_min=8.320 step_time_max=21.768 micro_time=2.348s tp=5211 tok/s
+[2025-10-28 22:33:19][Epoch 001][Step 0580/1200] global_step=1780 train_loss=4.5288 train_ppl=92.65 lr=0.000565 step_time=13.012s step_time_min=8.320 step_time_max=21.768 micro_time=2.594s tp=4720 tok/s
+[2025-10-28 22:35:22][Epoch 001][Step 0590/1200] global_step=1790 train_loss=4.5522 train_ppl=94.84 lr=0.000565 step_time=12.263s step_time_min=8.320 step_time_max=21.768 micro_time=2.444s tp=5009 tok/s
+[2025-10-28 22:37:33][Epoch 001][Step 0600/1200] global_step=1800 train_loss=4.5688 train_ppl=96.43 lr=0.000564 step_time=13.114s step_time_min=8.320 step_time_max=21.768 micro_time=2.614s tp=4684 tok/s
+[2025-10-28 22:38:44][MiniVal][Epoch 001][Step 0600] val_loss=3.9908 val_ppl=54.10 val_time=70.89s
+[2025-10-28 22:40:51][Epoch 001][Step 0610/1200] global_step=1810 train_loss=4.5160 train_ppl=91.47 lr=0.000563 step_time=12.693s step_time_min=8.320 step_time_max=21.768 micro_time=2.530s tp=3105 tok/s
+[2025-10-28 22:42:52][Epoch 001][Step 0620/1200] global_step=1820 train_loss=4.5328 train_ppl=93.02 lr=0.000563 step_time=12.086s step_time_min=8.320 step_time_max=21.768 micro_time=2.409s tp=5082 tok/s
+[2025-10-28 22:45:04][Epoch 001][Step 0630/1200] global_step=1830 train_loss=4.5537 train_ppl=94.98 lr=0.000562 step_time=13.223s step_time_min=8.320 step_time_max=21.768 micro_time=2.636s tp=4645 tok/s
+[2025-10-28 22:46:56][Epoch 001][Step 0640/1200] global_step=1840 train_loss=4.4900 train_ppl=89.12 lr=0.000561 step_time=11.235s step_time_min=8.320 step_time_max=21.768 micro_time=2.238s tp=5467 tok/s
+[2025-10-28 22:49:11][Epoch 001][Step 0650/1200] global_step=1850 train_loss=4.4779 train_ppl=88.05 lr=0.000561 step_time=13.430s step_time_min=8.320 step_time_max=21.768 micro_time=2.678s tp=4573 tok/s
+[2025-10-28 22:51:09][Epoch 001][Step 0660/1200] global_step=1860 train_loss=4.4749 train_ppl=87.79 lr=0.000560 step_time=11.831s step_time_min=8.320 step_time_max=21.768 micro_time=2.358s tp=5191 tok/s
+[2025-10-28 22:53:23][Epoch 001][Step 0670/1200] global_step=1870 train_loss=4.5157 train_ppl=91.44 lr=0.000559 step_time=13.389s step_time_min=8.320 step_time_max=21.768 micro_time=2.669s tp=4587 tok/s
+[2025-10-28 22:55:21][Epoch 001][Step 0680/1200] global_step=1880 train_loss=4.5136 train_ppl=91.25 lr=0.000558 step_time=11.835s step_time_min=8.320 step_time_max=21.768 micro_time=2.358s tp=5190 tok/s
+[2025-10-28 22:57:30][Epoch 001][Step 0690/1200] global_step=1890 train_loss=4.4525 train_ppl=85.84 lr=0.000558 step_time=12.896s step_time_min=8.320 step_time_max=21.768 micro_time=2.570s tp=4763 tok/s
+[2025-10-28 22:59:43][Epoch 001][Step 0700/1200] global_step=1900 train_loss=4.4720 train_ppl=87.54 lr=0.000557 step_time=13.283s step_time_min=8.320 step_time_max=21.768 micro_time=2.648s tp=4624 tok/s
+[2025-10-28 23:01:39][Epoch 001][Step 0710/1200] global_step=1910 train_loss=4.4710 train_ppl=87.45 lr=0.000556 step_time=11.561s step_time_min=8.320 step_time_max=21.768 micro_time=2.304s tp=5313 tok/s
+[2025-10-28 23:03:30][Epoch 001][Step 0720/1200] global_step=1920 train_loss=4.4993 train_ppl=89.95 lr=0.000556 step_time=11.114s step_time_min=8.320 step_time_max=21.768 micro_time=2.214s tp=5527 tok/s
+[2025-10-28 23:05:34][Epoch 001][Step 0730/1200] global_step=1930 train_loss=4.3960 train_ppl=81.13 lr=0.000555 step_time=12.403s step_time_min=8.320 step_time_max=21.768 micro_time=2.472s tp=4952 tok/s
+[2025-10-28 23:07:30][Epoch 001][Step 0740/1200] global_step=1940 train_loss=4.5232 train_ppl=92.13 lr=0.000554 step_time=11.621s step_time_min=8.320 step_time_max=21.768 micro_time=2.315s tp=5286 tok/s
+[2025-10-28 23:09:52][Epoch 001][Step 0750/1200] global_step=1950 train_loss=4.4477 train_ppl=85.43 lr=0.000553 step_time=14.184s step_time_min=8.320 step_time_max=21.768 micro_time=2.828s tp=4331 tok/s
+[2025-10-28 23:12:05][Epoch 001][Step 0760/1200] global_step=1960 train_loss=4.4593 train_ppl=86.43 lr=0.000553 step_time=13.273s step_time_min=8.320 step_time_max=21.768 micro_time=2.646s tp=4628 tok/s
+[2025-10-28 23:14:11][Epoch 001][Step 0770/1200] global_step=1970 train_loss=4.4438 train_ppl=85.10 lr=0.000552 step_time=12.598s step_time_min=8.320 step_time_max=21.768 micro_time=2.511s tp=4876 tok/s
+[2025-10-28 23:16:08][Epoch 001][Step 0780/1200] global_step=1980 train_loss=4.4031 train_ppl=81.70 lr=0.000551 step_time=11.710s step_time_min=8.320 step_time_max=21.768 micro_time=2.334s tp=5245 tok/s
+[2025-10-28 23:18:10][Epoch 001][Step 0790/1200] global_step=1990 train_loss=4.4410 train_ppl=84.86 lr=0.000550 step_time=12.135s step_time_min=8.320 step_time_max=21.768 micro_time=2.418s tp=5061 tok/s
+[2025-10-28 23:20:19][Epoch 001][Step 0800/1200] global_step=2000 train_loss=4.4395 train_ppl=84.73 lr=0.000550 step_time=12.944s step_time_min=8.320 step_time_max=21.768 micro_time=2.580s tp=4745 tok/s
+[2025-10-28 23:22:31][Epoch 001][Step 0810/1200] global_step=2010 train_loss=4.4527 train_ppl=85.86 lr=0.000549 step_time=13.198s step_time_min=8.320 step_time_max=21.768 micro_time=2.631s tp=4654 tok/s
+[2025-10-28 23:24:36][Epoch 001][Step 0820/1200] global_step=2020 train_loss=4.4369 train_ppl=84.51 lr=0.000548 step_time=12.495s step_time_min=8.320 step_time_max=21.768 micro_time=2.490s tp=4916 tok/s
+[2025-10-28 23:26:42][Epoch 001][Step 0830/1200] global_step=2030 train_loss=4.3852 train_ppl=80.26 lr=0.000547 step_time=12.534s step_time_min=8.320 step_time_max=21.768 micro_time=2.498s tp=4900 tok/s
+[2025-10-28 23:28:45][Epoch 001][Step 0840/1200] global_step=2040 train_loss=4.3704 train_ppl=79.08 lr=0.000547 step_time=12.362s step_time_min=8.320 step_time_max=21.768 micro_time=2.464s tp=4968 tok/s
+[2025-10-28 23:30:35][Epoch 001][Step 0850/1200] global_step=2050 train_loss=4.4315 train_ppl=84.06 lr=0.000546 step_time=10.983s step_time_min=8.320 step_time_max=21.768 micro_time=2.188s tp=5592 tok/s
+[2025-10-28 23:32:51][Epoch 001][Step 0860/1200] global_step=2060 train_loss=4.4108 train_ppl=82.34 lr=0.000545 step_time=13.592s step_time_min=8.320 step_time_max=21.768 micro_time=2.710s tp=4519 tok/s
+[2025-10-28 23:34:47][Epoch 001][Step 0870/1200] global_step=2070 train_loss=4.3376 train_ppl=76.52 lr=0.000544 step_time=11.563s step_time_min=8.320 step_time_max=21.768 micro_time=2.304s tp=5312 tok/s
+[2025-10-28 23:36:38][Epoch 001][Step 0880/1200] global_step=2080 train_loss=4.4127 train_ppl=82.50 lr=0.000543 step_time=11.130s step_time_min=8.320 step_time_max=21.768 micro_time=2.218s tp=5518 tok/s
+[2025-10-28 23:38:37][Epoch 001][Step 0890/1200] global_step=2090 train_loss=4.3632 train_ppl=78.51 lr=0.000543 step_time=11.877s step_time_min=8.320 step_time_max=21.768 micro_time=2.367s tp=5171 tok/s
+[2025-10-28 23:40:46][Epoch 001][Step 0900/1200] global_step=2100 train_loss=4.3287 train_ppl=75.85 lr=0.000542 step_time=12.894s step_time_min=8.320 step_time_max=21.768 micro_time=2.570s tp=4763 tok/s
+[2025-10-28 23:42:04][MiniVal][Epoch 001][Step 0900] val_loss=3.8927 val_ppl=49.05 val_time=78.06s
+[2025-10-28 23:44:03][Epoch 001][Step 0910/1200] global_step=2110 train_loss=4.3751 train_ppl=79.45 lr=0.000541 step_time=11.883s step_time_min=8.320 step_time_max=21.768 micro_time=2.368s tp=3119 tok/s
+[2025-10-28 23:45:59][Epoch 001][Step 0920/1200] global_step=2120 train_loss=4.4413 train_ppl=84.89 lr=0.000540 step_time=11.582s step_time_min=8.320 step_time_max=21.768 micro_time=2.308s tp=5303 tok/s
+[2025-10-28 23:47:58][Epoch 001][Step 0930/1200] global_step=2130 train_loss=4.3943 train_ppl=80.98 lr=0.000539 step_time=11.880s step_time_min=8.320 step_time_max=21.768 micro_time=2.367s tp=5170 tok/s
+[2025-10-28 23:50:08][Epoch 001][Step 0940/1200] global_step=2140 train_loss=4.4160 train_ppl=82.77 lr=0.000539 step_time=12.975s step_time_min=8.320 step_time_max=21.768 micro_time=2.586s tp=4734 tok/s
+[2025-10-28 23:52:20][Epoch 001][Step 0950/1200] global_step=2150 train_loss=4.4306 train_ppl=83.98 lr=0.000538 step_time=13.232s step_time_min=8.317 step_time_max=22.368 micro_time=2.638s tp=4642 tok/s
+[2025-10-28 23:54:13][Epoch 001][Step 0960/1200] global_step=2160 train_loss=4.4032 train_ppl=81.72 lr=0.000537 step_time=11.261s step_time_min=8.317 step_time_max=22.368 micro_time=2.244s tp=5454 tok/s
+[2025-10-28 23:56:11][Epoch 001][Step 0970/1200] global_step=2170 train_loss=4.3712 train_ppl=79.14 lr=0.000536 step_time=11.845s step_time_min=8.317 step_time_max=22.368 micro_time=2.360s tp=5185 tok/s
+[2025-10-28 23:58:15][Epoch 001][Step 0980/1200] global_step=2180 train_loss=4.3442 train_ppl=77.03 lr=0.000535 step_time=12.369s step_time_min=8.317 step_time_max=22.368 micro_time=2.465s tp=4966 tok/s
+[2025-10-29 00:00:19][Epoch 001][Step 0990/1200] global_step=2190 train_loss=4.3684 train_ppl=78.92 lr=0.000534 step_time=12.382s step_time_min=8.317 step_time_max=22.368 micro_time=2.468s tp=4960 tok/s
+[2025-10-29 00:02:28][Epoch 001][Step 1000/1200] global_step=2200 train_loss=4.3811 train_ppl=79.93 lr=0.000534 step_time=12.893s step_time_min=8.316 step_time_max=22.368 micro_time=2.570s tp=4764 tok/s
+[2025-10-29 00:04:38][Epoch 001][Step 1010/1200] global_step=2210 train_loss=4.3505 train_ppl=77.52 lr=0.000533 step_time=12.970s step_time_min=8.316 step_time_max=22.368 micro_time=2.585s tp=4736 tok/s
+[2025-10-29 00:06:53][Epoch 001][Step 1020/1200] global_step=2220 train_loss=4.3317 train_ppl=76.08 lr=0.000532 step_time=13.585s step_time_min=8.312 step_time_max=22.368 micro_time=2.708s tp=4521 tok/s
+[2025-10-29 00:08:58][Epoch 001][Step 1030/1200] global_step=2230 train_loss=4.3321 train_ppl=76.10 lr=0.000531 step_time=12.457s step_time_min=8.312 step_time_max=22.368 micro_time=2.483s tp=4931 tok/s
+[2025-10-29 00:10:56][Epoch 001][Step 1040/1200] global_step=2240 train_loss=4.3595 train_ppl=78.22 lr=0.000530 step_time=11.742s step_time_min=8.312 step_time_max=22.368 micro_time=2.340s tp=5231 tok/s
+[2025-10-29 00:13:01][Epoch 001][Step 1050/1200] global_step=2250 train_loss=4.3135 train_ppl=74.70 lr=0.000529 step_time=12.569s step_time_min=8.312 step_time_max=22.368 micro_time=2.505s tp=4887 tok/s
+[2025-10-29 00:15:12][Epoch 001][Step 1060/1200] global_step=2260 train_loss=4.2838 train_ppl=72.51 lr=0.000528 step_time=13.032s step_time_min=8.312 step_time_max=22.368 micro_time=2.598s tp=4713 tok/s
+[2025-10-29 00:17:26][Epoch 001][Step 1070/1200] global_step=2270 train_loss=4.3123 train_ppl=74.61 lr=0.000527 step_time=13.429s step_time_min=8.312 step_time_max=22.368 micro_time=2.677s tp=4574 tok/s
+[2025-10-29 00:19:46][Epoch 001][Step 1080/1200] global_step=2280 train_loss=4.3136 train_ppl=74.71 lr=0.000526 step_time=13.988s step_time_min=8.312 step_time_max=22.368 micro_time=2.789s tp=4391 tok/s
+[2025-10-29 00:22:10][Epoch 001][Step 1090/1200] global_step=2290 train_loss=4.3878 train_ppl=80.46 lr=0.000526 step_time=14.430s step_time_min=8.311 step_time_max=22.368 micro_time=2.877s tp=4257 tok/s
+[2025-10-29 00:24:18][Epoch 001][Step 1100/1200] global_step=2300 train_loss=4.3417 train_ppl=76.84 lr=0.000525 step_time=12.761s step_time_min=8.304 step_time_max=22.368 micro_time=2.544s tp=4813 tok/s
+[2025-10-29 00:26:24][Epoch 001][Step 1110/1200] global_step=2310 train_loss=4.3133 train_ppl=74.69 lr=0.000524 step_time=12.560s step_time_min=8.304 step_time_max=22.368 micro_time=2.503s tp=4890 tok/s
+[2025-10-29 00:28:18][Epoch 001][Step 1120/1200] global_step=2320 train_loss=4.5056 train_ppl=90.52 lr=0.000523 step_time=11.458s step_time_min=8.304 step_time_max=22.368 micro_time=2.284s tp=5360 tok/s
+[2025-10-29 00:30:39][Epoch 001][Step 1130/1200] global_step=2330 train_loss=4.3401 train_ppl=76.72 lr=0.000522 step_time=14.016s step_time_min=8.304 step_time_max=22.368 micro_time=2.794s tp=4382 tok/s
+[2025-10-29 00:32:41][Epoch 001][Step 1140/1200] global_step=2340 train_loss=4.3377 train_ppl=76.53 lr=0.000521 step_time=12.251s step_time_min=8.304 step_time_max=22.368 micro_time=2.442s tp=5013 tok/s
+[2025-10-29 00:34:54][Epoch 001][Step 1150/1200] global_step=2350 train_loss=4.3457 train_ppl=77.15 lr=0.000520 step_time=13.307s step_time_min=8.304 step_time_max=22.368 micro_time=2.653s tp=4616 tok/s
+[2025-10-29 00:36:50][Epoch 001][Step 1160/1200] global_step=2360 train_loss=4.3128 train_ppl=74.65 lr=0.000519 step_time=11.549s step_time_min=8.304 step_time_max=22.368 micro_time=2.301s tp=5318 tok/s
+[2025-10-29 00:39:12][Epoch 001][Step 1170/1200] global_step=2370 train_loss=4.3351 train_ppl=76.33 lr=0.000518 step_time=14.203s step_time_min=8.304 step_time_max=22.368 micro_time=2.832s tp=4325 tok/s
+[2025-10-29 00:41:24][Epoch 001][Step 1180/1200] global_step=2380 train_loss=4.2660 train_ppl=71.24 lr=0.000517 step_time=13.203s step_time_min=8.304 step_time_max=22.368 micro_time=2.632s tp=4652 tok/s
+[2025-10-29 00:43:46][Epoch 001][Step 1190/1200] global_step=2390 train_loss=4.3020 train_ppl=73.85 lr=0.000516 step_time=14.209s step_time_min=8.286 step_time_max=22.368 micro_time=2.833s tp=4323 tok/s
+[2025-10-29 00:46:03][Epoch 001][Step 1200/1200] global_step=2400 train_loss=4.3705 train_ppl=79.08 lr=0.000515 step_time=13.672s step_time_min=8.286 step_time_max=22.368 micro_time=2.726s tp=4493 tok/s
+[2025-10-29 00:47:15][MiniVal][Epoch 001][Step 1200] val_loss=3.8309 val_ppl=46.10 val_time=72.34s
+[2025-10-29 00:50:53][Epoch 001] global_step=2400  train_loss=4.3705 train_ppl=79.08 val_ppl=45.62 micro_steps=6000 micro_time=2.517s steps=1200 step_time=12.628s epoch_train_time=15450.688s  epoch_time=15668.947s tp=4772 tok/s straggle_events=3033
+[2025-10-29 00:50:54] New best validation perplexity: 45.62
+[2025-10-29 00:50:54][Epoch 002] ...
+[2025-10-29 00:52:54][Epoch 002][Step 0010/1200] global_step=2410 train_loss=4.3285 train_ppl=75.83 lr=0.000514 step_time=12.071s step_time_min=8.285 step_time_max=17.152 micro_time=2.406s tp=5079 tok/s
+[2025-10-29 00:54:42][Epoch 002][Step 0020/1200] global_step=2420 train_loss=4.3097 train_ppl=74.42 lr=0.000513 step_time=10.709s step_time_min=8.285 step_time_max=17.152 micro_time=2.133s tp=5736 tok/s
+[2025-10-29 00:56:54][Epoch 002][Step 0030/1200] global_step=2430 train_loss=4.3470 train_ppl=77.25 lr=0.000513 step_time=13.195s step_time_min=8.285 step_time_max=17.152 micro_time=2.630s tp=4655 tok/s
+[2025-10-29 00:59:12][Epoch 002][Step 0040/1200] global_step=2440 train_loss=4.2653 train_ppl=71.19 lr=0.000512 step_time=13.871s step_time_min=8.285 step_time_max=19.897 micro_time=2.765s tp=4428 tok/s
+[2025-10-29 01:01:13][Epoch 002][Step 0050/1200] global_step=2450 train_loss=4.3014 train_ppl=73.81 lr=0.000511 step_time=12.060s step_time_min=8.285 step_time_max=19.897 micro_time=2.403s tp=5093 tok/s
+[2025-10-29 01:03:14][Epoch 002][Step 0060/1200] global_step=2460 train_loss=4.2469 train_ppl=69.89 lr=0.000510 step_time=12.080s step_time_min=8.285 step_time_max=19.897 micro_time=2.407s tp=5084 tok/s
+[2025-10-29 01:05:04][Epoch 002][Step 0070/1200] global_step=2470 train_loss=4.3073 train_ppl=74.24 lr=0.000509 step_time=10.991s step_time_min=8.285 step_time_max=19.897 micro_time=2.190s tp=5588 tok/s
+[2025-10-29 01:07:29][Epoch 002][Step 0080/1200] global_step=2480 train_loss=4.2327 train_ppl=68.91 lr=0.000508 step_time=14.511s step_time_min=8.285 step_time_max=19.897 micro_time=2.894s tp=4233 tok/s
+[2025-10-29 01:09:32][Epoch 002][Step 0090/1200] global_step=2490 train_loss=4.2377 train_ppl=69.25 lr=0.000507 step_time=12.316s step_time_min=8.285 step_time_max=19.897 micro_time=2.455s tp=4987 tok/s
+[2025-10-29 01:11:30][Epoch 002][Step 0100/1200] global_step=2500 train_loss=4.2390 train_ppl=69.34 lr=0.000506 step_time=11.731s step_time_min=8.285 step_time_max=19.897 micro_time=2.338s tp=5236 tok/s
+[2025-10-29 01:13:17][Epoch 002][Step 0110/1200] global_step=2510 train_loss=4.2610 train_ppl=70.88 lr=0.000505 step_time=10.727s step_time_min=8.285 step_time_max=19.897 micro_time=2.137s tp=5725 tok/s
+[2025-10-29 01:15:35][Epoch 002][Step 0120/1200] global_step=2520 train_loss=4.2262 train_ppl=68.46 lr=0.000504 step_time=13.799s step_time_min=8.285 step_time_max=20.200 micro_time=2.751s tp=4451 tok/s
+[2025-10-29 01:17:31][Epoch 002][Step 0130/1200] global_step=2530 train_loss=4.2274 train_ppl=68.54 lr=0.000503 step_time=11.569s step_time_min=8.285 step_time_max=20.200 micro_time=2.305s tp=5309 tok/s
+[2025-10-29 01:19:52][Epoch 002][Step 0140/1200] global_step=2540 train_loss=4.2693 train_ppl=71.47 lr=0.000502 step_time=14.117s step_time_min=8.285 step_time_max=22.343 micro_time=2.815s tp=4351 tok/s
+[2025-10-29 01:22:01][Epoch 002][Step 0150/1200] global_step=2550 train_loss=4.2109 train_ppl=67.42 lr=0.000501 step_time=12.942s step_time_min=8.285 step_time_max=22.343 micro_time=2.580s tp=4746 tok/s
+[2025-10-29 01:23:57][Epoch 002][Step 0160/1200] global_step=2560 train_loss=4.2446 train_ppl=69.73 lr=0.000500 step_time=11.567s step_time_min=8.285 step_time_max=22.343 micro_time=2.305s tp=5309 tok/s
+[2025-10-29 01:25:53][Epoch 002][Step 0170/1200] global_step=2570 train_loss=4.2154 train_ppl=67.72 lr=0.000499 step_time=11.540s step_time_min=8.285 step_time_max=22.343 micro_time=2.299s tp=5322 tok/s
+[2025-10-29 01:28:10][Epoch 002][Step 0180/1200] global_step=2580 train_loss=4.2401 train_ppl=69.41 lr=0.000498 step_time=13.775s step_time_min=8.285 step_time_max=22.343 micro_time=2.746s tp=4459 tok/s
+[2025-10-29 01:30:14][Epoch 002][Step 0190/1200] global_step=2590 train_loss=4.2121 train_ppl=67.50 lr=0.000497 step_time=12.328s step_time_min=8.285 step_time_max=22.343 micro_time=2.457s tp=4982 tok/s
+[2025-10-29 01:32:33][Epoch 002][Step 0200/1200] global_step=2600 train_loss=4.2674 train_ppl=71.34 lr=0.000496 step_time=13.874s step_time_min=8.285 step_time_max=22.343 micro_time=2.766s tp=4427 tok/s
+[2025-10-29 01:34:35][Epoch 002][Step 0210/1200] global_step=2610 train_loss=4.2518 train_ppl=70.23 lr=0.000494 step_time=12.188s step_time_min=8.285 step_time_max=22.343 micro_time=2.429s tp=5040 tok/s
+[2025-10-29 01:36:42][Epoch 002][Step 0220/1200] global_step=2620 train_loss=4.2205 train_ppl=68.07 lr=0.000493 step_time=12.739s step_time_min=8.285 step_time_max=22.343 micro_time=2.539s tp=4821 tok/s
+[2025-10-29 01:38:46][Epoch 002][Step 0230/1200] global_step=2630 train_loss=4.2280 train_ppl=68.58 lr=0.000492 step_time=12.352s step_time_min=8.285 step_time_max=22.343 micro_time=2.462s tp=4972 tok/s
+[2025-10-29 01:40:44][Epoch 002][Step 0240/1200] global_step=2640 train_loss=4.3290 train_ppl=75.87 lr=0.000491 step_time=11.869s step_time_min=8.285 step_time_max=22.343 micro_time=2.365s tp=5175 tok/s
+[2025-10-29 01:42:46][Epoch 002][Step 0250/1200] global_step=2650 train_loss=4.2276 train_ppl=68.55 lr=0.000490 step_time=12.123s step_time_min=8.285 step_time_max=22.343 micro_time=2.416s tp=5067 tok/s
+[2025-10-29 01:45:00][Epoch 002][Step 0260/1200] global_step=2660 train_loss=4.2356 train_ppl=69.10 lr=0.000489 step_time=13.454s step_time_min=8.285 step_time_max=22.343 micro_time=2.682s tp=4566 tok/s
+[2025-10-29 01:47:15][Epoch 002][Step 0270/1200] global_step=2670 train_loss=4.1904 train_ppl=66.05 lr=0.000488 step_time=13.488s step_time_min=8.285 step_time_max=22.343 micro_time=2.689s tp=4554 tok/s
+[2025-10-29 01:49:17][Epoch 002][Step 0280/1200] global_step=2680 train_loss=4.1527 train_ppl=63.61 lr=0.000487 step_time=12.160s step_time_min=8.285 step_time_max=22.343 micro_time=2.423s tp=5051 tok/s
+[2025-10-29 01:51:15][Epoch 002][Step 0290/1200] global_step=2690 train_loss=4.1264 train_ppl=61.96 lr=0.000486 step_time=11.784s step_time_min=8.285 step_time_max=22.343 micro_time=2.348s tp=5212 tok/s
+[2025-10-29 01:53:09][Epoch 002][Step 0300/1200] global_step=2700 train_loss=4.2313 train_ppl=68.81 lr=0.000485 step_time=11.423s step_time_min=8.285 step_time_max=22.343 micro_time=2.276s tp=5377 tok/s
+[2025-10-29 01:54:34][MiniVal][Epoch 002][Step 0300] val_loss=3.7706 val_ppl=43.41 val_time=84.76s
+[2025-10-29 01:56:54][Epoch 002][Step 0310/1200] global_step=2710 train_loss=3.9756 train_ppl=53.28 lr=0.000484 step_time=13.980s step_time_min=8.285 step_time_max=22.343 micro_time=2.787s tp=2735 tok/s
+[2025-10-29 01:58:50][Epoch 002][Step 0320/1200] global_step=2720 train_loss=4.1355 train_ppl=62.52 lr=0.000483 step_time=11.672s step_time_min=8.284 step_time_max=22.343 micro_time=2.326s tp=5262 tok/s
+[2025-10-29 02:00:48][Epoch 002][Step 0330/1200] global_step=2730 train_loss=4.2082 train_ppl=67.23 lr=0.000482 step_time=11.769s step_time_min=8.284 step_time_max=22.343 micro_time=2.345s tp=5219 tok/s
+[2025-10-29 02:02:56][Epoch 002][Step 0340/1200] global_step=2740 train_loss=4.1715 train_ppl=64.81 lr=0.000481 step_time=12.760s step_time_min=8.284 step_time_max=22.343 micro_time=2.543s tp=4814 tok/s
+[2025-10-29 02:04:48][Epoch 002][Step 0350/1200] global_step=2750 train_loss=4.1934 train_ppl=66.25 lr=0.000480 step_time=11.183s step_time_min=8.284 step_time_max=22.343 micro_time=2.228s tp=5492 tok/s
+[2025-10-29 02:06:45][Epoch 002][Step 0360/1200] global_step=2760 train_loss=4.2486 train_ppl=70.01 lr=0.000478 step_time=11.766s step_time_min=8.284 step_time_max=22.343 micro_time=2.345s tp=5220 tok/s
+[2025-10-29 02:08:52][Epoch 002][Step 0370/1200] global_step=2770 train_loss=4.2455 train_ppl=69.79 lr=0.000477 step_time=12.670s step_time_min=8.284 step_time_max=22.343 micro_time=2.525s tp=4848 tok/s
+[2025-10-29 02:11:06][Epoch 002][Step 0380/1200] global_step=2780 train_loss=4.2087 train_ppl=67.27 lr=0.000476 step_time=13.350s step_time_min=8.284 step_time_max=22.343 micro_time=2.661s tp=4601 tok/s
+[2025-10-29 02:13:11][Epoch 002][Step 0390/1200] global_step=2790 train_loss=4.2200 train_ppl=68.04 lr=0.000475 step_time=12.513s step_time_min=8.284 step_time_max=22.343 micro_time=2.494s tp=4909 tok/s
+[2025-10-29 02:15:27][Epoch 002][Step 0400/1200] global_step=2800 train_loss=4.2036 train_ppl=66.93 lr=0.000474 step_time=13.563s step_time_min=8.284 step_time_max=22.395 micro_time=2.704s tp=4529 tok/s
+[2025-10-29 02:17:47][Epoch 002][Step 0410/1200] global_step=2810 train_loss=4.2121 train_ppl=67.50 lr=0.000473 step_time=14.033s step_time_min=8.284 step_time_max=22.395 micro_time=2.798s tp=4377 tok/s
+[2025-10-29 02:19:50][Epoch 002][Step 0420/1200] global_step=2820 train_loss=4.1748 train_ppl=65.03 lr=0.000472 step_time=12.267s step_time_min=8.284 step_time_max=22.395 micro_time=2.445s tp=5007 tok/s
+[2025-10-29 02:21:57][Epoch 002][Step 0430/1200] global_step=2830 train_loss=4.1636 train_ppl=64.30 lr=0.000471 step_time=12.725s step_time_min=8.284 step_time_max=22.395 micro_time=2.536s tp=4826 tok/s
+[2025-10-29 02:23:58][Epoch 002][Step 0440/1200] global_step=2840 train_loss=4.1881 train_ppl=65.90 lr=0.000470 step_time=12.118s step_time_min=8.284 step_time_max=22.395 micro_time=2.415s tp=5069 tok/s
+[2025-10-29 02:26:14][Epoch 002][Step 0450/1200] global_step=2850 train_loss=4.1586 train_ppl=63.98 lr=0.000468 step_time=13.527s step_time_min=8.284 step_time_max=22.395 micro_time=2.697s tp=4541 tok/s
+[2025-10-29 02:28:13][Epoch 002][Step 0460/1200] global_step=2860 train_loss=4.1357 train_ppl=62.53 lr=0.000467 step_time=11.884s step_time_min=8.284 step_time_max=22.395 micro_time=2.368s tp=5169 tok/s
+[2025-10-29 02:30:16][Epoch 002][Step 0470/1200] global_step=2870 train_loss=4.1579 train_ppl=63.94 lr=0.000466 step_time=12.383s step_time_min=8.284 step_time_max=22.395 micro_time=2.468s tp=4960 tok/s
+[2025-10-29 02:32:18][Epoch 002][Step 0480/1200] global_step=2880 train_loss=4.1042 train_ppl=60.60 lr=0.000465 step_time=12.117s step_time_min=8.284 step_time_max=22.395 micro_time=2.415s tp=5069 tok/s
+[2025-10-29 02:34:32][Epoch 002][Step 0490/1200] global_step=2890 train_loss=4.1313 train_ppl=62.26 lr=0.000464 step_time=13.394s step_time_min=8.284 step_time_max=22.395 micro_time=2.670s tp=4586 tok/s
+[2025-10-29 02:36:36][Epoch 002][Step 0500/1200] global_step=2900 train_loss=4.1755 train_ppl=65.07 lr=0.000463 step_time=12.477s step_time_min=8.284 step_time_max=22.395 micro_time=2.487s tp=4923 tok/s
+[2025-10-29 02:38:49][Epoch 002][Step 0510/1200] global_step=2910 train_loss=4.1502 train_ppl=63.44 lr=0.000462 step_time=13.297s step_time_min=8.284 step_time_max=22.395 micro_time=2.651s tp=4619 tok/s
+[2025-10-29 02:41:01][Epoch 002][Step 0520/1200] global_step=2920 train_loss=4.1652 train_ppl=64.41 lr=0.000461 step_time=13.162s step_time_min=8.284 step_time_max=22.395 micro_time=2.624s tp=4667 tok/s
+[2025-10-29 02:43:08][Epoch 002][Step 0530/1200] global_step=2930 train_loss=4.1551 train_ppl=63.76 lr=0.000459 step_time=12.725s step_time_min=8.284 step_time_max=22.395 micro_time=2.536s tp=4827 tok/s
+[2025-10-29 02:45:17][Epoch 002][Step 0540/1200] global_step=2940 train_loss=4.1525 train_ppl=63.59 lr=0.000458 step_time=12.833s step_time_min=8.277 step_time_max=22.395 micro_time=2.558s tp=4786 tok/s
+[2025-10-29 02:47:13][Epoch 002][Step 0550/1200] global_step=2950 train_loss=4.1425 train_ppl=62.96 lr=0.000457 step_time=11.618s step_time_min=8.277 step_time_max=22.395 micro_time=2.315s tp=5287 tok/s
+[2025-10-29 02:49:13][Epoch 002][Step 0560/1200] global_step=2960 train_loss=4.1356 train_ppl=62.53 lr=0.000456 step_time=12.017s step_time_min=8.277 step_time_max=22.395 micro_time=2.395s tp=5111 tok/s
+[2025-10-29 02:51:28][Epoch 002][Step 0570/1200] global_step=2970 train_loss=4.1045 train_ppl=60.61 lr=0.000455 step_time=13.481s step_time_min=8.277 step_time_max=22.395 micro_time=2.688s tp=4556 tok/s
+[2025-10-29 02:53:26][Epoch 002][Step 0580/1200] global_step=2980 train_loss=4.1146 train_ppl=61.23 lr=0.000454 step_time=11.774s step_time_min=8.277 step_time_max=22.395 micro_time=2.346s tp=5217 tok/s
+[2025-10-29 02:55:37][Epoch 002][Step 0590/1200] global_step=2990 train_loss=4.1568 train_ppl=63.87 lr=0.000452 step_time=13.087s step_time_min=8.277 step_time_max=22.395 micro_time=2.609s tp=4693 tok/s
+[2025-10-29 02:57:49][Epoch 002][Step 0600/1200] global_step=3000 train_loss=4.1610 train_ppl=64.14 lr=0.000451 step_time=13.193s step_time_min=8.277 step_time_max=22.395 micro_time=2.630s tp=4655 tok/s
+[2025-10-29 02:59:07][MiniVal][Epoch 002][Step 0600] val_loss=3.7305 val_ppl=41.70 val_time=77.91s
+[2025-10-29 03:01:29][Epoch 002][Step 0610/1200] global_step=3010 train_loss=4.1139 train_ppl=61.18 lr=0.000450 step_time=14.171s step_time_min=8.277 step_time_max=22.395 micro_time=2.826s tp=2797 tok/s
+[2025-10-29 03:03:34][Epoch 002][Step 0620/1200] global_step=3020 train_loss=4.1264 train_ppl=61.95 lr=0.000449 step_time=12.563s step_time_min=8.276 step_time_max=22.395 micro_time=2.504s tp=4889 tok/s
+[2025-10-29 03:05:40][Epoch 002][Step 0630/1200] global_step=3030 train_loss=4.1555 train_ppl=63.78 lr=0.000448 step_time=12.557s step_time_min=8.276 step_time_max=22.395 micro_time=2.503s tp=4891 tok/s
+[2025-10-29 03:08:00][Epoch 002][Step 0640/1200] global_step=3040 train_loss=4.1132 train_ppl=61.14 lr=0.000447 step_time=14.025s step_time_min=8.276 step_time_max=22.395 micro_time=2.797s tp=4380 tok/s
+[2025-10-29 03:10:09][Epoch 002][Step 0650/1200] global_step=3050 train_loss=4.0816 train_ppl=59.24 lr=0.000445 step_time=12.914s step_time_min=8.276 step_time_max=22.395 micro_time=2.574s tp=4756 tok/s
+[2025-10-29 03:12:07][Epoch 002][Step 0660/1200] global_step=3060 train_loss=4.0675 train_ppl=58.41 lr=0.000444 step_time=11.758s step_time_min=8.276 step_time_max=22.395 micro_time=2.343s tp=5224 tok/s
+[2025-10-29 03:14:11][Epoch 002][Step 0670/1200] global_step=3070 train_loss=4.1356 train_ppl=62.53 lr=0.000443 step_time=12.393s step_time_min=8.276 step_time_max=22.395 micro_time=2.470s tp=4956 tok/s
+[2025-10-29 03:16:22][Epoch 002][Step 0680/1200] global_step=3080 train_loss=4.1347 train_ppl=62.47 lr=0.000442 step_time=13.052s step_time_min=8.276 step_time_max=22.395 micro_time=2.602s tp=4706 tok/s
+[2025-10-29 03:18:53][Epoch 002][Step 0690/1200] global_step=3090 train_loss=4.0877 train_ppl=59.60 lr=0.000441 step_time=15.105s step_time_min=8.276 step_time_max=22.395 micro_time=3.012s tp=4066 tok/s
+[2025-10-29 03:20:45][Epoch 002][Step 0700/1200] global_step=3100 train_loss=4.0742 train_ppl=58.80 lr=0.000439 step_time=11.248s step_time_min=8.276 step_time_max=22.395 micro_time=2.241s tp=5460 tok/s
+[2025-10-29 03:22:49][Epoch 002][Step 0710/1200] global_step=3110 train_loss=4.1096 train_ppl=60.92 lr=0.000438 step_time=12.405s step_time_min=8.276 step_time_max=22.395 micro_time=2.472s tp=4951 tok/s
+[2025-10-29 03:25:04][Epoch 002][Step 0720/1200] global_step=3120 train_loss=4.1358 train_ppl=62.54 lr=0.000437 step_time=13.492s step_time_min=8.276 step_time_max=22.395 micro_time=2.690s tp=4552 tok/s
+[2025-10-29 03:27:16][Epoch 002][Step 0730/1200] global_step=3130 train_loss=4.0025 train_ppl=54.74 lr=0.000436 step_time=13.134s step_time_min=8.276 step_time_max=22.395 micro_time=2.618s tp=4677 tok/s
+[2025-10-29 03:29:17][Epoch 002][Step 0740/1200] global_step=3140 train_loss=4.1719 train_ppl=64.84 lr=0.000435 step_time=12.149s step_time_min=8.276 step_time_max=22.395 micro_time=2.422s tp=5055 tok/s
+[2025-10-29 03:31:17][Epoch 002][Step 0750/1200] global_step=3150 train_loss=4.0991 train_ppl=60.29 lr=0.000433 step_time=11.936s step_time_min=8.276 step_time_max=22.395 micro_time=2.379s tp=5146 tok/s
+[2025-10-29 03:33:17][Epoch 002][Step 0760/1200] global_step=3160 train_loss=4.0990 train_ppl=60.28 lr=0.000432 step_time=12.006s step_time_min=8.276 step_time_max=23.324 micro_time=2.393s tp=5116 tok/s
+[2025-10-29 03:35:32][Epoch 002][Step 0770/1200] global_step=3170 train_loss=4.0974 train_ppl=60.18 lr=0.000431 step_time=13.554s step_time_min=8.276 step_time_max=23.324 micro_time=2.702s tp=4532 tok/s
+[2025-10-29 03:37:38][Epoch 002][Step 0780/1200] global_step=3180 train_loss=4.0624 train_ppl=58.11 lr=0.000430 step_time=12.535s step_time_min=8.276 step_time_max=23.324 micro_time=2.499s tp=4900 tok/s
+[2025-10-29 03:39:39][Epoch 002][Step 0790/1200] global_step=3190 train_loss=4.0866 train_ppl=59.54 lr=0.000429 step_time=12.111s step_time_min=8.276 step_time_max=23.324 micro_time=2.413s tp=5072 tok/s
+[2025-10-29 03:41:44][Epoch 002][Step 0800/1200] global_step=3200 train_loss=4.1028 train_ppl=60.51 lr=0.000427 step_time=12.527s step_time_min=8.276 step_time_max=23.324 micro_time=2.497s tp=4903 tok/s
+[2025-10-29 03:43:47][Epoch 002][Step 0810/1200] global_step=3210 train_loss=4.1170 train_ppl=61.38 lr=0.000426 step_time=12.294s step_time_min=8.276 step_time_max=23.324 micro_time=2.450s tp=4996 tok/s
+[2025-10-29 03:45:49][Epoch 002][Step 0820/1200] global_step=3220 train_loss=4.1093 train_ppl=60.91 lr=0.000425 step_time=12.196s step_time_min=8.276 step_time_max=23.324 micro_time=2.431s tp=5036 tok/s
+[2025-10-29 03:47:57][Epoch 002][Step 0830/1200] global_step=3230 train_loss=4.0469 train_ppl=57.22 lr=0.000424 step_time=12.803s step_time_min=8.276 step_time_max=23.324 micro_time=2.552s tp=4798 tok/s
+[2025-10-29 03:50:13][Epoch 002][Step 0840/1200] global_step=3240 train_loss=4.0471 train_ppl=57.23 lr=0.000422 step_time=13.592s step_time_min=8.276 step_time_max=23.324 micro_time=2.710s tp=4519 tok/s
+[2025-10-29 03:52:32][Epoch 002][Step 0850/1200] global_step=3250 train_loss=4.0959 train_ppl=60.09 lr=0.000421 step_time=13.864s step_time_min=8.276 step_time_max=23.324 micro_time=2.764s tp=4431 tok/s
+[2025-10-29 03:54:31][Epoch 002][Step 0860/1200] global_step=3260 train_loss=4.0854 train_ppl=59.47 lr=0.000420 step_time=11.894s step_time_min=8.276 step_time_max=23.324 micro_time=2.370s tp=5164 tok/s
+[2025-10-29 03:56:45][Epoch 002][Step 0870/1200] global_step=3270 train_loss=4.0108 train_ppl=55.19 lr=0.000419 step_time=13.342s step_time_min=8.276 step_time_max=23.324 micro_time=2.660s tp=4604 tok/s
+[2025-10-29 03:58:51][Epoch 002][Step 0880/1200] global_step=3280 train_loss=4.0826 train_ppl=59.30 lr=0.000418 step_time=12.654s step_time_min=8.276 step_time_max=23.324 micro_time=2.522s tp=4854 tok/s
+[2025-10-29 04:01:00][Epoch 002][Step 0890/1200] global_step=3290 train_loss=4.0450 train_ppl=57.11 lr=0.000416 step_time=12.840s step_time_min=8.276 step_time_max=23.324 micro_time=2.559s tp=4784 tok/s
+[2025-10-29 04:03:04][Epoch 002][Step 0900/1200] global_step=3300 train_loss=4.0097 train_ppl=55.13 lr=0.000415 step_time=12.410s step_time_min=8.276 step_time_max=23.324 micro_time=2.473s tp=4949 tok/s
+[2025-10-29 04:04:25][MiniVal][Epoch 002][Step 0900] val_loss=3.6849 val_ppl=39.84 val_time=80.92s
+[2025-10-29 04:06:36][Epoch 002][Step 0910/1200] global_step=3310 train_loss=4.0589 train_ppl=57.91 lr=0.000414 step_time=13.142s step_time_min=8.267 step_time_max=23.324 micro_time=2.620s tp=2893 tok/s
+[2025-10-29 04:08:39][Epoch 002][Step 0920/1200] global_step=3320 train_loss=4.1207 train_ppl=61.60 lr=0.000413 step_time=12.309s step_time_min=8.267 step_time_max=23.324 micro_time=2.453s tp=4990 tok/s
+[2025-10-29 04:10:53][Epoch 002][Step 0930/1200] global_step=3330 train_loss=4.0693 train_ppl=58.52 lr=0.000411 step_time=13.379s step_time_min=8.257 step_time_max=23.324 micro_time=2.667s tp=4591 tok/s
+[2025-10-29 04:12:59][Epoch 002][Step 0940/1200] global_step=3340 train_loss=4.0940 train_ppl=59.98 lr=0.000410 step_time=12.526s step_time_min=8.257 step_time_max=23.324 micro_time=2.497s tp=4903 tok/s
+[2025-10-29 04:15:05][Epoch 002][Step 0950/1200] global_step=3350 train_loss=4.1128 train_ppl=61.12 lr=0.000409 step_time=12.642s step_time_min=8.257 step_time_max=23.324 micro_time=2.520s tp=4858 tok/s
+[2025-10-29 04:17:33][Epoch 002][Step 0960/1200] global_step=3360 train_loss=4.0819 train_ppl=59.26 lr=0.000408 step_time=14.823s step_time_min=8.257 step_time_max=23.324 micro_time=2.956s tp=4144 tok/s
+[2025-10-29 04:19:43][Epoch 002][Step 0970/1200] global_step=3370 train_loss=4.0512 train_ppl=57.47 lr=0.000406 step_time=12.967s step_time_min=8.257 step_time_max=23.324 micro_time=2.585s tp=4737 tok/s
+[2025-10-29 04:21:52][Epoch 002][Step 0980/1200] global_step=3380 train_loss=4.0240 train_ppl=55.92 lr=0.000405 step_time=12.844s step_time_min=8.257 step_time_max=23.324 micro_time=2.560s tp=4782 tok/s
+[2025-10-29 04:23:42][Epoch 002][Step 0990/1200] global_step=3390 train_loss=4.0645 train_ppl=58.24 lr=0.000404 step_time=11.076s step_time_min=8.257 step_time_max=23.324 micro_time=2.207s tp=5545 tok/s
+[2025-10-29 04:25:42][Epoch 002][Step 1000/1200] global_step=3400 train_loss=4.0632 train_ppl=58.16 lr=0.000403 step_time=11.975s step_time_min=8.257 step_time_max=23.324 micro_time=2.386s tp=5129 tok/s
+[2025-10-29 04:27:38][Epoch 002][Step 1010/1200] global_step=3410 train_loss=4.0348 train_ppl=56.53 lr=0.000401 step_time=11.600s step_time_min=8.257 step_time_max=23.324 micro_time=2.311s tp=5294 tok/s
+[2025-10-29 04:29:43][Epoch 002][Step 1020/1200] global_step=3420 train_loss=4.0313 train_ppl=56.33 lr=0.000400 step_time=12.457s step_time_min=8.257 step_time_max=23.324 micro_time=2.482s tp=4930 tok/s
+[2025-10-29 04:31:43][Epoch 002][Step 1030/1200] global_step=3430 train_loss=4.0296 train_ppl=56.24 lr=0.000399 step_time=11.962s step_time_min=8.257 step_time_max=23.324 micro_time=2.384s tp=5135 tok/s
+[2025-10-29 04:33:55][Epoch 002][Step 1040/1200] global_step=3440 train_loss=4.0548 train_ppl=57.67 lr=0.000397 step_time=13.204s step_time_min=8.257 step_time_max=23.324 micro_time=2.632s tp=4652 tok/s
+[2025-10-29 04:35:46][Epoch 002][Step 1050/1200] global_step=3450 train_loss=4.0247 train_ppl=55.96 lr=0.000396 step_time=11.100s step_time_min=8.257 step_time_max=23.324 micro_time=2.212s tp=5533 tok/s
+[2025-10-29 04:37:48][Epoch 002][Step 1060/1200] global_step=3460 train_loss=3.9812 train_ppl=53.58 lr=0.000395 step_time=12.184s step_time_min=8.257 step_time_max=23.324 micro_time=2.428s tp=5041 tok/s
+[2025-10-29 04:39:57][Epoch 002][Step 1070/1200] global_step=3470 train_loss=4.0233 train_ppl=55.88 lr=0.000394 step_time=12.965s step_time_min=8.257 step_time_max=23.324 micro_time=2.585s tp=4737 tok/s
+[2025-10-29 04:42:03][Epoch 002][Step 1080/1200] global_step=3480 train_loss=4.0213 train_ppl=55.78 lr=0.000392 step_time=12.578s step_time_min=8.257 step_time_max=23.324 micro_time=2.507s tp=4883 tok/s
+[2025-10-29 04:44:18][Epoch 002][Step 1090/1200] global_step=3490 train_loss=4.0899 train_ppl=59.74 lr=0.000391 step_time=13.440s step_time_min=8.257 step_time_max=23.324 micro_time=2.679s tp=4570 tok/s
+[2025-10-29 04:46:17][Epoch 002][Step 1100/1200] global_step=3500 train_loss=4.0504 train_ppl=57.42 lr=0.000390 step_time=11.944s step_time_min=8.257 step_time_max=23.324 micro_time=2.381s tp=5142 tok/s
+[2025-10-29 04:48:15][Epoch 002][Step 1110/1200] global_step=3510 train_loss=4.0301 train_ppl=56.27 lr=0.000389 step_time=11.821s step_time_min=8.257 step_time_max=23.324 micro_time=2.355s tp=5196 tok/s
+[2025-10-29 04:50:29][Epoch 002][Step 1120/1200] global_step=3520 train_loss=4.1983 train_ppl=66.57 lr=0.000387 step_time=13.348s step_time_min=8.257 step_time_max=23.324 micro_time=2.661s tp=4601 tok/s
+[2025-10-29 04:52:39][Epoch 002][Step 1130/1200] global_step=3530 train_loss=4.0343 train_ppl=56.51 lr=0.000386 step_time=13.013s step_time_min=8.257 step_time_max=23.324 micro_time=2.594s tp=4720 tok/s
+[2025-10-29 04:54:57][Epoch 002][Step 1140/1200] global_step=3540 train_loss=4.0351 train_ppl=56.55 lr=0.000385 step_time=13.745s step_time_min=8.257 step_time_max=23.324 micro_time=2.740s tp=4469 tok/s
+[2025-10-29 04:56:40][Epoch 002][Step 1150/1200] global_step=3550 train_loss=4.0504 train_ppl=57.42 lr=0.000383 step_time=10.336s step_time_min=8.257 step_time_max=23.324 micro_time=2.059s tp=5942 tok/s
+[2025-10-29 04:58:44][Epoch 002][Step 1160/1200] global_step=3560 train_loss=4.0378 train_ppl=56.70 lr=0.000382 step_time=12.390s step_time_min=8.257 step_time_max=23.324 micro_time=2.470s tp=4958 tok/s
+[2025-10-29 05:00:59][Epoch 002][Step 1170/1200] global_step=3570 train_loss=4.0500 train_ppl=57.40 lr=0.000381 step_time=13.484s step_time_min=8.257 step_time_max=23.324 micro_time=2.688s tp=4555 tok/s
+[2025-10-29 05:03:10][Epoch 002][Step 1180/1200] global_step=3580 train_loss=3.9736 train_ppl=53.18 lr=0.000380 step_time=13.047s step_time_min=8.257 step_time_max=23.324 micro_time=2.601s tp=4708 tok/s
+[2025-10-29 05:05:08][Epoch 002][Step 1190/1200] global_step=3590 train_loss=4.0200 train_ppl=55.70 lr=0.000378 step_time=11.851s step_time_min=8.257 step_time_max=23.324 micro_time=2.362s tp=5182 tok/s
+[2025-10-29 05:07:12][Epoch 002][Step 1200/1200] global_step=3600 train_loss=4.0779 train_ppl=59.02 lr=0.000377 step_time=12.353s step_time_min=8.257 step_time_max=23.324 micro_time=2.462s tp=4972 tok/s
+[2025-10-29 05:08:17][MiniVal][Epoch 002][Step 1200] val_loss=3.6563 val_ppl=38.72 val_time=65.44s
+[2025-10-29 05:12:06][Epoch 002] global_step=3600  train_loss=4.0779 train_ppl=59.02 val_ppl=38.15 micro_steps=6000 micro_time=2.513s steps=1200 step_time=12.606s epoch_train_time=15443.681s  epoch_time=15672.307s tp=4774 tok/s straggle_events=3027
+[2025-10-29 05:12:06] New best validation perplexity: 38.15
+[2025-10-29 05:12:06][Epoch 003] ...
+[2025-10-29 05:14:07][Epoch 003][Step 0010/1200] global_step=3610 train_loss=4.0538 train_ppl=57.62 lr=0.000376 step_time=12.040s step_time_min=8.277 step_time_max=13.922 micro_time=2.399s tp=5091 tok/s
+[2025-10-29 05:16:02][Epoch 003][Step 0020/1200] global_step=3620 train_loss=4.0172 train_ppl=55.54 lr=0.000374 step_time=11.543s step_time_min=8.277 step_time_max=19.136 micro_time=2.300s tp=5321 tok/s
+[2025-10-29 05:18:10][Epoch 003][Step 0030/1200] global_step=3630 train_loss=4.0595 train_ppl=57.95 lr=0.000373 step_time=12.815s step_time_min=8.277 step_time_max=19.136 micro_time=2.554s tp=4793 tok/s
+[2025-10-29 05:20:16][Epoch 003][Step 0040/1200] global_step=3640 train_loss=3.9921 train_ppl=54.17 lr=0.000372 step_time=12.521s step_time_min=8.277 step_time_max=19.136 micro_time=2.496s tp=4905 tok/s
+[2025-10-29 05:22:27][Epoch 003][Step 0050/1200] global_step=3650 train_loss=4.0361 train_ppl=56.60 lr=0.000371 step_time=13.098s step_time_min=8.277 step_time_max=19.136 micro_time=2.611s tp=4689 tok/s
+[2025-10-29 05:24:33][Epoch 003][Step 0060/1200] global_step=3660 train_loss=3.9760 train_ppl=53.30 lr=0.000369 step_time=12.622s step_time_min=8.277 step_time_max=19.136 micro_time=2.516s tp=4866 tok/s
+[2025-10-29 05:26:55][Epoch 003][Step 0070/1200] global_step=3670 train_loss=4.0268 train_ppl=56.08 lr=0.000368 step_time=14.250s step_time_min=8.277 step_time_max=19.412 micro_time=2.841s tp=4310 tok/s
+[2025-10-29 05:28:57][Epoch 003][Step 0080/1200] global_step=3680 train_loss=3.9629 train_ppl=52.61 lr=0.000367 step_time=12.190s step_time_min=8.277 step_time_max=19.412 micro_time=2.430s tp=5039 tok/s
+[2025-10-29 05:31:08][Epoch 003][Step 0090/1200] global_step=3690 train_loss=3.9721 train_ppl=53.10 lr=0.000365 step_time=13.048s step_time_min=8.277 step_time_max=19.412 micro_time=2.601s tp=4708 tok/s
+[2025-10-29 05:32:59][Epoch 003][Step 0100/1200] global_step=3700 train_loss=3.9749 train_ppl=53.24 lr=0.000364 step_time=11.151s step_time_min=8.277 step_time_max=19.412 micro_time=2.222s tp=5508 tok/s
+[2025-10-29 05:34:58][Epoch 003][Step 0110/1200] global_step=3710 train_loss=3.9953 train_ppl=54.34 lr=0.000363 step_time=11.848s step_time_min=8.277 step_time_max=19.412 micro_time=2.361s tp=5184 tok/s
+[2025-10-29 05:37:13][Epoch 003][Step 0120/1200] global_step=3720 train_loss=3.9584 train_ppl=52.37 lr=0.000361 step_time=13.510s step_time_min=8.277 step_time_max=19.412 micro_time=2.693s tp=4546 tok/s
+[2025-10-29 05:39:20][Epoch 003][Step 0130/1200] global_step=3730 train_loss=3.9676 train_ppl=52.86 lr=0.000360 step_time=12.687s step_time_min=8.277 step_time_max=19.412 micro_time=2.529s tp=4841 tok/s
+[2025-10-29 05:41:29][Epoch 003][Step 0140/1200] global_step=3740 train_loss=3.9921 train_ppl=54.17 lr=0.000359 step_time=12.898s step_time_min=8.277 step_time_max=21.323 micro_time=2.571s tp=4762 tok/s
+[2025-10-29 05:43:38][Epoch 003][Step 0150/1200] global_step=3750 train_loss=3.9510 train_ppl=51.99 lr=0.000358 step_time=12.932s step_time_min=8.277 step_time_max=21.323 micro_time=2.578s tp=4750 tok/s
+[2025-10-29 05:45:57][Epoch 003][Step 0160/1200] global_step=3760 train_loss=3.9757 train_ppl=53.29 lr=0.000356 step_time=13.832s step_time_min=8.277 step_time_max=21.323 micro_time=2.758s tp=4441 tok/s
+[2025-10-29 05:48:04][Epoch 003][Step 0170/1200] global_step=3770 train_loss=3.9544 train_ppl=52.16 lr=0.000355 step_time=12.684s step_time_min=8.277 step_time_max=21.323 micro_time=2.529s tp=4843 tok/s
+[2025-10-29 05:50:06][Epoch 003][Step 0180/1200] global_step=3780 train_loss=3.9841 train_ppl=53.74 lr=0.000354 step_time=12.225s step_time_min=8.277 step_time_max=21.323 micro_time=2.436s tp=5024 tok/s
+[2025-10-29 05:52:08][Epoch 003][Step 0190/1200] global_step=3790 train_loss=3.9585 train_ppl=52.38 lr=0.000352 step_time=12.192s step_time_min=8.277 step_time_max=21.323 micro_time=2.430s tp=5038 tok/s
+[2025-10-29 05:54:12][Epoch 003][Step 0200/1200] global_step=3800 train_loss=4.0063 train_ppl=54.94 lr=0.000351 step_time=12.396s step_time_min=8.277 step_time_max=21.323 micro_time=2.471s tp=4955 tok/s
+[2025-10-29 05:56:12][Epoch 003][Step 0210/1200] global_step=3810 train_loss=3.9957 train_ppl=54.36 lr=0.000350 step_time=11.947s step_time_min=8.277 step_time_max=21.323 micro_time=2.380s tp=5141 tok/s
+[2025-10-29 05:58:14][Epoch 003][Step 0220/1200] global_step=3820 train_loss=3.9674 train_ppl=52.85 lr=0.000348 step_time=12.241s step_time_min=8.277 step_time_max=21.323 micro_time=2.439s tp=5018 tok/s
+[2025-10-29 06:00:21][Epoch 003][Step 0230/1200] global_step=3830 train_loss=3.9669 train_ppl=52.82 lr=0.000347 step_time=12.683s step_time_min=8.277 step_time_max=21.323 micro_time=2.528s tp=4843 tok/s
+[2025-10-29 06:02:28][Epoch 003][Step 0240/1200] global_step=3840 train_loss=4.0533 train_ppl=57.58 lr=0.000346 step_time=12.668s step_time_min=8.277 step_time_max=21.441 micro_time=2.525s tp=4848 tok/s
+[2025-10-29 06:04:36][Epoch 003][Step 0250/1200] global_step=3850 train_loss=3.9690 train_ppl=52.93 lr=0.000345 step_time=12.852s step_time_min=8.277 step_time_max=21.441 micro_time=2.562s tp=4779 tok/s
+[2025-10-29 06:06:53][Epoch 003][Step 0260/1200] global_step=3860 train_loss=3.9686 train_ppl=52.91 lr=0.000343 step_time=13.649s step_time_min=8.277 step_time_max=21.441 micro_time=2.721s tp=4500 tok/s
+[2025-10-29 06:09:05][Epoch 003][Step 0270/1200] global_step=3870 train_loss=3.9308 train_ppl=50.95 lr=0.000342 step_time=13.222s step_time_min=8.277 step_time_max=21.441 micro_time=2.636s tp=4646 tok/s
+[2025-10-29 06:10:56][Epoch 003][Step 0280/1200] global_step=3880 train_loss=3.9004 train_ppl=49.42 lr=0.000341 step_time=11.083s step_time_min=8.277 step_time_max=21.441 micro_time=2.208s tp=5542 tok/s
+[2025-10-29 06:12:59][Epoch 003][Step 0290/1200] global_step=3890 train_loss=3.8581 train_ppl=47.38 lr=0.000339 step_time=12.317s step_time_min=8.277 step_time_max=21.441 micro_time=2.455s tp=4987 tok/s
+[2025-10-29 06:15:14][Epoch 003][Step 0300/1200] global_step=3900 train_loss=3.9890 train_ppl=54.00 lr=0.000338 step_time=13.446s step_time_min=8.277 step_time_max=21.441 micro_time=2.681s tp=4568 tok/s
+[2025-10-29 06:16:22][MiniVal][Epoch 003][Step 0300] val_loss=3.6248 val_ppl=37.52 val_time=68.22s
+[2025-10-29 06:18:18][Epoch 003][Step 0310/1200] global_step=3910 train_loss=3.7283 train_ppl=41.61 lr=0.000337 step_time=11.545s step_time_min=8.277 step_time_max=21.441 micro_time=2.300s tp=3344 tok/s
+[2025-10-29 06:20:28][Epoch 003][Step 0320/1200] global_step=3920 train_loss=3.8849 train_ppl=48.66 lr=0.000335 step_time=13.042s step_time_min=8.277 step_time_max=21.441 micro_time=2.600s tp=4710 tok/s
+[2025-10-29 06:22:36][Epoch 003][Step 0330/1200] global_step=3930 train_loss=3.9504 train_ppl=51.95 lr=0.000334 step_time=12.753s step_time_min=8.277 step_time_max=21.441 micro_time=2.542s tp=4816 tok/s
+[2025-10-29 06:24:51][Epoch 003][Step 0340/1200] global_step=3940 train_loss=3.9285 train_ppl=50.83 lr=0.000333 step_time=13.506s step_time_min=8.277 step_time_max=21.441 micro_time=2.693s tp=4548 tok/s
+[2025-10-29 06:27:06][Epoch 003][Step 0350/1200] global_step=3950 train_loss=3.9496 train_ppl=51.92 lr=0.000331 step_time=13.482s step_time_min=8.277 step_time_max=21.441 micro_time=2.688s tp=4556 tok/s
+[2025-10-29 06:29:07][Epoch 003][Step 0360/1200] global_step=3960 train_loss=3.9806 train_ppl=53.55 lr=0.000330 step_time=12.154s step_time_min=8.277 step_time_max=21.441 micro_time=2.422s tp=5054 tok/s
+[2025-10-29 06:31:13][Epoch 003][Step 0370/1200] global_step=3970 train_loss=4.0014 train_ppl=54.67 lr=0.000329 step_time=12.622s step_time_min=8.277 step_time_max=21.441 micro_time=2.516s tp=4866 tok/s
+[2025-10-29 06:33:37][Epoch 003][Step 0380/1200] global_step=3980 train_loss=3.9773 train_ppl=53.37 lr=0.000328 step_time=14.305s step_time_min=8.277 step_time_max=21.441 micro_time=2.853s tp=4294 tok/s
+[2025-10-29 06:35:47][Epoch 003][Step 0390/1200] global_step=3990 train_loss=3.9806 train_ppl=53.55 lr=0.000326 step_time=13.009s step_time_min=8.277 step_time_max=21.441 micro_time=2.593s tp=4721 tok/s
+[2025-10-29 06:37:56][Epoch 003][Step 0400/1200] global_step=4000 train_loss=3.9619 train_ppl=52.56 lr=0.000325 step_time=12.881s step_time_min=8.277 step_time_max=21.441 micro_time=2.568s tp=4768 tok/s
+[2025-10-29 06:40:11][Epoch 003][Step 0410/1200] global_step=4010 train_loss=3.9742 train_ppl=53.20 lr=0.000324 step_time=13.538s step_time_min=8.277 step_time_max=21.441 micro_time=2.699s tp=4537 tok/s
+[2025-10-29 06:42:07][Epoch 003][Step 0420/1200] global_step=4020 train_loss=3.9385 train_ppl=51.34 lr=0.000322 step_time=11.623s step_time_min=8.277 step_time_max=21.441 micro_time=2.316s tp=5284 tok/s
+[2025-10-29 06:44:11][Epoch 003][Step 0430/1200] global_step=4030 train_loss=3.9275 train_ppl=50.78 lr=0.000321 step_time=12.345s step_time_min=8.277 step_time_max=21.441 micro_time=2.460s tp=4976 tok/s
+[2025-10-29 06:46:25][Epoch 003][Step 0440/1200] global_step=4040 train_loss=3.9490 train_ppl=51.88 lr=0.000320 step_time=13.383s step_time_min=8.277 step_time_max=21.441 micro_time=2.668s tp=4590 tok/s
+[2025-10-29 06:48:47][Epoch 003][Step 0450/1200] global_step=4050 train_loss=3.9188 train_ppl=50.34 lr=0.000318 step_time=14.206s step_time_min=8.277 step_time_max=23.022 micro_time=2.832s tp=4324 tok/s
+[2025-10-29 06:50:56][Epoch 003][Step 0460/1200] global_step=4060 train_loss=3.8931 train_ppl=49.06 lr=0.000317 step_time=12.924s step_time_min=8.277 step_time_max=23.022 micro_time=2.576s tp=4752 tok/s
+[2025-10-29 06:52:58][Epoch 003][Step 0470/1200] global_step=4070 train_loss=3.9260 train_ppl=50.70 lr=0.000316 step_time=12.179s step_time_min=8.277 step_time_max=23.022 micro_time=2.427s tp=5043 tok/s
+[2025-10-29 06:55:06][Epoch 003][Step 0480/1200] global_step=4080 train_loss=3.8749 train_ppl=48.18 lr=0.000314 step_time=12.829s step_time_min=8.277 step_time_max=23.022 micro_time=2.557s tp=4788 tok/s
+[2025-10-29 06:57:08][Epoch 003][Step 0490/1200] global_step=4090 train_loss=3.8863 train_ppl=48.73 lr=0.000313 step_time=12.167s step_time_min=8.277 step_time_max=23.022 micro_time=2.425s tp=5048 tok/s
+[2025-10-29 06:59:00][Epoch 003][Step 0500/1200] global_step=4100 train_loss=3.9346 train_ppl=51.14 lr=0.000312 step_time=11.207s step_time_min=8.277 step_time_max=23.022 micro_time=2.233s tp=5481 tok/s
+[2025-10-29 07:00:50][Epoch 003][Step 0510/1200] global_step=4110 train_loss=3.9036 train_ppl=49.58 lr=0.000311 step_time=10.979s step_time_min=8.277 step_time_max=23.022 micro_time=2.187s tp=5594 tok/s
+[2025-10-29 07:03:09][Epoch 003][Step 0520/1200] global_step=4120 train_loss=3.9299 train_ppl=50.90 lr=0.000309 step_time=13.882s step_time_min=8.277 step_time_max=23.022 micro_time=2.768s tp=4425 tok/s
+[2025-10-29 07:05:17][Epoch 003][Step 0530/1200] global_step=4130 train_loss=3.9274 train_ppl=50.78 lr=0.000308 step_time=12.826s step_time_min=8.277 step_time_max=23.022 micro_time=2.556s tp=4789 tok/s
+[2025-10-29 07:07:15][Epoch 003][Step 0540/1200] global_step=4140 train_loss=3.9169 train_ppl=50.24 lr=0.000307 step_time=11.807s step_time_min=8.277 step_time_max=23.022 micro_time=2.353s tp=5202 tok/s
+[2025-10-29 07:09:27][Epoch 003][Step 0550/1200] global_step=4150 train_loss=3.9094 train_ppl=49.87 lr=0.000305 step_time=13.124s step_time_min=8.277 step_time_max=23.022 micro_time=2.616s tp=4680 tok/s
+[2025-10-29 07:11:44][Epoch 003][Step 0560/1200] global_step=4160 train_loss=3.9081 train_ppl=49.81 lr=0.000304 step_time=13.701s step_time_min=8.277 step_time_max=23.022 micro_time=2.732s tp=4483 tok/s
+[2025-10-29 07:13:48][Epoch 003][Step 0570/1200] global_step=4170 train_loss=3.8791 train_ppl=48.38 lr=0.000303 step_time=12.414s step_time_min=8.277 step_time_max=23.022 micro_time=2.474s tp=4948 tok/s
+[2025-10-29 07:15:46][Epoch 003][Step 0580/1200] global_step=4180 train_loss=3.8853 train_ppl=48.68 lr=0.000301 step_time=11.811s step_time_min=8.277 step_time_max=23.022 micro_time=2.354s tp=5200 tok/s
+[2025-10-29 07:18:00][Epoch 003][Step 0590/1200] global_step=4190 train_loss=3.9251 train_ppl=50.66 lr=0.000300 step_time=13.407s step_time_min=8.277 step_time_max=23.022 micro_time=2.673s tp=4581 tok/s
+[2025-10-29 07:19:56][Epoch 003][Step 0600/1200] global_step=4200 train_loss=3.9324 train_ppl=51.03 lr=0.000299 step_time=11.528s step_time_min=8.277 step_time_max=23.022 micro_time=2.297s tp=5328 tok/s
+[2025-10-29 07:21:05][MiniVal][Epoch 003][Step 0600] val_loss=3.5990 val_ppl=36.56 val_time=69.74s
+[2025-10-29 07:23:03][Epoch 003][Step 0610/1200] global_step=4210 train_loss=3.8830 train_ppl=48.57 lr=0.000297 step_time=11.748s step_time_min=8.277 step_time_max=23.022 micro_time=2.341s tp=3281 tok/s
+[2025-10-29 07:25:05][Epoch 003][Step 0620/1200] global_step=4220 train_loss=3.8968 train_ppl=49.25 lr=0.000296 step_time=12.196s step_time_min=8.277 step_time_max=23.022 micro_time=2.430s tp=5036 tok/s
+[2025-10-29 07:27:05][Epoch 003][Step 0630/1200] global_step=4230 train_loss=3.9285 train_ppl=50.83 lr=0.000295 step_time=12.035s step_time_min=8.277 step_time_max=23.022 micro_time=2.398s tp=5104 tok/s
+[2025-10-29 07:29:03][Epoch 003][Step 0640/1200] global_step=4240 train_loss=3.8942 train_ppl=49.12 lr=0.000294 step_time=11.792s step_time_min=8.277 step_time_max=23.022 micro_time=2.350s tp=5208 tok/s
+[2025-10-29 07:31:18][Epoch 003][Step 0650/1200] global_step=4250 train_loss=3.8454 train_ppl=46.78 lr=0.000292 step_time=13.454s step_time_min=8.277 step_time_max=23.022 micro_time=2.682s tp=4565 tok/s
+[2025-10-29 07:33:17][Epoch 003][Step 0660/1200] global_step=4260 train_loss=3.8247 train_ppl=45.82 lr=0.000291 step_time=11.891s step_time_min=8.277 step_time_max=23.022 micro_time=2.369s tp=5165 tok/s
+[2025-10-29 07:35:32][Epoch 003][Step 0670/1200] global_step=4270 train_loss=3.9078 train_ppl=49.79 lr=0.000290 step_time=13.485s step_time_min=8.277 step_time_max=23.022 micro_time=2.689s tp=4555 tok/s
+[2025-10-29 07:37:46][Epoch 003][Step 0680/1200] global_step=4280 train_loss=3.9158 train_ppl=50.19 lr=0.000288 step_time=13.410s step_time_min=8.277 step_time_max=23.022 micro_time=2.673s tp=4580 tok/s
+[2025-10-29 07:39:38][Epoch 003][Step 0690/1200] global_step=4290 train_loss=3.8731 train_ppl=48.09 lr=0.000287 step_time=11.161s step_time_min=8.277 step_time_max=23.022 micro_time=2.224s tp=5503 tok/s
+[2025-10-29 07:41:47][Epoch 003][Step 0700/1200] global_step=4300 train_loss=3.8494 train_ppl=46.97 lr=0.000286 step_time=12.906s step_time_min=8.277 step_time_max=23.022 micro_time=2.573s tp=4759 tok/s
+[2025-10-29 07:43:38][Epoch 003][Step 0710/1200] global_step=4310 train_loss=3.8772 train_ppl=48.29 lr=0.000285 step_time=11.167s step_time_min=8.277 step_time_max=23.022 micro_time=2.225s tp=5500 tok/s
+[2025-10-29 07:45:57][Epoch 003][Step 0720/1200] global_step=4320 train_loss=3.9001 train_ppl=49.41 lr=0.000283 step_time=13.884s step_time_min=8.277 step_time_max=23.022 micro_time=2.768s tp=4424 tok/s
+[2025-10-29 07:47:49][Epoch 003][Step 0730/1200] global_step=4330 train_loss=3.7825 train_ppl=43.93 lr=0.000282 step_time=11.184s step_time_min=8.277 step_time_max=23.022 micro_time=2.228s tp=5492 tok/s
+[2025-10-29 07:49:59][Epoch 003][Step 0740/1200] global_step=4340 train_loss=3.9534 train_ppl=52.11 lr=0.000281 step_time=12.997s step_time_min=8.277 step_time_max=23.022 micro_time=2.591s tp=4726 tok/s
+[2025-10-29 07:52:11][Epoch 003][Step 0750/1200] global_step=4350 train_loss=3.8814 train_ppl=48.49 lr=0.000279 step_time=13.138s step_time_min=8.277 step_time_max=23.022 micro_time=2.619s tp=4675 tok/s
+[2025-10-29 07:54:16][Epoch 003][Step 0760/1200] global_step=4360 train_loss=3.8818 train_ppl=48.51 lr=0.000278 step_time=12.476s step_time_min=8.277 step_time_max=23.022 micro_time=2.486s tp=4923 tok/s
+[2025-10-29 07:56:19][Epoch 003][Step 0770/1200] global_step=4370 train_loss=3.8873 train_ppl=48.78 lr=0.000277 step_time=12.309s step_time_min=8.277 step_time_max=23.022 micro_time=2.453s tp=4990 tok/s
+[2025-10-29 07:58:30][Epoch 003][Step 0780/1200] global_step=4380 train_loss=3.8601 train_ppl=47.47 lr=0.000276 step_time=13.160s step_time_min=8.277 step_time_max=23.022 micro_time=2.624s tp=4667 tok/s
+[2025-10-29 08:00:46][Epoch 003][Step 0790/1200] global_step=4390 train_loss=3.8756 train_ppl=48.21 lr=0.000274 step_time=13.519s step_time_min=8.277 step_time_max=23.022 micro_time=2.695s tp=4543 tok/s
+[2025-10-29 08:03:03][Epoch 003][Step 0800/1200] global_step=4400 train_loss=3.8952 train_ppl=49.17 lr=0.000273 step_time=13.741s step_time_min=8.277 step_time_max=23.022 micro_time=2.739s tp=4470 tok/s
+[2025-10-29 08:05:11][Epoch 003][Step 0810/1200] global_step=4410 train_loss=3.9092 train_ppl=49.86 lr=0.000272 step_time=12.805s step_time_min=8.277 step_time_max=23.022 micro_time=2.552s tp=4796 tok/s
+[2025-10-29 08:07:35][Epoch 003][Step 0820/1200] global_step=4420 train_loss=3.9066 train_ppl=49.73 lr=0.000270 step_time=14.336s step_time_min=8.277 step_time_max=23.022 micro_time=2.859s tp=4285 tok/s
+[2025-10-29 08:10:03][Epoch 003][Step 0830/1200] global_step=4430 train_loss=3.8348 train_ppl=46.28 lr=0.000269 step_time=14.849s step_time_min=8.277 step_time_max=24.770 micro_time=2.961s tp=4136 tok/s
+[2025-10-29 08:11:51][Epoch 003][Step 0840/1200] global_step=4440 train_loss=3.8439 train_ppl=46.71 lr=0.000268 step_time=10.744s step_time_min=8.277 step_time_max=24.770 micro_time=2.140s tp=5717 tok/s
+[2025-10-29 08:14:02][Epoch 003][Step 0850/1200] global_step=4450 train_loss=3.8842 train_ppl=48.63 lr=0.000267 step_time=13.123s step_time_min=8.277 step_time_max=24.770 micro_time=2.616s tp=4680 tok/s
+[2025-10-29 08:16:01][Epoch 003][Step 0860/1200] global_step=4460 train_loss=3.8790 train_ppl=48.38 lr=0.000265 step_time=11.923s step_time_min=8.277 step_time_max=24.770 micro_time=2.376s tp=5151 tok/s
+[2025-10-29 08:18:00][Epoch 003][Step 0870/1200] global_step=4470 train_loss=3.8074 train_ppl=45.03 lr=0.000264 step_time=11.875s step_time_min=8.277 step_time_max=24.770 micro_time=2.367s tp=5172 tok/s
+[2025-10-29 08:20:04][Epoch 003][Step 0880/1200] global_step=4480 train_loss=3.8776 train_ppl=48.31 lr=0.000263 step_time=12.388s step_time_min=8.277 step_time_max=24.770 micro_time=2.469s tp=4958 tok/s
+[2025-10-29 08:22:02][Epoch 003][Step 0890/1200] global_step=4490 train_loss=3.8398 train_ppl=46.52 lr=0.000262 step_time=11.834s step_time_min=8.277 step_time_max=24.770 micro_time=2.358s tp=5190 tok/s
+[2025-10-29 08:24:17][Epoch 003][Step 0900/1200] global_step=4500 train_loss=3.8080 train_ppl=45.06 lr=0.000260 step_time=13.415s step_time_min=8.277 step_time_max=24.770 micro_time=2.674s tp=4579 tok/s
+[2025-10-29 08:25:21][MiniVal][Epoch 003][Step 0900] val_loss=3.5720 val_ppl=35.59 val_time=64.40s
+[2025-10-29 08:27:28][Epoch 003][Step 0910/1200] global_step=4510 train_loss=3.8587 train_ppl=47.40 lr=0.000259 step_time=12.717s step_time_min=8.277 step_time_max=24.770 micro_time=2.535s tp=3206 tok/s
+[2025-10-29 08:29:39][Epoch 003][Step 0920/1200] global_step=4520 train_loss=3.9168 train_ppl=50.24 lr=0.000258 step_time=13.072s step_time_min=8.277 step_time_max=24.770 micro_time=2.606s tp=4699 tok/s
+[2025-10-29 08:31:47][Epoch 003][Step 0930/1200] global_step=4530 train_loss=3.8605 train_ppl=47.49 lr=0.000256 step_time=12.769s step_time_min=8.277 step_time_max=24.770 micro_time=2.545s tp=4810 tok/s
+[2025-10-29 08:33:37][Epoch 003][Step 0940/1200] global_step=4540 train_loss=3.8884 train_ppl=48.83 lr=0.000255 step_time=10.968s step_time_min=8.277 step_time_max=24.770 micro_time=2.185s tp=5600 tok/s
+[2025-10-29 08:35:42][Epoch 003][Step 0950/1200] global_step=4550 train_loss=3.9073 train_ppl=49.77 lr=0.000254 step_time=12.559s step_time_min=8.277 step_time_max=24.770 micro_time=2.503s tp=4890 tok/s
+[2025-10-29 08:37:53][Epoch 003][Step 0960/1200] global_step=4560 train_loss=3.8720 train_ppl=48.04 lr=0.000253 step_time=13.066s step_time_min=8.277 step_time_max=24.770 micro_time=2.605s tp=4701 tok/s
+[2025-10-29 08:39:49][Epoch 003][Step 0970/1200] global_step=4570 train_loss=3.8483 train_ppl=46.91 lr=0.000251 step_time=11.644s step_time_min=8.277 step_time_max=24.770 micro_time=2.320s tp=5275 tok/s
+[2025-10-29 08:41:44][Epoch 003][Step 0980/1200] global_step=4580 train_loss=3.8250 train_ppl=45.83 lr=0.000250 step_time=11.402s step_time_min=8.277 step_time_max=24.770 micro_time=2.272s tp=5387 tok/s
+[2025-10-29 08:43:43][Epoch 003][Step 0990/1200] global_step=4590 train_loss=3.8726 train_ppl=48.07 lr=0.000249 step_time=11.895s step_time_min=8.277 step_time_max=24.770 micro_time=2.371s tp=5164 tok/s
+[2025-10-29 08:45:48][Epoch 003][Step 1000/1200] global_step=4600 train_loss=3.8603 train_ppl=47.48 lr=0.000248 step_time=12.544s step_time_min=8.277 step_time_max=24.770 micro_time=2.500s tp=4897 tok/s
+[2025-10-29 08:47:48][Epoch 003][Step 1010/1200] global_step=4610 train_loss=3.8305 train_ppl=46.08 lr=0.000246 step_time=11.960s step_time_min=8.277 step_time_max=24.770 micro_time=2.383s tp=5136 tok/s
+[2025-10-29 08:49:54][Epoch 003][Step 1020/1200] global_step=4620 train_loss=3.8378 train_ppl=46.42 lr=0.000245 step_time=12.581s step_time_min=8.277 step_time_max=24.770 micro_time=2.507s tp=4882 tok/s
+[2025-10-29 08:51:53][Epoch 003][Step 1030/1200] global_step=4630 train_loss=3.8365 train_ppl=46.36 lr=0.000244 step_time=11.936s step_time_min=8.277 step_time_max=24.770 micro_time=2.378s tp=5146 tok/s
+[2025-10-29 08:53:41][Epoch 003][Step 1040/1200] global_step=4640 train_loss=3.8567 train_ppl=47.31 lr=0.000243 step_time=10.836s step_time_min=8.277 step_time_max=24.770 micro_time=2.158s tp=5668 tok/s
+[2025-10-29 08:55:44][Epoch 003][Step 1050/1200] global_step=4650 train_loss=3.8316 train_ppl=46.14 lr=0.000241 step_time=12.213s step_time_min=8.277 step_time_max=24.770 micro_time=2.434s tp=5029 tok/s
+[2025-10-29 08:57:43][Epoch 003][Step 1060/1200] global_step=4660 train_loss=3.7821 train_ppl=43.91 lr=0.000240 step_time=11.955s step_time_min=8.277 step_time_max=24.770 micro_time=2.382s tp=5138 tok/s
+[2025-10-29 08:59:51][Epoch 003][Step 1070/1200] global_step=4670 train_loss=3.8321 train_ppl=46.16 lr=0.000239 step_time=12.775s step_time_min=8.277 step_time_max=24.770 micro_time=2.546s tp=4808 tok/s
+[2025-10-29 09:01:59][Epoch 003][Step 1080/1200] global_step=4680 train_loss=3.8285 train_ppl=45.99 lr=0.000238 step_time=12.810s step_time_min=8.277 step_time_max=24.770 micro_time=2.553s tp=4795 tok/s
+[2025-10-29 09:04:03][Epoch 003][Step 1090/1200] global_step=4690 train_loss=3.8916 train_ppl=48.99 lr=0.000237 step_time=12.395s step_time_min=8.277 step_time_max=24.770 micro_time=2.470s tp=4955 tok/s
+[2025-10-29 09:06:00][Epoch 003][Step 1100/1200] global_step=4700 train_loss=3.8592 train_ppl=47.43 lr=0.000235 step_time=11.658s step_time_min=8.277 step_time_max=24.770 micro_time=2.323s tp=5269 tok/s
+[2025-10-29 09:07:57][Epoch 003][Step 1110/1200] global_step=4710 train_loss=3.8413 train_ppl=46.59 lr=0.000234 step_time=11.741s step_time_min=8.277 step_time_max=24.770 micro_time=2.340s tp=5231 tok/s
+[2025-10-29 09:10:08][Epoch 003][Step 1120/1200] global_step=4720 train_loss=4.0028 train_ppl=54.75 lr=0.000233 step_time=13.033s step_time_min=8.277 step_time_max=24.770 micro_time=2.598s tp=4713 tok/s
+[2025-10-29 09:12:17][Epoch 003][Step 1130/1200] global_step=4730 train_loss=3.8386 train_ppl=46.46 lr=0.000232 step_time=12.961s step_time_min=8.277 step_time_max=24.770 micro_time=2.584s tp=4739 tok/s
+[2025-10-29 09:14:31][Epoch 003][Step 1140/1200] global_step=4740 train_loss=3.8414 train_ppl=46.59 lr=0.000230 step_time=13.334s step_time_min=8.277 step_time_max=24.770 micro_time=2.658s tp=4606 tok/s
+[2025-10-29 09:16:34][Epoch 003][Step 1150/1200] global_step=4750 train_loss=3.8463 train_ppl=46.82 lr=0.000229 step_time=12.356s step_time_min=8.277 step_time_max=24.770 micro_time=2.462s tp=4971 tok/s
+[2025-10-29 09:18:33][Epoch 003][Step 1160/1200] global_step=4760 train_loss=3.8371 train_ppl=46.39 lr=0.000228 step_time=11.867s step_time_min=8.277 step_time_max=24.770 micro_time=2.365s tp=5176 tok/s
+[2025-10-29 09:20:37][Epoch 003][Step 1170/1200] global_step=4770 train_loss=3.8415 train_ppl=46.59 lr=0.000227 step_time=12.419s step_time_min=8.277 step_time_max=24.770 micro_time=2.475s tp=4946 tok/s
+[2025-10-29 09:22:34][Epoch 003][Step 1180/1200] global_step=4780 train_loss=3.7799 train_ppl=43.81 lr=0.000226 step_time=11.663s step_time_min=8.277 step_time_max=24.770 micro_time=2.324s tp=5266 tok/s
+[2025-10-29 09:24:29][Epoch 003][Step 1190/1200] global_step=4790 train_loss=3.8276 train_ppl=45.95 lr=0.000224 step_time=11.447s step_time_min=8.277 step_time_max=24.770 micro_time=2.281s tp=5365 tok/s
+[2025-10-29 09:26:34][Epoch 003][Step 1200/1200] global_step=4800 train_loss=3.8774 train_ppl=48.30 lr=0.000223 step_time=12.553s step_time_min=8.277 step_time_max=24.770 micro_time=2.502s tp=4893 tok/s
+[2025-10-29 09:27:51][MiniVal][Epoch 003][Step 1200] val_loss=3.5549 val_ppl=34.98 val_time=77.09s
+[2025-10-29 09:31:23][Epoch 003] global_step=4800  train_loss=3.8774 train_ppl=48.30 val_ppl=34.42 micro_steps=6000 micro_time=2.501s steps=1200 step_time=12.549s epoch_train_time=15345.436s  epoch_time=15557.182s tp=4805 tok/s straggle_events=2986
+[2025-10-29 09:31:23] New best validation perplexity: 34.42
+[2025-10-29 09:31:23][Epoch 004] ...
+[2025-10-29 09:33:54][Epoch 004][Step 0010/1200] global_step=4810 train_loss=3.8534 train_ppl=47.15 lr=0.000222 step_time=15.069s step_time_min=9.057 step_time_max=22.198 micro_time=3.005s tp=4071 tok/s
+[2025-10-29 09:35:59][Epoch 004][Step 0020/1200] global_step=4820 train_loss=3.8203 train_ppl=45.62 lr=0.000221 step_time=12.498s step_time_min=8.287 step_time_max=22.198 micro_time=2.491s tp=4914 tok/s
+[2025-10-29 09:37:57][Epoch 004][Step 0030/1200] global_step=4830 train_loss=3.8612 train_ppl=47.52 lr=0.000220 step_time=11.795s step_time_min=8.287 step_time_max=22.198 micro_time=2.350s tp=5208 tok/s
+[2025-10-29 09:40:00][Epoch 004][Step 0040/1200] global_step=4840 train_loss=3.8036 train_ppl=44.86 lr=0.000218 step_time=12.288s step_time_min=8.287 step_time_max=22.198 micro_time=2.449s tp=4998 tok/s
+[2025-10-29 09:41:58][Epoch 004][Step 0050/1200] global_step=4850 train_loss=3.8532 train_ppl=47.14 lr=0.000217 step_time=11.801s step_time_min=8.287 step_time_max=22.198 micro_time=2.352s tp=5204 tok/s
+[2025-10-29 09:43:59][Epoch 004][Step 0060/1200] global_step=4860 train_loss=3.7878 train_ppl=44.16 lr=0.000216 step_time=12.118s step_time_min=8.287 step_time_max=22.198 micro_time=2.415s tp=5068 tok/s
+[2025-10-29 09:46:02][Epoch 004][Step 0070/1200] global_step=4870 train_loss=3.8412 train_ppl=46.58 lr=0.000215 step_time=12.243s step_time_min=8.287 step_time_max=22.198 micro_time=2.440s tp=5017 tok/s
+[2025-10-29 09:48:09][Epoch 004][Step 0080/1200] global_step=4880 train_loss=3.7812 train_ppl=43.87 lr=0.000214 step_time=12.712s step_time_min=8.287 step_time_max=22.198 micro_time=2.534s tp=4832 tok/s
+[2025-10-29 09:50:16][Epoch 004][Step 0090/1200] global_step=4890 train_loss=3.7898 train_ppl=44.25 lr=0.000212 step_time=12.664s step_time_min=8.287 step_time_max=22.198 micro_time=2.524s tp=4850 tok/s
+[2025-10-29 09:52:21][Epoch 004][Step 0100/1200] global_step=4900 train_loss=3.7893 train_ppl=44.23 lr=0.000211 step_time=12.480s step_time_min=8.287 step_time_max=22.198 micro_time=2.487s tp=4922 tok/s
+[2025-10-29 09:54:31][Epoch 004][Step 0110/1200] global_step=4910 train_loss=3.8162 train_ppl=45.43 lr=0.000210 step_time=13.004s step_time_min=8.287 step_time_max=22.198 micro_time=2.592s tp=4723 tok/s
+[2025-10-29 09:56:39][Epoch 004][Step 0120/1200] global_step=4920 train_loss=3.7797 train_ppl=43.80 lr=0.000209 step_time=12.851s step_time_min=8.287 step_time_max=22.198 micro_time=2.561s tp=4780 tok/s
+[2025-10-29 09:58:40][Epoch 004][Step 0130/1200] global_step=4930 train_loss=3.7849 train_ppl=44.03 lr=0.000208 step_time=12.089s step_time_min=8.287 step_time_max=22.198 micro_time=2.409s tp=5081 tok/s
+[2025-10-29 10:00:49][Epoch 004][Step 0140/1200] global_step=4940 train_loss=3.8030 train_ppl=44.84 lr=0.000207 step_time=12.893s step_time_min=8.287 step_time_max=22.198 micro_time=2.570s tp=4764 tok/s
+[2025-10-29 10:02:55][Epoch 004][Step 0150/1200] global_step=4950 train_loss=3.7705 train_ppl=43.40 lr=0.000205 step_time=12.591s step_time_min=8.287 step_time_max=22.198 micro_time=2.509s tp=4878 tok/s
+[2025-10-29 10:04:57][Epoch 004][Step 0160/1200] global_step=4960 train_loss=3.7893 train_ppl=44.22 lr=0.000204 step_time=12.156s step_time_min=8.287 step_time_max=22.198 micro_time=2.423s tp=5053 tok/s
+[2025-10-29 10:07:19][Epoch 004][Step 0170/1200] global_step=4970 train_loss=3.7727 train_ppl=43.50 lr=0.000203 step_time=14.244s step_time_min=8.287 step_time_max=22.198 micro_time=2.840s tp=4312 tok/s
+[2025-10-29 10:09:35][Epoch 004][Step 0180/1200] global_step=4980 train_loss=3.7977 train_ppl=44.60 lr=0.000202 step_time=13.613s step_time_min=8.287 step_time_max=22.198 micro_time=2.714s tp=4512 tok/s
+[2025-10-29 10:11:46][Epoch 004][Step 0190/1200] global_step=4990 train_loss=3.7805 train_ppl=43.84 lr=0.000201 step_time=13.000s step_time_min=8.287 step_time_max=22.198 micro_time=2.591s tp=4725 tok/s
+[2025-10-29 10:13:44][Epoch 004][Step 0200/1200] global_step=5000 train_loss=3.8224 train_ppl=45.71 lr=0.000200 step_time=11.891s step_time_min=8.287 step_time_max=22.198 micro_time=2.370s tp=5165 tok/s
+[2025-10-29 10:15:43][Epoch 004][Step 0210/1200] global_step=5010 train_loss=3.8140 train_ppl=45.33 lr=0.000199 step_time=11.795s step_time_min=8.287 step_time_max=22.198 micro_time=2.350s tp=5207 tok/s
+[2025-10-29 10:17:38][Epoch 004][Step 0220/1200] global_step=5020 train_loss=3.7886 train_ppl=44.19 lr=0.000197 step_time=11.537s step_time_min=8.287 step_time_max=22.198 micro_time=2.299s tp=5324 tok/s
+[2025-10-29 10:19:44][Epoch 004][Step 0230/1200] global_step=5030 train_loss=3.7858 train_ppl=44.07 lr=0.000196 step_time=12.613s step_time_min=8.287 step_time_max=22.198 micro_time=2.514s tp=4870 tok/s
+[2025-10-29 10:21:48][Epoch 004][Step 0240/1200] global_step=5040 train_loss=3.8595 train_ppl=47.44 lr=0.000195 step_time=12.361s step_time_min=8.287 step_time_max=22.198 micro_time=2.464s tp=4969 tok/s
+[2025-10-29 10:23:41][Epoch 004][Step 0250/1200] global_step=5050 train_loss=3.7927 train_ppl=44.38 lr=0.000194 step_time=11.309s step_time_min=8.287 step_time_max=22.198 micro_time=2.253s tp=5431 tok/s
+[2025-10-29 10:25:49][Epoch 004][Step 0260/1200] global_step=5060 train_loss=3.7871 train_ppl=44.13 lr=0.000193 step_time=12.808s step_time_min=8.287 step_time_max=22.198 micro_time=2.552s tp=4796 tok/s
+[2025-10-29 10:27:55][Epoch 004][Step 0270/1200] global_step=5070 train_loss=3.7545 train_ppl=42.71 lr=0.000192 step_time=12.578s step_time_min=8.287 step_time_max=22.198 micro_time=2.507s tp=4883 tok/s
+[2025-10-29 10:29:59][Epoch 004][Step 0280/1200] global_step=5080 train_loss=3.7215 train_ppl=41.33 lr=0.000191 step_time=12.422s step_time_min=8.287 step_time_max=22.198 micro_time=2.476s tp=4945 tok/s
+[2025-10-29 10:32:03][Epoch 004][Step 0290/1200] global_step=5090 train_loss=3.6736 train_ppl=39.39 lr=0.000189 step_time=12.333s step_time_min=8.287 step_time_max=22.198 micro_time=2.458s tp=4980 tok/s
+[2025-10-29 10:33:53][Epoch 004][Step 0300/1200] global_step=5100 train_loss=3.8167 train_ppl=45.46 lr=0.000188 step_time=11.016s step_time_min=8.287 step_time_max=22.198 micro_time=2.195s tp=5575 tok/s
+[2025-10-29 10:35:07][MiniVal][Epoch 004][Step 0300] val_loss=3.5370 val_ppl=34.36 val_time=74.56s
+[2025-10-29 10:37:12][Epoch 004][Step 0310/1200] global_step=5110 train_loss=3.5515 train_ppl=34.87 lr=0.000187 step_time=12.482s step_time_min=8.270 step_time_max=22.198 micro_time=2.488s tp=3081 tok/s
+[2025-10-29 10:39:10][Epoch 004][Step 0320/1200] global_step=5120 train_loss=3.6987 train_ppl=40.40 lr=0.000186 step_time=11.770s step_time_min=8.270 step_time_max=22.198 micro_time=2.345s tp=5218 tok/s
+[2025-10-29 10:41:12][Epoch 004][Step 0330/1200] global_step=5130 train_loss=3.7705 train_ppl=43.40 lr=0.000185 step_time=12.174s step_time_min=8.270 step_time_max=22.198 micro_time=2.426s tp=5045 tok/s
+[2025-10-29 10:43:25][Epoch 004][Step 0340/1200] global_step=5140 train_loss=3.7569 train_ppl=42.81 lr=0.000184 step_time=13.264s step_time_min=8.270 step_time_max=22.198 micro_time=2.644s tp=4631 tok/s
+[2025-10-29 10:45:47][Epoch 004][Step 0350/1200] global_step=5150 train_loss=3.7856 train_ppl=44.06 lr=0.000183 step_time=14.227s step_time_min=8.270 step_time_max=22.198 micro_time=2.837s tp=4318 tok/s
+[2025-10-29 10:48:00][Epoch 004][Step 0360/1200] global_step=5160 train_loss=3.7932 train_ppl=44.40 lr=0.000182 step_time=13.276s step_time_min=8.270 step_time_max=22.198 micro_time=2.647s tp=4626 tok/s
+[2025-10-29 10:49:47][Epoch 004][Step 0370/1200] global_step=5170 train_loss=3.8303 train_ppl=46.08 lr=0.000181 step_time=10.744s step_time_min=8.270 step_time_max=22.198 micro_time=2.140s tp=5717 tok/s
+[2025-10-29 10:51:56][Epoch 004][Step 0380/1200] global_step=5180 train_loss=3.8125 train_ppl=45.26 lr=0.000180 step_time=12.822s step_time_min=8.270 step_time_max=22.198 micro_time=2.556s tp=4790 tok/s
+[2025-10-29 10:53:59][Epoch 004][Step 0390/1200] global_step=5190 train_loss=3.8117 train_ppl=45.23 lr=0.000178 step_time=12.390s step_time_min=8.270 step_time_max=22.198 micro_time=2.469s tp=4957 tok/s
+[2025-10-29 10:56:04][Epoch 004][Step 0400/1200] global_step=5200 train_loss=3.7933 train_ppl=44.40 lr=0.000177 step_time=12.472s step_time_min=8.270 step_time_max=22.198 micro_time=2.486s tp=4925 tok/s
+[2025-10-29 10:58:10][Epoch 004][Step 0410/1200] global_step=5210 train_loss=3.8041 train_ppl=44.88 lr=0.000176 step_time=12.557s step_time_min=8.270 step_time_max=22.198 micro_time=2.503s tp=4891 tok/s
+[2025-10-29 11:00:15][Epoch 004][Step 0420/1200] global_step=5220 train_loss=3.7734 train_ppl=43.53 lr=0.000175 step_time=12.494s step_time_min=8.270 step_time_max=22.198 micro_time=2.490s tp=4916 tok/s
+[2025-10-29 11:02:14][Epoch 004][Step 0430/1200] global_step=5230 train_loss=3.7616 train_ppl=43.02 lr=0.000174 step_time=11.950s step_time_min=8.270 step_time_max=22.198 micro_time=2.381s tp=5140 tok/s
+[2025-10-29 11:04:19][Epoch 004][Step 0440/1200] global_step=5240 train_loss=3.7786 train_ppl=43.75 lr=0.000173 step_time=12.442s step_time_min=8.270 step_time_max=22.198 micro_time=2.480s tp=4937 tok/s
+[2025-10-29 11:06:23][Epoch 004][Step 0450/1200] global_step=5250 train_loss=3.7500 train_ppl=42.52 lr=0.000172 step_time=12.354s step_time_min=8.270 step_time_max=22.198 micro_time=2.462s tp=4972 tok/s
+[2025-10-29 11:08:45][Epoch 004][Step 0460/1200] global_step=5260 train_loss=3.7235 train_ppl=41.41 lr=0.000171 step_time=14.227s step_time_min=8.270 step_time_max=22.198 micro_time=2.837s tp=4318 tok/s
+[2025-10-29 11:10:42][Epoch 004][Step 0470/1200] global_step=5270 train_loss=3.7517 train_ppl=42.60 lr=0.000170 step_time=11.690s step_time_min=8.270 step_time_max=22.198 micro_time=2.330s tp=5254 tok/s
+[2025-10-29 11:12:51][Epoch 004][Step 0480/1200] global_step=5280 train_loss=3.7120 train_ppl=40.94 lr=0.000169 step_time=12.951s step_time_min=8.270 step_time_max=22.198 micro_time=2.582s tp=4743 tok/s
+[2025-10-29 11:15:18][Epoch 004][Step 0490/1200] global_step=5290 train_loss=3.7132 train_ppl=40.98 lr=0.000168 step_time=14.611s step_time_min=8.270 step_time_max=22.198 micro_time=2.914s tp=4204 tok/s
+[2025-10-29 11:17:11][Epoch 004][Step 0500/1200] global_step=5300 train_loss=3.7685 train_ppl=43.32 lr=0.000167 step_time=11.358s step_time_min=8.270 step_time_max=22.198 micro_time=2.263s tp=5407 tok/s
+[2025-10-29 11:19:15][Epoch 004][Step 0510/1200] global_step=5310 train_loss=3.7375 train_ppl=41.99 lr=0.000166 step_time=12.388s step_time_min=8.270 step_time_max=22.198 micro_time=2.469s tp=4958 tok/s
+[2025-10-29 11:21:24][Epoch 004][Step 0520/1200] global_step=5320 train_loss=3.7616 train_ppl=43.02 lr=0.000165 step_time=12.856s step_time_min=8.270 step_time_max=22.198 micro_time=2.562s tp=4778 tok/s
+[2025-10-29 11:23:25][Epoch 004][Step 0530/1200] global_step=5330 train_loss=3.7632 train_ppl=43.09 lr=0.000164 step_time=12.137s step_time_min=8.270 step_time_max=22.198 micro_time=2.418s tp=5061 tok/s
+[2025-10-29 11:25:31][Epoch 004][Step 0540/1200] global_step=5340 train_loss=3.7539 train_ppl=42.69 lr=0.000163 step_time=12.533s step_time_min=8.270 step_time_max=22.198 micro_time=2.498s tp=4901 tok/s
+[2025-10-29 11:27:43][Epoch 004][Step 0550/1200] global_step=5350 train_loss=3.7460 train_ppl=42.35 lr=0.000162 step_time=13.227s step_time_min=8.270 step_time_max=22.198 micro_time=2.637s tp=4644 tok/s
+[2025-10-29 11:29:53][Epoch 004][Step 0560/1200] global_step=5360 train_loss=3.7500 train_ppl=42.52 lr=0.000161 step_time=13.008s step_time_min=8.270 step_time_max=22.198 micro_time=2.593s tp=4722 tok/s
+[2025-10-29 11:31:49][Epoch 004][Step 0570/1200] global_step=5370 train_loss=3.7211 train_ppl=41.31 lr=0.000160 step_time=11.572s step_time_min=8.270 step_time_max=22.198 micro_time=2.306s tp=5308 tok/s
+[2025-10-29 11:33:49][Epoch 004][Step 0580/1200] global_step=5380 train_loss=3.7223 train_ppl=41.36 lr=0.000159 step_time=11.967s step_time_min=8.270 step_time_max=22.198 micro_time=2.385s tp=5133 tok/s
+[2025-10-29 11:35:43][Epoch 004][Step 0590/1200] global_step=5390 train_loss=3.7625 train_ppl=43.06 lr=0.000158 step_time=11.405s step_time_min=8.270 step_time_max=22.198 micro_time=2.272s tp=5385 tok/s
+[2025-10-29 11:37:41][Epoch 004][Step 0600/1200] global_step=5400 train_loss=3.7670 train_ppl=43.25 lr=0.000157 step_time=11.838s step_time_min=8.270 step_time_max=22.198 micro_time=2.359s tp=5189 tok/s
+[2025-10-29 11:38:55][MiniVal][Epoch 004][Step 0600] val_loss=3.5217 val_ppl=33.84 val_time=73.92s
+[2025-10-29 11:41:01][Epoch 004][Step 0610/1200] global_step=5410 train_loss=3.7167 train_ppl=41.13 lr=0.000156 step_time=12.540s step_time_min=8.270 step_time_max=22.198 micro_time=2.499s tp=3081 tok/s
+[2025-10-29 11:43:06][Epoch 004][Step 0620/1200] global_step=5420 train_loss=3.7349 train_ppl=41.88 lr=0.000155 step_time=12.547s step_time_min=8.270 step_time_max=22.198 micro_time=2.500s tp=4895 tok/s
+[2025-10-29 11:45:06][Epoch 004][Step 0630/1200] global_step=5430 train_loss=3.7677 train_ppl=43.28 lr=0.000154 step_time=11.986s step_time_min=8.270 step_time_max=22.198 micro_time=2.389s tp=5124 tok/s
+[2025-10-29 11:47:03][Epoch 004][Step 0640/1200] global_step=5440 train_loss=3.7374 train_ppl=41.99 lr=0.000153 step_time=11.682s step_time_min=8.270 step_time_max=22.198 micro_time=2.328s tp=5257 tok/s
+[2025-10-29 11:49:07][Epoch 004][Step 0650/1200] global_step=5450 train_loss=3.6851 train_ppl=39.85 lr=0.000152 step_time=12.457s step_time_min=8.270 step_time_max=22.198 micro_time=2.483s tp=4931 tok/s
+[2025-10-29 11:51:16][Epoch 004][Step 0660/1200] global_step=5460 train_loss=3.6587 train_ppl=38.81 lr=0.000151 step_time=12.892s step_time_min=8.270 step_time_max=22.198 micro_time=2.570s tp=4764 tok/s
+[2025-10-29 11:53:36][Epoch 004][Step 0670/1200] global_step=5470 train_loss=3.7492 train_ppl=42.49 lr=0.000150 step_time=13.898s step_time_min=8.270 step_time_max=22.198 micro_time=2.771s tp=4420 tok/s
+[2025-10-29 11:55:36][Epoch 004][Step 0680/1200] global_step=5480 train_loss=3.7569 train_ppl=42.82 lr=0.000149 step_time=12.028s step_time_min=8.270 step_time_max=22.198 micro_time=2.397s tp=5106 tok/s
+[2025-10-29 11:57:37][Epoch 004][Step 0690/1200] global_step=5490 train_loss=3.7204 train_ppl=41.28 lr=0.000148 step_time=12.115s step_time_min=8.270 step_time_max=22.198 micro_time=2.414s tp=5070 tok/s
+[2025-10-29 11:59:35][Epoch 004][Step 0700/1200] global_step=5500 train_loss=3.6965 train_ppl=40.31 lr=0.000147 step_time=11.820s step_time_min=8.270 step_time_max=22.198 micro_time=2.355s tp=5196 tok/s
+[2025-10-29 12:01:52][Epoch 004][Step 0710/1200] global_step=5510 train_loss=3.7182 train_ppl=41.19 lr=0.000146 step_time=13.706s step_time_min=8.270 step_time_max=22.198 micro_time=2.733s tp=4481 tok/s
+[2025-10-29 12:04:14][Epoch 004][Step 0720/1200] global_step=5520 train_loss=3.7361 train_ppl=41.93 lr=0.000145 step_time=14.172s step_time_min=8.270 step_time_max=22.198 micro_time=2.826s tp=4334 tok/s
+[2025-10-29 12:06:12][Epoch 004][Step 0730/1200] global_step=5530 train_loss=3.6269 train_ppl=37.60 lr=0.000144 step_time=11.786s step_time_min=8.270 step_time_max=22.198 micro_time=2.349s tp=5211 tok/s
+[2025-10-29 12:08:07][Epoch 004][Step 0740/1200] global_step=5540 train_loss=3.7924 train_ppl=44.36 lr=0.000143 step_time=11.509s step_time_min=8.270 step_time_max=22.198 micro_time=2.293s tp=5337 tok/s
+[2025-10-29 12:10:16][Epoch 004][Step 0750/1200] global_step=5550 train_loss=3.7289 train_ppl=41.63 lr=0.000142 step_time=12.888s step_time_min=8.270 step_time_max=22.198 micro_time=2.569s tp=4766 tok/s
+[2025-10-29 12:12:16][Epoch 004][Step 0760/1200] global_step=5560 train_loss=3.7215 train_ppl=41.33 lr=0.000141 step_time=12.012s step_time_min=8.270 step_time_max=22.198 micro_time=2.394s tp=5113 tok/s
+[2025-10-29 12:14:25][Epoch 004][Step 0770/1200] global_step=5570 train_loss=3.7307 train_ppl=41.71 lr=0.000140 step_time=12.897s step_time_min=8.270 step_time_max=22.198 micro_time=2.570s tp=4763 tok/s
+[2025-10-29 12:16:29][Epoch 004][Step 0780/1200] global_step=5580 train_loss=3.7112 train_ppl=40.90 lr=0.000139 step_time=12.327s step_time_min=8.270 step_time_max=22.198 micro_time=2.457s tp=4983 tok/s
+[2025-10-29 12:18:25][Epoch 004][Step 0790/1200] global_step=5590 train_loss=3.7211 train_ppl=41.31 lr=0.000138 step_time=11.641s step_time_min=8.270 step_time_max=22.198 micro_time=2.320s tp=5276 tok/s
+[2025-10-29 12:20:42][Epoch 004][Step 0800/1200] global_step=5600 train_loss=3.7459 train_ppl=42.35 lr=0.000137 step_time=13.655s step_time_min=8.270 step_time_max=22.688 micro_time=2.722s tp=4498 tok/s
+[2025-10-29 12:22:50][Epoch 004][Step 0810/1200] global_step=5610 train_loss=3.7619 train_ppl=43.03 lr=0.000136 step_time=12.853s step_time_min=8.270 step_time_max=22.688 micro_time=2.562s tp=4779 tok/s
+[2025-10-29 12:24:50][Epoch 004][Step 0820/1200] global_step=5620 train_loss=3.7598 train_ppl=42.94 lr=0.000136 step_time=11.916s step_time_min=8.270 step_time_max=22.688 micro_time=2.375s tp=5154 tok/s
+[2025-10-29 12:26:58][Epoch 004][Step 0830/1200] global_step=5630 train_loss=3.6832 train_ppl=39.77 lr=0.000135 step_time=12.823s step_time_min=8.270 step_time_max=22.688 micro_time=2.556s tp=4790 tok/s
+[2025-10-29 12:29:09][Epoch 004][Step 0840/1200] global_step=5640 train_loss=3.7013 train_ppl=40.50 lr=0.000134 step_time=13.070s step_time_min=8.270 step_time_max=22.688 micro_time=2.605s tp=4699 tok/s
+[2025-10-29 12:31:06][Epoch 004][Step 0850/1200] global_step=5650 train_loss=3.7365 train_ppl=41.95 lr=0.000133 step_time=11.700s step_time_min=8.270 step_time_max=22.688 micro_time=2.331s tp=5250 tok/s
+[2025-10-29 12:33:11][Epoch 004][Step 0860/1200] global_step=5660 train_loss=3.7344 train_ppl=41.86 lr=0.000132 step_time=12.531s step_time_min=8.270 step_time_max=22.688 micro_time=2.498s tp=4902 tok/s
+[2025-10-29 12:35:15][Epoch 004][Step 0870/1200] global_step=5670 train_loss=3.6619 train_ppl=38.94 lr=0.000131 step_time=12.404s step_time_min=8.270 step_time_max=22.688 micro_time=2.472s tp=4951 tok/s
+[2025-10-29 12:37:26][Epoch 004][Step 0880/1200] global_step=5680 train_loss=3.7316 train_ppl=41.75 lr=0.000130 step_time=13.114s step_time_min=8.270 step_time_max=22.907 micro_time=2.614s tp=4684 tok/s
+[2025-10-29 12:39:30][Epoch 004][Step 0890/1200] global_step=5690 train_loss=3.6950 train_ppl=40.25 lr=0.000129 step_time=12.307s step_time_min=8.270 step_time_max=22.907 micro_time=2.453s tp=4991 tok/s
+[2025-10-29 12:41:35][Epoch 004][Step 0900/1200] global_step=5700 train_loss=3.6638 train_ppl=39.01 lr=0.000128 step_time=12.534s step_time_min=8.270 step_time_max=22.907 micro_time=2.498s tp=4900 tok/s
+[2025-10-29 12:42:35][MiniVal][Epoch 004][Step 0900] val_loss=3.5060 val_ppl=33.32 val_time=60.23s
+[2025-10-29 12:44:46][Epoch 004][Step 0910/1200] global_step=5710 train_loss=3.7160 train_ppl=41.10 lr=0.000128 step_time=13.056s step_time_min=8.270 step_time_max=22.907 micro_time=2.602s tp=3219 tok/s
+[2025-10-29 12:46:53][Epoch 004][Step 0920/1200] global_step=5720 train_loss=3.7707 train_ppl=43.41 lr=0.000127 step_time=12.686s step_time_min=8.270 step_time_max=22.907 micro_time=2.528s tp=4841 tok/s
+[2025-10-29 12:49:04][Epoch 004][Step 0930/1200] global_step=5730 train_loss=3.7120 train_ppl=40.94 lr=0.000126 step_time=13.086s step_time_min=8.270 step_time_max=22.907 micro_time=2.608s tp=4694 tok/s
+[2025-10-29 12:51:04][Epoch 004][Step 0940/1200] global_step=5740 train_loss=3.7428 train_ppl=42.21 lr=0.000125 step_time=12.061s step_time_min=8.270 step_time_max=22.907 micro_time=2.404s tp=5092 tok/s
+[2025-10-29 12:53:06][Epoch 004][Step 0950/1200] global_step=5750 train_loss=3.7609 train_ppl=42.99 lr=0.000124 step_time=12.132s step_time_min=8.270 step_time_max=22.907 micro_time=2.418s tp=5063 tok/s
+[2025-10-29 12:54:57][Epoch 004][Step 0960/1200] global_step=5760 train_loss=3.7263 train_ppl=41.53 lr=0.000123 step_time=11.079s step_time_min=8.270 step_time_max=22.907 micro_time=2.207s tp=5544 tok/s
+[2025-10-29 12:57:00][Epoch 004][Step 0970/1200] global_step=5770 train_loss=3.7048 train_ppl=40.64 lr=0.000122 step_time=12.335s step_time_min=8.270 step_time_max=22.907 micro_time=2.458s tp=4979 tok/s
+[2025-10-29 12:59:05][Epoch 004][Step 0980/1200] global_step=5780 train_loss=3.6813 train_ppl=39.70 lr=0.000122 step_time=12.453s step_time_min=8.270 step_time_max=22.907 micro_time=2.482s tp=4932 tok/s
+[2025-10-29 13:01:12][Epoch 004][Step 0990/1200] global_step=5790 train_loss=3.7352 train_ppl=41.90 lr=0.000121 step_time=12.715s step_time_min=8.270 step_time_max=22.907 micro_time=2.534s tp=4831 tok/s
+[2025-10-29 13:03:29][Epoch 004][Step 1000/1200] global_step=5800 train_loss=3.7161 train_ppl=41.10 lr=0.000120 step_time=13.703s step_time_min=8.270 step_time_max=22.907 micro_time=2.732s tp=4482 tok/s
+[2025-10-29 13:05:36][Epoch 004][Step 1010/1200] global_step=5810 train_loss=3.6860 train_ppl=39.88 lr=0.000119 step_time=12.662s step_time_min=8.270 step_time_max=22.907 micro_time=2.524s tp=4851 tok/s
+[2025-10-29 13:07:48][Epoch 004][Step 1020/1200] global_step=5820 train_loss=3.7012 train_ppl=40.50 lr=0.000118 step_time=13.235s step_time_min=8.270 step_time_max=22.907 micro_time=2.638s tp=4641 tok/s
+[2025-10-29 13:09:38][Epoch 004][Step 1030/1200] global_step=5830 train_loss=3.6962 train_ppl=40.29 lr=0.000117 step_time=10.978s step_time_min=8.270 step_time_max=22.907 micro_time=2.187s tp=5595 tok/s
+[2025-10-29 13:11:49][Epoch 004][Step 1040/1200] global_step=5840 train_loss=3.7173 train_ppl=41.15 lr=0.000117 step_time=13.142s step_time_min=8.270 step_time_max=22.907 micro_time=2.620s tp=4674 tok/s
+[2025-10-29 13:14:01][Epoch 004][Step 1050/1200] global_step=5850 train_loss=3.6958 train_ppl=40.28 lr=0.000116 step_time=13.198s step_time_min=8.270 step_time_max=22.907 micro_time=2.631s tp=4654 tok/s
+[2025-10-29 13:16:05][Epoch 004][Step 1060/1200] global_step=5860 train_loss=3.6408 train_ppl=38.12 lr=0.000115 step_time=12.383s step_time_min=8.270 step_time_max=22.907 micro_time=2.468s tp=4960 tok/s
+[2025-10-29 13:18:21][Epoch 004][Step 1070/1200] global_step=5870 train_loss=3.6981 train_ppl=40.37 lr=0.000114 step_time=13.574s step_time_min=8.270 step_time_max=22.907 micro_time=2.706s tp=4525 tok/s
+[2025-10-29 13:20:35][Epoch 004][Step 1080/1200] global_step=5880 train_loss=3.6929 train_ppl=40.16 lr=0.000114 step_time=13.372s step_time_min=8.270 step_time_max=22.907 micro_time=2.666s tp=4594 tok/s
+[2025-10-29 13:22:43][Epoch 004][Step 1090/1200] global_step=5890 train_loss=3.7525 train_ppl=42.63 lr=0.000113 step_time=12.809s step_time_min=8.270 step_time_max=22.907 micro_time=2.553s tp=4795 tok/s
+[2025-10-29 13:25:00][Epoch 004][Step 1100/1200] global_step=5900 train_loss=3.7217 train_ppl=41.33 lr=0.000112 step_time=13.696s step_time_min=8.270 step_time_max=22.907 micro_time=2.731s tp=4485 tok/s
+[2025-10-29 13:26:42][Epoch 004][Step 1110/1200] global_step=5910 train_loss=3.7066 train_ppl=40.71 lr=0.000111 step_time=10.142s step_time_min=8.270 step_time_max=22.907 micro_time=2.020s tp=6056 tok/s
+[2025-10-29 13:29:03][Epoch 004][Step 1120/1200] global_step=5920 train_loss=3.8685 train_ppl=47.87 lr=0.000110 step_time=14.100s step_time_min=8.270 step_time_max=22.907 micro_time=2.811s tp=4356 tok/s
+[2025-10-29 13:31:13][Epoch 004][Step 1130/1200] global_step=5930 train_loss=3.6989 train_ppl=40.40 lr=0.000110 step_time=12.990s step_time_min=8.270 step_time_max=22.907 micro_time=2.589s tp=4728 tok/s
+[2025-10-29 13:33:16][Epoch 004][Step 1140/1200] global_step=5940 train_loss=3.7043 train_ppl=40.62 lr=0.000109 step_time=12.354s step_time_min=8.270 step_time_max=22.907 micro_time=2.462s tp=4972 tok/s
+[2025-10-29 13:35:18][Epoch 004][Step 1150/1200] global_step=5950 train_loss=3.7093 train_ppl=40.83 lr=0.000108 step_time=12.122s step_time_min=8.270 step_time_max=22.907 micro_time=2.416s tp=5067 tok/s
+[2025-10-29 13:37:20][Epoch 004][Step 1160/1200] global_step=5960 train_loss=3.7023 train_ppl=40.54 lr=0.000107 step_time=12.266s step_time_min=8.270 step_time_max=22.907 micro_time=2.445s tp=5007 tok/s
+[2025-10-29 13:39:40][Epoch 004][Step 1170/1200] global_step=5970 train_loss=3.7014 train_ppl=40.50 lr=0.000107 step_time=13.991s step_time_min=8.270 step_time_max=22.907 micro_time=2.789s tp=4390 tok/s
+[2025-10-29 13:41:59][Epoch 004][Step 1180/1200] global_step=5980 train_loss=3.6469 train_ppl=38.36 lr=0.000106 step_time=13.887s step_time_min=8.270 step_time_max=22.907 micro_time=2.769s tp=4423 tok/s
+[2025-10-29 13:44:12][Epoch 004][Step 1190/1200] global_step=5990 train_loss=3.6958 train_ppl=40.28 lr=0.000105 step_time=13.277s step_time_min=8.270 step_time_max=22.907 micro_time=2.647s tp=4626 tok/s
+[2025-10-29 13:46:09][Epoch 004][Step 1200/1200] global_step=6000 train_loss=3.7456 train_ppl=42.33 lr=0.000104 step_time=11.712s step_time_min=8.270 step_time_max=22.907 micro_time=2.334s tp=5244 tok/s
+[2025-10-29 13:47:16][MiniVal][Epoch 004][Step 1200] val_loss=3.4967 val_ppl=33.01 val_time=67.11s
+[2025-10-29 13:50:25][Epoch 004] global_step=6000  train_loss=3.7456 train_ppl=42.33 val_ppl=32.46 micro_steps=6000 micro_time=2.503s steps=1200 step_time=12.558s epoch_train_time=15353.280s  epoch_time=15541.895s tp=4802 tok/s straggle_events=2979
+[2025-10-29 13:50:25] New best validation perplexity: 32.46
+[2025-10-29 13:50:25][Epoch 005] ...
+[2025-10-29 13:52:30][Epoch 005][Step 0010/1200] global_step=6010 train_loss=3.7222 train_ppl=41.35 lr=0.000104 step_time=12.439s step_time_min=8.289 step_time_max=17.194 micro_time=2.479s tp=4929 tok/s
+[2025-10-29 13:54:31][Epoch 005][Step 0020/1200] global_step=6020 train_loss=3.6834 train_ppl=39.78 lr=0.000103 step_time=12.163s step_time_min=8.282 step_time_max=17.194 micro_time=2.424s tp=5050 tok/s
+[2025-10-29 13:56:37][Epoch 005][Step 0030/1200] global_step=6030 train_loss=3.7285 train_ppl=41.62 lr=0.000102 step_time=12.602s step_time_min=8.282 step_time_max=17.194 micro_time=2.512s tp=4874 tok/s
+[2025-10-29 13:58:58][Epoch 005][Step 0040/1200] global_step=6040 train_loss=3.6738 train_ppl=39.40 lr=0.000102 step_time=14.059s step_time_min=8.282 step_time_max=20.721 micro_time=2.803s tp=4369 tok/s
+[2025-10-29 14:01:08][Epoch 005][Step 0050/1200] global_step=6050 train_loss=3.7277 train_ppl=41.59 lr=0.000101 step_time=13.009s step_time_min=8.282 step_time_max=21.028 micro_time=2.593s tp=4722 tok/s
+[2025-10-29 14:03:00][Epoch 005][Step 0060/1200] global_step=6060 train_loss=3.6582 train_ppl=38.79 lr=0.000100 step_time=11.191s step_time_min=8.282 step_time_max=21.028 micro_time=2.229s tp=5488 tok/s
+[2025-10-29 14:05:28][Epoch 005][Step 0070/1200] global_step=6070 train_loss=3.7098 train_ppl=40.85 lr=0.000100 step_time=14.770s step_time_min=8.282 step_time_max=21.028 micro_time=2.946s tp=4159 tok/s
+[2025-10-29 14:07:47][Epoch 005][Step 0080/1200] global_step=6080 train_loss=3.6537 train_ppl=38.62 lr=0.000099 step_time=13.874s step_time_min=8.282 step_time_max=21.028 micro_time=2.766s tp=4427 tok/s
+[2025-10-29 14:09:53][Epoch 005][Step 0090/1200] global_step=6090 train_loss=3.6615 train_ppl=38.92 lr=0.000098 step_time=12.593s step_time_min=8.282 step_time_max=21.028 micro_time=2.510s tp=4878 tok/s
+[2025-10-29 14:11:54][Epoch 005][Step 0100/1200] global_step=6100 train_loss=3.6623 train_ppl=38.95 lr=0.000098 step_time=12.119s step_time_min=8.282 step_time_max=21.028 micro_time=2.415s tp=5068 tok/s
+[2025-10-29 14:13:53][Epoch 005][Step 0110/1200] global_step=6110 train_loss=3.6893 train_ppl=40.02 lr=0.000097 step_time=11.870s step_time_min=8.282 step_time_max=21.028 micro_time=2.365s tp=5174 tok/s
+[2025-10-29 14:16:05][Epoch 005][Step 0120/1200] global_step=6120 train_loss=3.6563 train_ppl=38.72 lr=0.000096 step_time=13.185s step_time_min=8.282 step_time_max=21.028 micro_time=2.629s tp=4658 tok/s
+[2025-10-29 14:18:14][Epoch 005][Step 0130/1200] global_step=6130 train_loss=3.6592 train_ppl=38.83 lr=0.000096 step_time=12.925s step_time_min=8.282 step_time_max=21.028 micro_time=2.576s tp=4752 tok/s
+[2025-10-29 14:20:15][Epoch 005][Step 0140/1200] global_step=6140 train_loss=3.6742 train_ppl=39.42 lr=0.000095 step_time=12.137s step_time_min=8.282 step_time_max=21.028 micro_time=2.419s tp=5061 tok/s
+[2025-10-29 14:22:11][Epoch 005][Step 0150/1200] global_step=6150 train_loss=3.6454 train_ppl=38.30 lr=0.000094 step_time=11.518s step_time_min=8.282 step_time_max=21.028 micro_time=2.295s tp=5332 tok/s
+[2025-10-29 14:24:15][Epoch 005][Step 0160/1200] global_step=6160 train_loss=3.6620 train_ppl=38.94 lr=0.000094 step_time=12.477s step_time_min=8.282 step_time_max=21.028 micro_time=2.487s tp=4923 tok/s
+[2025-10-29 14:26:22][Epoch 005][Step 0170/1200] global_step=6170 train_loss=3.6482 train_ppl=38.41 lr=0.000093 step_time=12.637s step_time_min=8.282 step_time_max=21.028 micro_time=2.519s tp=4860 tok/s
+[2025-10-29 14:28:34][Epoch 005][Step 0180/1200] global_step=6180 train_loss=3.6727 train_ppl=39.36 lr=0.000092 step_time=13.157s step_time_min=8.282 step_time_max=21.028 micro_time=2.623s tp=4668 tok/s
+[2025-10-29 14:30:45][Epoch 005][Step 0190/1200] global_step=6190 train_loss=3.6583 train_ppl=38.80 lr=0.000092 step_time=13.151s step_time_min=8.282 step_time_max=21.813 micro_time=2.621s tp=4671 tok/s
+[2025-10-29 14:32:47][Epoch 005][Step 0200/1200] global_step=6200 train_loss=3.6959 train_ppl=40.28 lr=0.000091 step_time=12.181s step_time_min=8.282 step_time_max=21.813 micro_time=2.427s tp=5042 tok/s
+[2025-10-29 14:34:44][Epoch 005][Step 0210/1200] global_step=6210 train_loss=3.6890 train_ppl=40.00 lr=0.000091 step_time=11.645s step_time_min=8.282 step_time_max=21.813 micro_time=2.320s tp=5274 tok/s
+[2025-10-29 14:36:55][Epoch 005][Step 0220/1200] global_step=6220 train_loss=3.6672 train_ppl=39.14 lr=0.000090 step_time=13.097s step_time_min=8.282 step_time_max=21.813 micro_time=2.611s tp=4690 tok/s
+[2025-10-29 14:38:56][Epoch 005][Step 0230/1200] global_step=6230 train_loss=3.6626 train_ppl=38.96 lr=0.000089 step_time=12.132s step_time_min=8.282 step_time_max=21.813 micro_time=2.418s tp=5062 tok/s
+[2025-10-29 14:41:10][Epoch 005][Step 0240/1200] global_step=6240 train_loss=3.7318 train_ppl=41.75 lr=0.000089 step_time=13.392s step_time_min=8.282 step_time_max=24.444 micro_time=2.670s tp=4586 tok/s
+[2025-10-29 14:42:56][Epoch 005][Step 0250/1200] global_step=6250 train_loss=3.6754 train_ppl=39.47 lr=0.000088 step_time=10.570s step_time_min=8.282 step_time_max=24.444 micro_time=2.105s tp=5811 tok/s
+[2025-10-29 14:45:03][Epoch 005][Step 0260/1200] global_step=6260 train_loss=3.6640 train_ppl=39.02 lr=0.000088 step_time=12.729s step_time_min=8.282 step_time_max=24.444 micro_time=2.537s tp=4825 tok/s
+[2025-10-29 14:47:32][Epoch 005][Step 0270/1200] global_step=6270 train_loss=3.6377 train_ppl=38.01 lr=0.000087 step_time=14.917s step_time_min=8.282 step_time_max=24.444 micro_time=2.975s tp=4118 tok/s
+[2025-10-29 14:49:39][Epoch 005][Step 0280/1200] global_step=6280 train_loss=3.6028 train_ppl=36.70 lr=0.000086 step_time=12.712s step_time_min=8.282 step_time_max=24.444 micro_time=2.534s tp=4832 tok/s
+[2025-10-29 14:52:04][Epoch 005][Step 0290/1200] global_step=6290 train_loss=3.5539 train_ppl=34.95 lr=0.000086 step_time=14.448s step_time_min=8.282 step_time_max=24.444 micro_time=2.881s tp=4251 tok/s
+[2025-10-29 14:54:08][Epoch 005][Step 0300/1200] global_step=6300 train_loss=3.6981 train_ppl=40.37 lr=0.000085 step_time=12.434s step_time_min=8.282 step_time_max=24.444 micro_time=2.478s tp=4940 tok/s
+[2025-10-29 14:55:19][MiniVal][Epoch 005][Step 0300] val_loss=3.4856 val_ppl=32.64 val_time=70.91s
+[2025-10-29 14:57:31][Epoch 005][Step 0310/1200] global_step=6310 train_loss=3.4402 train_ppl=31.19 lr=0.000085 step_time=13.149s step_time_min=8.282 step_time_max=24.444 micro_time=2.621s tp=3035 tok/s
+[2025-10-29 14:59:31][Epoch 005][Step 0320/1200] global_step=6320 train_loss=3.5743 train_ppl=35.67 lr=0.000084 step_time=12.004s step_time_min=8.282 step_time_max=24.444 micro_time=2.392s tp=5116 tok/s
+[2025-10-29 15:01:34][Epoch 005][Step 0330/1200] global_step=6330 train_loss=3.6485 train_ppl=38.42 lr=0.000084 step_time=12.344s step_time_min=8.282 step_time_max=24.444 micro_time=2.460s tp=4975 tok/s
+[2025-10-29 15:03:36][Epoch 005][Step 0340/1200] global_step=6340 train_loss=3.6441 train_ppl=38.25 lr=0.000083 step_time=12.156s step_time_min=8.282 step_time_max=24.444 micro_time=2.423s tp=5053 tok/s
+[2025-10-29 15:05:47][Epoch 005][Step 0350/1200] global_step=6350 train_loss=3.6694 train_ppl=39.23 lr=0.000083 step_time=13.061s step_time_min=8.282 step_time_max=24.444 micro_time=2.603s tp=4703 tok/s
+[2025-10-29 15:07:52][Epoch 005][Step 0360/1200] global_step=6360 train_loss=3.6715 train_ppl=39.31 lr=0.000082 step_time=12.493s step_time_min=8.282 step_time_max=24.444 micro_time=2.490s tp=4916 tok/s
+[2025-10-29 15:09:57][Epoch 005][Step 0370/1200] global_step=6370 train_loss=3.7150 train_ppl=41.06 lr=0.000082 step_time=12.526s step_time_min=8.282 step_time_max=24.444 micro_time=2.496s tp=4904 tok/s
+[2025-10-29 15:12:09][Epoch 005][Step 0380/1200] global_step=6380 train_loss=3.7027 train_ppl=40.56 lr=0.000081 step_time=13.146s step_time_min=8.282 step_time_max=24.444 micro_time=2.621s tp=4672 tok/s
+[2025-10-29 15:14:15][Epoch 005][Step 0390/1200] global_step=6390 train_loss=3.6999 train_ppl=40.44 lr=0.000081 step_time=12.598s step_time_min=8.282 step_time_max=24.444 micro_time=2.511s tp=4876 tok/s
+[2025-10-29 15:16:20][Epoch 005][Step 0400/1200] global_step=6400 train_loss=3.6813 train_ppl=39.70 lr=0.000080 step_time=12.498s step_time_min=8.282 step_time_max=24.444 micro_time=2.491s tp=4915 tok/s
+[2025-10-29 15:18:18][Epoch 005][Step 0410/1200] global_step=6410 train_loss=3.6911 train_ppl=40.09 lr=0.000080 step_time=11.816s step_time_min=8.282 step_time_max=24.444 micro_time=2.355s tp=5198 tok/s
+[2025-10-29 15:20:10][Epoch 005][Step 0420/1200] global_step=6420 train_loss=3.6627 train_ppl=38.97 lr=0.000079 step_time=11.236s step_time_min=8.282 step_time_max=24.444 micro_time=2.238s tp=5466 tok/s
+[2025-10-29 15:22:06][Epoch 005][Step 0430/1200] global_step=6430 train_loss=3.6516 train_ppl=38.54 lr=0.000079 step_time=11.527s step_time_min=8.282 step_time_max=24.444 micro_time=2.297s tp=5328 tok/s
+[2025-10-29 15:24:08][Epoch 005][Step 0440/1200] global_step=6440 train_loss=3.6660 train_ppl=39.10 lr=0.000078 step_time=12.270s step_time_min=8.282 step_time_max=24.444 micro_time=2.445s tp=5006 tok/s
+[2025-10-29 15:26:13][Epoch 005][Step 0450/1200] global_step=6450 train_loss=3.6352 train_ppl=37.91 lr=0.000078 step_time=12.430s step_time_min=8.282 step_time_max=24.444 micro_time=2.477s tp=4941 tok/s
+[2025-10-29 15:28:21][Epoch 005][Step 0460/1200] global_step=6460 train_loss=3.6146 train_ppl=37.14 lr=0.000077 step_time=12.769s step_time_min=8.282 step_time_max=24.444 micro_time=2.545s tp=4810 tok/s
+[2025-10-29 15:30:37][Epoch 005][Step 0470/1200] global_step=6470 train_loss=3.6407 train_ppl=38.12 lr=0.000077 step_time=13.594s step_time_min=8.282 step_time_max=24.444 micro_time=2.710s tp=4518 tok/s
+[2025-10-29 15:32:55][Epoch 005][Step 0480/1200] global_step=6480 train_loss=3.6075 train_ppl=36.87 lr=0.000076 step_time=13.827s step_time_min=8.282 step_time_max=24.444 micro_time=2.757s tp=4442 tok/s
+[2025-10-29 15:35:10][Epoch 005][Step 0490/1200] global_step=6490 train_loss=3.5983 train_ppl=36.54 lr=0.000076 step_time=13.509s step_time_min=8.282 step_time_max=24.444 micro_time=2.693s tp=4547 tok/s
+[2025-10-29 15:37:22][Epoch 005][Step 0500/1200] global_step=6500 train_loss=3.6570 train_ppl=38.74 lr=0.000075 step_time=13.178s step_time_min=8.282 step_time_max=24.444 micro_time=2.627s tp=4661 tok/s
+[2025-10-29 15:39:25][Epoch 005][Step 0510/1200] global_step=6510 train_loss=3.6269 train_ppl=37.60 lr=0.000075 step_time=12.277s step_time_min=8.282 step_time_max=24.444 micro_time=2.447s tp=5003 tok/s
+[2025-10-29 15:41:43][Epoch 005][Step 0520/1200] global_step=6520 train_loss=3.6533 train_ppl=38.60 lr=0.000075 step_time=13.792s step_time_min=8.282 step_time_max=24.444 micro_time=2.750s tp=4453 tok/s
+[2025-10-29 15:43:41][Epoch 005][Step 0530/1200] global_step=6530 train_loss=3.6598 train_ppl=38.85 lr=0.000074 step_time=11.807s step_time_min=8.282 step_time_max=24.444 micro_time=2.352s tp=5202 tok/s
+[2025-10-29 15:45:59][Epoch 005][Step 0540/1200] global_step=6540 train_loss=3.6429 train_ppl=38.20 lr=0.000074 step_time=13.855s step_time_min=8.282 step_time_max=24.444 micro_time=2.762s tp=4433 tok/s
+[2025-10-29 15:47:49][Epoch 005][Step 0550/1200] global_step=6550 train_loss=3.6384 train_ppl=38.03 lr=0.000073 step_time=10.940s step_time_min=8.282 step_time_max=24.444 micro_time=2.179s tp=5614 tok/s
+[2025-10-29 15:49:48][Epoch 005][Step 0560/1200] global_step=6560 train_loss=3.6457 train_ppl=38.31 lr=0.000073 step_time=11.890s step_time_min=8.282 step_time_max=24.444 micro_time=2.369s tp=5166 tok/s
+[2025-10-29 15:51:34][Epoch 005][Step 0570/1200] global_step=6570 train_loss=3.6181 train_ppl=37.27 lr=0.000073 step_time=10.590s step_time_min=8.282 step_time_max=24.444 micro_time=2.109s tp=5800 tok/s
+[2025-10-29 15:53:40][Epoch 005][Step 0580/1200] global_step=6580 train_loss=3.6167 train_ppl=37.21 lr=0.000072 step_time=12.609s step_time_min=8.282 step_time_max=24.444 micro_time=2.513s tp=4871 tok/s
+[2025-10-29 15:55:37][Epoch 005][Step 0590/1200] global_step=6590 train_loss=3.6580 train_ppl=38.78 lr=0.000072 step_time=11.681s step_time_min=8.282 step_time_max=24.444 micro_time=2.327s tp=5258 tok/s
+[2025-10-29 15:57:36][Epoch 005][Step 0600/1200] global_step=6600 train_loss=3.6619 train_ppl=38.94 lr=0.000071 step_time=11.902s step_time_min=8.282 step_time_max=24.444 micro_time=2.371s tp=5161 tok/s
+[2025-10-29 15:58:46][MiniVal][Epoch 005][Step 0600] val_loss=3.4796 val_ppl=32.45 val_time=69.77s
+[2025-10-29 16:00:48][Epoch 005][Step 0610/1200] global_step=6610 train_loss=3.6134 train_ppl=37.09 lr=0.000071 step_time=12.194s step_time_min=8.282 step_time_max=24.444 micro_time=2.430s tp=3204 tok/s
+[2025-10-29 16:02:59][Epoch 005][Step 0620/1200] global_step=6620 train_loss=3.6325 train_ppl=37.81 lr=0.000071 step_time=13.123s step_time_min=8.282 step_time_max=24.444 micro_time=2.616s tp=4681 tok/s
+[2025-10-29 16:05:07][Epoch 005][Step 0630/1200] global_step=6630 train_loss=3.6647 train_ppl=39.04 lr=0.000070 step_time=12.763s step_time_min=8.282 step_time_max=24.444 micro_time=2.544s tp=4812 tok/s
+[2025-10-29 16:07:12][Epoch 005][Step 0640/1200] global_step=6640 train_loss=3.6378 train_ppl=38.01 lr=0.000070 step_time=12.530s step_time_min=8.282 step_time_max=24.444 micro_time=2.497s tp=4902 tok/s
+[2025-10-29 16:09:12][Epoch 005][Step 0650/1200] global_step=6650 train_loss=3.5836 train_ppl=36.00 lr=0.000070 step_time=12.029s step_time_min=8.282 step_time_max=24.444 micro_time=2.397s tp=5106 tok/s
+[2025-10-29 16:11:23][Epoch 005][Step 0660/1200] global_step=6660 train_loss=3.5551 train_ppl=34.99 lr=0.000069 step_time=13.039s step_time_min=8.282 step_time_max=24.444 micro_time=2.599s tp=4711 tok/s
+[2025-10-29 16:13:24][Epoch 005][Step 0670/1200] global_step=6670 train_loss=3.6476 train_ppl=38.38 lr=0.000069 step_time=12.068s step_time_min=8.282 step_time_max=24.444 micro_time=2.405s tp=5089 tok/s
+[2025-10-29 16:15:18][Epoch 005][Step 0680/1200] global_step=6680 train_loss=3.6585 train_ppl=38.80 lr=0.000069 step_time=11.391s step_time_min=8.282 step_time_max=24.444 micro_time=2.270s tp=5392 tok/s
+[2025-10-29 16:17:36][Epoch 005][Step 0690/1200] global_step=6690 train_loss=3.6250 train_ppl=37.52 lr=0.000068 step_time=13.798s step_time_min=8.282 step_time_max=24.444 micro_time=2.751s tp=4452 tok/s
+[2025-10-29 16:19:33][Epoch 005][Step 0700/1200] global_step=6700 train_loss=3.5994 train_ppl=36.58 lr=0.000068 step_time=11.683s step_time_min=8.282 step_time_max=24.444 micro_time=2.328s tp=5257 tok/s
+[2025-10-29 16:21:40][Epoch 005][Step 0710/1200] global_step=6710 train_loss=3.6221 train_ppl=37.42 lr=0.000068 step_time=12.742s step_time_min=8.282 step_time_max=24.444 micro_time=2.540s tp=4820 tok/s
+[2025-10-29 16:23:42][Epoch 005][Step 0720/1200] global_step=6720 train_loss=3.6373 train_ppl=37.99 lr=0.000067 step_time=12.226s step_time_min=8.282 step_time_max=24.444 micro_time=2.436s tp=5024 tok/s
+[2025-10-29 16:25:40][Epoch 005][Step 0730/1200] global_step=6730 train_loss=3.5278 train_ppl=34.05 lr=0.000067 step_time=11.799s step_time_min=8.282 step_time_max=24.444 micro_time=2.351s tp=5206 tok/s
+[2025-10-29 16:27:48][Epoch 005][Step 0740/1200] global_step=6740 train_loss=3.6965 train_ppl=40.31 lr=0.000067 step_time=12.725s step_time_min=8.282 step_time_max=24.444 micro_time=2.536s tp=4827 tok/s
+[2025-10-29 16:29:58][Epoch 005][Step 0750/1200] global_step=6750 train_loss=3.6350 train_ppl=37.90 lr=0.000066 step_time=13.000s step_time_min=8.282 step_time_max=24.444 micro_time=2.591s tp=4725 tok/s
+[2025-10-29 16:32:03][Epoch 005][Step 0760/1200] global_step=6760 train_loss=3.6256 train_ppl=37.55 lr=0.000066 step_time=12.506s step_time_min=8.282 step_time_max=24.444 micro_time=2.492s tp=4911 tok/s
+[2025-10-29 16:34:21][Epoch 005][Step 0770/1200] global_step=6770 train_loss=3.6360 train_ppl=37.94 lr=0.000066 step_time=13.808s step_time_min=8.282 step_time_max=24.444 micro_time=2.753s tp=4448 tok/s
+[2025-10-29 16:36:28][Epoch 005][Step 0780/1200] global_step=6780 train_loss=3.6191 train_ppl=37.31 lr=0.000066 step_time=12.682s step_time_min=8.282 step_time_max=24.444 micro_time=2.528s tp=4843 tok/s
+[2025-10-29 16:38:30][Epoch 005][Step 0790/1200] global_step=6790 train_loss=3.6277 train_ppl=37.63 lr=0.000065 step_time=12.186s step_time_min=8.282 step_time_max=24.444 micro_time=2.429s tp=5040 tok/s
+[2025-10-29 16:40:38][Epoch 005][Step 0800/1200] global_step=6800 train_loss=3.6554 train_ppl=38.68 lr=0.000065 step_time=12.835s step_time_min=8.282 step_time_max=24.444 micro_time=2.558s tp=4785 tok/s
+[2025-10-29 16:42:39][Epoch 005][Step 0810/1200] global_step=6810 train_loss=3.6725 train_ppl=39.35 lr=0.000065 step_time=12.103s step_time_min=8.282 step_time_max=24.444 micro_time=2.412s tp=5075 tok/s
+[2025-10-29 16:44:52][Epoch 005][Step 0820/1200] global_step=6820 train_loss=3.6713 train_ppl=39.30 lr=0.000065 step_time=13.263s step_time_min=8.282 step_time_max=24.444 micro_time=2.644s tp=4631 tok/s
+[2025-10-29 16:46:52][Epoch 005][Step 0830/1200] global_step=6830 train_loss=3.5925 train_ppl=36.32 lr=0.000064 step_time=12.006s step_time_min=8.282 step_time_max=24.444 micro_time=2.393s tp=5116 tok/s
+[2025-10-29 16:48:59][Epoch 005][Step 0840/1200] global_step=6840 train_loss=3.6149 train_ppl=37.15 lr=0.000064 step_time=12.691s step_time_min=8.282 step_time_max=24.444 micro_time=2.530s tp=4840 tok/s
+[2025-10-29 16:50:57][Epoch 005][Step 0850/1200] global_step=6850 train_loss=3.6489 train_ppl=38.43 lr=0.000064 step_time=11.759s step_time_min=8.282 step_time_max=24.444 micro_time=2.343s tp=5223 tok/s
+[2025-10-29 16:52:58][Epoch 005][Step 0860/1200] global_step=6860 train_loss=3.6458 train_ppl=38.31 lr=0.000064 step_time=12.103s step_time_min=8.282 step_time_max=24.444 micro_time=2.412s tp=5075 tok/s
+[2025-10-29 16:55:03][Epoch 005][Step 0870/1200] global_step=6870 train_loss=3.5767 train_ppl=35.76 lr=0.000063 step_time=12.506s step_time_min=8.282 step_time_max=24.444 micro_time=2.492s tp=4911 tok/s
+[2025-10-29 16:57:08][Epoch 005][Step 0880/1200] global_step=6880 train_loss=3.6456 train_ppl=38.30 lr=0.000063 step_time=12.456s step_time_min=8.282 step_time_max=24.444 micro_time=2.483s tp=4931 tok/s
+[2025-10-29 16:59:16][Epoch 005][Step 0890/1200] global_step=6890 train_loss=3.6093 train_ppl=36.94 lr=0.000063 step_time=12.777s step_time_min=8.282 step_time_max=24.444 micro_time=2.546s tp=4807 tok/s
+[2025-10-29 17:01:17][Epoch 005][Step 0900/1200] global_step=6900 train_loss=3.5804 train_ppl=35.89 lr=0.000063 step_time=12.147s step_time_min=8.282 step_time_max=24.444 micro_time=2.421s tp=5056 tok/s
+[2025-10-29 17:02:30][MiniVal][Epoch 005][Step 0900] val_loss=3.4730 val_ppl=32.23 val_time=73.22s
+[2025-10-29 17:04:37][Epoch 005][Step 0910/1200] global_step=6910 train_loss=3.6309 train_ppl=37.75 lr=0.000063 step_time=12.614s step_time_min=8.282 step_time_max=24.444 micro_time=2.514s tp=3081 tok/s
+[2025-10-29 17:06:38][Epoch 005][Step 0920/1200] global_step=6920 train_loss=3.6846 train_ppl=39.83 lr=0.000063 step_time=12.157s step_time_min=8.282 step_time_max=24.444 micro_time=2.423s tp=5053 tok/s
+[2025-10-29 17:08:59][Epoch 005][Step 0930/1200] global_step=6930 train_loss=3.6265 train_ppl=37.58 lr=0.000062 step_time=14.126s step_time_min=8.282 step_time_max=24.444 micro_time=2.816s tp=4348 tok/s
+[2025-10-29 17:10:56][Epoch 005][Step 0940/1200] global_step=6940 train_loss=3.6569 train_ppl=38.74 lr=0.000062 step_time=11.626s step_time_min=8.282 step_time_max=24.444 micro_time=2.317s tp=5283 tok/s
+[2025-10-29 17:12:55][Epoch 005][Step 0950/1200] global_step=6950 train_loss=3.6771 train_ppl=39.53 lr=0.000062 step_time=11.876s step_time_min=8.282 step_time_max=24.444 micro_time=2.366s tp=5172 tok/s
+[2025-10-29 17:15:01][Epoch 005][Step 0960/1200] global_step=6960 train_loss=3.6411 train_ppl=38.14 lr=0.000062 step_time=12.636s step_time_min=8.282 step_time_max=24.444 micro_time=2.518s tp=4861 tok/s
+[2025-10-29 17:17:05][Epoch 005][Step 0970/1200] global_step=6970 train_loss=3.6211 train_ppl=37.38 lr=0.000062 step_time=12.376s step_time_min=8.282 step_time_max=24.444 micro_time=2.467s tp=4963 tok/s
+[2025-10-29 17:19:07][Epoch 005][Step 0980/1200] global_step=6980 train_loss=3.5999 train_ppl=36.60 lr=0.000062 step_time=12.161s step_time_min=8.282 step_time_max=24.444 micro_time=2.423s tp=5050 tok/s
+[2025-10-29 17:20:58][Epoch 005][Step 0990/1200] global_step=6990 train_loss=3.6547 train_ppl=38.66 lr=0.000061 step_time=11.161s step_time_min=8.282 step_time_max=24.444 micro_time=2.224s tp=5503 tok/s
+[2025-10-29 17:22:54][Epoch 005][Step 1000/1200] global_step=7000 train_loss=3.6344 train_ppl=37.88 lr=0.000061 step_time=11.591s step_time_min=8.282 step_time_max=24.444 micro_time=2.310s tp=5299 tok/s
+[2025-10-29 17:24:49][Epoch 005][Step 1010/1200] global_step=7010 train_loss=3.6053 train_ppl=36.79 lr=0.000061 step_time=11.443s step_time_min=8.282 step_time_max=24.444 micro_time=2.280s tp=5367 tok/s
+[2025-10-29 17:26:49][Epoch 005][Step 1020/1200] global_step=7020 train_loss=3.6223 train_ppl=37.42 lr=0.000061 step_time=11.979s step_time_min=8.282 step_time_max=24.444 micro_time=2.387s tp=5127 tok/s
+[2025-10-29 17:28:40][Epoch 005][Step 1030/1200] global_step=7030 train_loss=3.6181 train_ppl=37.27 lr=0.000061 step_time=11.149s step_time_min=8.282 step_time_max=24.444 micro_time=2.221s tp=5509 tok/s
+[2025-10-29 17:30:55][Epoch 005][Step 1040/1200] global_step=7040 train_loss=3.6386 train_ppl=38.04 lr=0.000061 step_time=13.526s step_time_min=8.282 step_time_max=24.444 micro_time=2.696s tp=4541 tok/s
+[2025-10-29 17:32:51][Epoch 005][Step 1050/1200] global_step=7050 train_loss=3.6191 train_ppl=37.30 lr=0.000061 step_time=11.569s step_time_min=8.282 step_time_max=24.444 micro_time=2.305s tp=5309 tok/s
+[2025-10-29 17:34:58][Epoch 005][Step 1060/1200] global_step=7060 train_loss=3.5622 train_ppl=35.24 lr=0.000061 step_time=12.709s step_time_min=8.282 step_time_max=24.444 micro_time=2.533s tp=4833 tok/s
+[2025-10-29 17:37:10][Epoch 005][Step 1070/1200] global_step=7070 train_loss=3.6239 train_ppl=37.49 lr=0.000061 step_time=13.182s step_time_min=8.282 step_time_max=24.444 micro_time=2.628s tp=4660 tok/s
+[2025-10-29 17:39:22][Epoch 005][Step 1080/1200] global_step=7080 train_loss=3.6185 train_ppl=37.28 lr=0.000060 step_time=13.177s step_time_min=8.282 step_time_max=24.444 micro_time=2.627s tp=4661 tok/s
+[2025-10-29 17:41:39][Epoch 005][Step 1090/1200] global_step=7090 train_loss=3.6756 train_ppl=39.47 lr=0.000060 step_time=13.732s step_time_min=8.282 step_time_max=24.444 micro_time=2.738s tp=4473 tok/s
+[2025-10-29 17:43:48][Epoch 005][Step 1100/1200] global_step=7100 train_loss=3.6468 train_ppl=38.35 lr=0.000060 step_time=12.893s step_time_min=8.282 step_time_max=24.444 micro_time=2.570s tp=4764 tok/s
+[2025-10-29 17:45:48][Epoch 005][Step 1110/1200] global_step=7110 train_loss=3.6338 train_ppl=37.86 lr=0.000060 step_time=11.990s step_time_min=8.282 step_time_max=24.444 micro_time=2.389s tp=5123 tok/s
+[2025-10-29 17:47:59][Epoch 005][Step 1120/1200] global_step=7120 train_loss=3.7954 train_ppl=44.50 lr=0.000060 step_time=13.089s step_time_min=8.282 step_time_max=24.444 micro_time=2.609s tp=4693 tok/s
+[2025-10-29 17:50:16][Epoch 005][Step 1130/1200] global_step=7130 train_loss=3.6244 train_ppl=37.50 lr=0.000060 step_time=13.696s step_time_min=8.282 step_time_max=24.444 micro_time=2.731s tp=4485 tok/s
+[2025-10-29 17:52:18][Epoch 005][Step 1140/1200] global_step=7140 train_loss=3.6284 train_ppl=37.65 lr=0.000060 step_time=12.191s step_time_min=8.282 step_time_max=24.444 micro_time=2.430s tp=5038 tok/s
+[2025-10-29 17:54:25][Epoch 005][Step 1150/1200] global_step=7150 train_loss=3.6333 train_ppl=37.84 lr=0.000060 step_time=12.671s step_time_min=8.282 step_time_max=24.444 micro_time=2.526s tp=4847 tok/s
+[2025-10-29 17:56:38][Epoch 005][Step 1160/1200] global_step=7160 train_loss=3.6295 train_ppl=37.69 lr=0.000060 step_time=13.307s step_time_min=8.282 step_time_max=24.444 micro_time=2.653s tp=4616 tok/s
+[2025-10-29 17:59:02][Epoch 005][Step 1170/1200] global_step=7170 train_loss=3.6253 train_ppl=37.54 lr=0.000060 step_time=14.360s step_time_min=8.282 step_time_max=24.444 micro_time=2.863s tp=4278 tok/s
+[2025-10-29 18:01:03][Epoch 005][Step 1180/1200] global_step=7180 train_loss=3.5743 train_ppl=35.67 lr=0.000060 step_time=12.098s step_time_min=8.282 step_time_max=24.444 micro_time=2.411s tp=5077 tok/s
+[2025-10-29 18:03:12][Epoch 005][Step 1190/1200] global_step=7190 train_loss=3.6245 train_ppl=37.51 lr=0.000060 step_time=12.926s step_time_min=8.282 step_time_max=24.444 micro_time=2.576s tp=4752 tok/s
+[2025-10-29 18:05:21][Epoch 005][Step 1200/1200] global_step=7200 train_loss=3.6702 train_ppl=39.26 lr=0.000060 step_time=12.912s step_time_min=8.282 step_time_max=24.444 micro_time=2.574s tp=4757 tok/s
+[2025-10-29 18:06:37][MiniVal][Epoch 005][Step 1200] val_loss=3.4703 val_ppl=32.15 val_time=75.32s
+[2025-10-29 18:10:35][Epoch 005] global_step=7200  train_loss=3.6702 train_ppl=39.26 val_ppl=31.62 micro_steps=6000 micro_time=2.504s steps=1200 step_time=12.562s epoch_train_time=15371.905s  epoch_time=15609.752s tp=4796 tok/s straggle_events=2997
+[2025-10-29 18:10:35] New best validation perplexity: 31.62
+dpa: backend finished with pool[0:1024] seqnums: 3506390,3506389,3506390,3506389,3502790,3502790,3502790,3502790,3502790,3502790,3463196,3463195,3463196,3463195,3463196,3463195,3463196,3463195,3463196,3463195,3463196,3463195,3463196,3463195,3463196,3463195,3463196,3463195,3463196,3463195,3463196,3463195...
+dpa: ctx-1 killed by thread 1497109, 0 tasks ignored
