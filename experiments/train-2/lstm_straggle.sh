@@ -107,11 +107,11 @@ sudo -E $(which python) experiments/train-2/lstm-2.py \
   --epochs 12 \
   --batch_size 64 \
   --straggle_points 3 \
-  --straggle_prob 5 \
+  --straggle_prob 16 \
   --straggle_ranks 1 \
-  --straggle_amount 0.06 \
+  --straggle_amount 1 \
   --straggle_multiply 0.5 2 \
-  --straggle_k 6
+  --straggle_k 5
   # --straggle_verbose \
   # --straggle_k $WORLD_K \
   "$@"

@@ -236,31 +236,124 @@ def validate(model, loader, device, args, num_classes: int):
 
     return {'loss': losses.avg, 'top1': top1.avg, 'top5': top5.avg}
 
+# def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, scaler, num_classes: int):
+#     model.train()
+#     losses, top1, top5 = AverageMeter(), AverageMeter(), AverageMeter()
+#     step_time, data_time = AverageMeter(), AverageMeter()
+
+#     #epoch timing events
+#     e_epoch_start = torch.cuda.Event(enable_timing=True)
+#     e_epoch_end = torch.cuda.Event(enable_timing=True)
+#     e_epoch_start.record()
+
+#     # step timing events
+#     e_step_start = torch.cuda.Event(enable_timing=True)
+#     e_step_end = torch.cuda.Event(enable_timing=True)
+
+#     data_start = time.perf_counter()
+#     samples_seen = 0.0
+
+#     for x, y, lengths in dataloader:
+#         data_time.update(time.perf_counter() - step_start, 1)
+#         e_step_start.record()
+
+#         x = x.to(device, non_blocking=True)
+#         y = y.to(device, non_blocking=True)
+#         samples_seen += y.size(0)
+
+#         optimizer.zero_grad(set_to_none=True)
+#         if scaler is not None:
+#             with torch.amp.autocast(device_type='cuda'):
+#                 out = model(x, lengths)  # lengths stays on CPU
+#                 loss = criterion(out, y)
+#             scaler.scale(loss).backward()
+#             if CLIP_NORM > 0:
+#                 scaler.unscale_(optimizer)
+#                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
+#             scaler.step(optimizer); scaler.update()
+#         else:
+#             out = model(x, lengths)
+#             loss = criterion(out, y)
+#             loss.backward()
+#             if CLIP_NORM > 0:
+#                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
+#             optimizer.step()
+
+#         # per-step scheduler
+#         scheduler.step()
+
+#         # metrics
+#         a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
+#         bs = y.size(0)
+#         losses.update(loss.item(), bs)
+#         top1.update(a1[0].item(), bs)
+#         top5.update(a5[0].item(), bs)
+
+#         step_time.update(time.perf_counter() - step_start, 1)
+#         step_start = time.perf_counter()
+
+#     # epoch duration
+#     if device.type == 'cuda':
+#         e_end.record()
+#         e_end.synchronize()
+#         duration = e_start.elapsed_time(e_end) / 1000.0
+#     else:
+#         duration = time.perf_counter() - e_wall
+
+#     throughput = samples_seen / max(1e-6, duration)
+
+#     # global loss average
+#     t = torch.tensor([losses.sum, losses.count], device=device, dtype=torch.float64)
+#     # dist.all_reduce(t, op=dist.ReduceOp.SUM)
+#     loss_global = (t[0] / torch.clamp(t[1], min=1.0)).item()
+
+#     return {
+#         'loss_global' : loss_global,
+#         'loss': losses.avg,
+#         'top1': top1.avg,
+#         'top5': top5.avg,
+#         'step_time_min': step_time.min,
+#         'step_time_max': step_time.max,
+#         'step_time': step_time.avg,
+#         'data_time': data_time.avg,
+#         'comp_time': step_time.avg - data_time.avg,
+#         'epoch_time': duration,
+#         'throughput': throughput,   # samples/s
+#     }
+
 def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, scaler, num_classes: int):
     model.train()
     losses = AverageMeter(); top1 = AverageMeter(); top5 = AverageMeter()
-    step_time = AverageMeter(); data_time = AverageMeter()
+    step_time = AverageMeter(); data_time = AverageMeter(); gpu_time = AverageMeter()
 
-    # epoch timing
-    if device.type == 'cuda':
-        e_start = torch.cuda.Event(enable_timing=True); e_end = torch.cuda.Event(enable_timing=True); e_start.record()
-    else:
-        e_wall = time.perf_counter()
+    # epoch timing events
+    e_epoch_start = torch.cuda.Event(enable_timing=True)
+    e_epoch_end = torch.cuda.Event(enable_timing=True)
+    e_epoch_start.record()
 
+    # gpu timing events
+    e_gpu_start = torch.cuda.Event(enable_timing=True)
+    e_gpu_end = torch.cuda.Event(enable_timing=True)
+    
     step_start = time.perf_counter()
     samples_seen = 0.0
 
-    for x, y, lengths in dataloader:
-        data_time.update(time.perf_counter() - step_start, 1)
-
+    for x, y, lengths in dataloader:  # Data loading happens here
+        # Measure data loading time
+        data_elapsed = time.perf_counter() - step_start
+        data_time.update(data_elapsed, 1)
+        
+        # Start GPU timing (after transfers)
         x = x.to(device, non_blocking=True)
         y = y.to(device, non_blocking=True)
         samples_seen += y.size(0)
+        
+        e_gpu_start.record()  # GPU-only work starts here
 
         optimizer.zero_grad(set_to_none=True)
         if scaler is not None:
             with torch.amp.autocast(device_type='cuda'):
-                out = model(x, lengths)  # lengths stays on CPU
+                out = model(x, lengths)
                 loss = criterion(out, y)
             scaler.scale(loss).backward()
             if CLIP_NORM > 0:
@@ -275,8 +368,13 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
             optimizer.step()
 
-        # per-step scheduler
         scheduler.step()
+
+        # Record GPU-only time
+        e_gpu_end.record()
+        e_gpu_end.synchronize()
+        gpu_duration = e_gpu_start.elapsed_time(e_gpu_end) / 1000.0
+        gpu_time.update(gpu_duration, 1)
 
         # metrics
         a1, a5 = accuracy_topk(out, y, num_classes=num_classes, ks=(1,5))
@@ -285,16 +383,17 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         top1.update(a1[0].item(), bs)
         top5.update(a5[0].item(), bs)
 
-        step_time.update(time.perf_counter() - step_start, 1)
+        # Total wall clock time for entire step
+        step_elapsed = time.perf_counter() - step_start
+        step_time.update(step_elapsed, 1)
+        
+        # Reset for next iteration
         step_start = time.perf_counter()
 
     # epoch duration
-    if device.type == 'cuda':
-        e_end.record()
-        e_end.synchronize()
-        duration = e_start.elapsed_time(e_end) / 1000.0
-    else:
-        duration = time.perf_counter() - e_wall
+    e_epoch_end.record()
+    e_epoch_end.synchronize()
+    duration = e_epoch_start.elapsed_time(e_epoch_end) / 1000.0
 
     throughput = samples_seen / max(1e-6, duration)
 
@@ -310,11 +409,12 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         'top5': top5.avg,
         'step_time_min': step_time.min,
         'step_time_max': step_time.max,
-        'step_time': step_time.avg,
-        'data_time': data_time.avg,
-        'comp_time': step_time.avg - data_time.avg,
+        'step_time': step_time.avg,           # TOTAL wall clock time (everything)
+        'data_time': data_time.avg,           # Just data loading
+        'gpu_time': gpu_time.avg,             # Just GPU compute (no transfers)
+        'comp_time': step_time.avg - data_time.avg,  # Everything except data loading
         'epoch_time': duration,
-        'throughput': throughput,   # samples/s
+        'throughput': throughput,
     }
 
 # ------------------------- Logging ------------------------------
