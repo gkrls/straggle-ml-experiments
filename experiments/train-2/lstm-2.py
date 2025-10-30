@@ -350,26 +350,26 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         
         e_gpu_start.record()  # GPU-only work starts here
 
-        with model.no_sync():
-            optimizer.zero_grad(set_to_none=True)
-            if scaler is not None:
-                with torch.amp.autocast(device_type='cuda'):
-                    out = model(x, lengths)
-                    loss = criterion(out, y)
-                scaler.scale(loss).backward()
-                if CLIP_NORM > 0:
-                    scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
-                scaler.step(optimizer); scaler.update()
-            else:
+        # with model.no_sync():
+        optimizer.zero_grad(set_to_none=True)
+        if scaler is not None:
+            with torch.amp.autocast(device_type='cuda'):
                 out = model(x, lengths)
                 loss = criterion(out, y)
-                loss.backward()
-                if CLIP_NORM > 0:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
-                optimizer.step()
+            scaler.scale(loss).backward()
+            if CLIP_NORM > 0:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
+            scaler.step(optimizer); scaler.update()
+        else:
+            out = model(x, lengths)
+            loss = criterion(out, y)
+            loss.backward()
+            if CLIP_NORM > 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
+            optimizer.step()
 
-            scheduler.step()
+        scheduler.step()
 
         # Record GPU-only time
         e_gpu_end.record()
