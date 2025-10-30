@@ -350,25 +350,26 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, 
         
         e_gpu_start.record()  # GPU-only work starts here
 
-        optimizer.zero_grad(set_to_none=True)
-        if scaler is not None:
-            with torch.amp.autocast(device_type='cuda'):
+        with model.no_sync():
+            optimizer.zero_grad(set_to_none=True)
+            if scaler is not None:
+                with torch.amp.autocast(device_type='cuda'):
+                    out = model(x, lengths)
+                    loss = criterion(out, y)
+                scaler.scale(loss).backward()
+                if CLIP_NORM > 0:
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
+                scaler.step(optimizer); scaler.update()
+            else:
                 out = model(x, lengths)
                 loss = criterion(out, y)
-            scaler.scale(loss).backward()
-            if CLIP_NORM > 0:
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
-            scaler.step(optimizer); scaler.update()
-        else:
-            out = model(x, lengths)
-            loss = criterion(out, y)
-            loss.backward()
-            if CLIP_NORM > 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
-            optimizer.step()
+                loss.backward()
+                if CLIP_NORM > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=CLIP_NORM)
+                optimizer.step()
 
-        scheduler.step()
+            scheduler.step()
 
         # Record GPU-only time
         e_gpu_end.record()
@@ -548,7 +549,7 @@ def train(args):
               f"train_loss={train_metrics['loss']:.4f} (global={train_metrics['loss_global']:.4f}) "
               f"val_loss={val_metrics['loss']:.4f} "
               f"top1={val_metrics['top1']:.2f}% top5={val_metrics['top5']:.2f}% "
-              f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.2f} "
+              f"lr={current_lr:.6f} epoch_time={epoch_time:.2f}s step_time={train_metrics['step_time']:.3f} "
               f"(min={train_metrics['step_time_min']:.2f}s, max={train_metrics['step_time_max']:.2f}) "
               f"tp=~{train_metrics['throughput']:.1f} samples/s",
               f"straggle_events={straggle.get_stats()['num_straggle_events']}",
