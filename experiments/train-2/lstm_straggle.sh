@@ -29,7 +29,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
         -DCMAKE_BUILD_TYPE=Release \
-        -DDPA_TRACE=OFF \
+        -DDPA_TRACE=ON \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
@@ -38,6 +38,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
+        -DDPA_TORCH_PINNEDPOOL_PRETOUCH=OFF \
         -DDPA_TORCH_WORKSTEALING=ON ..
   make -j4 install
 
@@ -61,7 +62,8 @@ cd $HOME/straggle-ml-experiments
 SCRIPT=${0##*/}
 DPA_CONF=$HOME/straggle-ml-experiments/configs/edgecore.json
 IFACE="${IFACE:-ens4f1}"                 # network interface to read IP from
-WORLD_SIZE="${WORLD_SIZE:-6}"            # set by launcher or leave 1 for single-node
+WORLD_SIZE="${WORLD_SIZE:-2}"            # set by launcher or leave 1 for single-node
+WORLD_K=$((WORLD_SIZE - 1))
 BACKEND="${BACKEND:-dpa_dpdk}"
 MASTER_ADDR="${MASTER_ADDR:-"42.0.1.1"}"
 MASTER_PORT="${MASTER_PORT:-"29500"}"
@@ -86,9 +88,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-# Standard settings for GPT2 on a 16GB GPU
-# Consumes around ~15.3GB of memory with AMP
-sudo -E $(which python) experiments/train-2/gpt2-2.py \
+sudo -E $(which python) experiments/train-2/lstm-2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -97,23 +97,31 @@ sudo -E $(which python) experiments/train-2/gpt2-2.py \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
   --workers 4 \
-  --epochs 6 \
-  --steps_per_epoch 6000 \
-  --mini_val_every_steps 300 \
-  --gradient_accumulation_steps 5 \
-  --batch_size 12 \
-  --seq_len 1024 \
-  --amp \
-  --deterministic \
   --prefetch_factor 4 \
-  --log_every_steps 50 \
-  --json experiments/train-2/gpt2_straggle_16.json \
-  --data ~/datasets/openwebtext \
-  --cache_dir ~/datasets/openwebtext/cache \
+  --learning_rate 0.0015 \
+  --weight_decay 1e-05 \
+  --hint_tensor_size 100000000 \
+  --hint_tensor_count 5 \
+  --json experiments/train-2/lstm_straggle_16.json \
+  --deterministic \
+  --epochs 12 \
+  --batch_size 64 \
   --straggle_points 3 \
   --straggle_prob 16 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.68 \
+  --straggle_ranks 0 \
+  --straggle_amount 0.06 \
   --straggle_multiply 0.5 2 \
+  --straggle_verbose \
   --straggle_k 5 \
+  # --straggle_k $WORLD_K \
   "$@"
+
+
+  # --learning_rate 0.0015 \
+  # --weight_decay 1e-05 \
+  # --label_smoothing 0.0 \
+  # --cosine_min_lr_mult 0.0 \
+  # --max_len 96 \
+  # --max_vocab 60000 \
+  # --hidden_dim 768 \
+  # "$@"

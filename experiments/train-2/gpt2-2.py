@@ -289,7 +289,8 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
             if scaler is not None:
                 scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-                scaler.step(optimizer); scaler.update()
+                scaler.step(optimizer)
+                scaler.update()
             else:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
                 optimizer.step()
@@ -414,6 +415,23 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 
 
 # ------------------------- training driver -------------------------
+
+class SimpleDDP(DDP):
+    def __init__(self, module, **kwargs):
+        super().__init__(module, broadcast_buffers=False, **kwargs)
+        self.require_forward_param_sync = False
+    
+    def _sync_params(self):
+        pass  # Never sync parameters
+    
+    def _distributed_broadcast_coalesced(self, *args, **kwargs):
+        pass  # Never broadcast anything
+    
+    # Optionally override forward to skip the check entirely
+    def forward(self, *inputs, **kwargs):
+        # Skip all DDP's sync logic, just call the module
+        return self.module(*inputs, **kwargs)
+
 def train(args):
     device = torch.device(args.device)
 
@@ -486,6 +504,7 @@ def train(args):
     #             bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False, bucket_cap_mb=args.bucket_cap_mb, 
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=False)
+    model.require_forward_param_sync = False
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
