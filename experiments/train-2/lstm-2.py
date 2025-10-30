@@ -462,6 +462,7 @@ def train(args):
         log["epochs"][str(epoch)] = epoch_metrics
         save_log(args.json, log)
 
+        straggle.print_stats()
 # ------------------------- DDP Setup / Main ------------------------------
 
 def setup_ddp(args):
