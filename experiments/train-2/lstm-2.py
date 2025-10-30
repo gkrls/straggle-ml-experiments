@@ -530,7 +530,8 @@ def train(args):
     dist.barrier()
 
     for epoch in range(args.epochs):
-        print(f"[{now()}][Epoch {epoch:03d}] ...")
+        print(f"[{time.time():.3f}] Rank {args.rank} STARTING epoch {epoch}", flush=True)
+        # print(f"[{now()}][Epoch {epoch:03d}] ...")
         epoch_start = time.time()
 
         straggle.reset_stats()
@@ -539,7 +540,11 @@ def train(args):
 
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, scheduler, device, scaler,
                                         num_classes=args.num_classes)
+        print(f"[{time.time():.3f}] Rank {args.rank} FINISHED training epoch {epoch}", flush=True)
+
         val_metrics   = validate(model, val_loader, device, args, num_classes=args.num_classes)
+        print(f"[{time.time():.3f}] Rank {args.rank} FINISHED validation epoch {epoch}", flush=True)
+
 
         epoch_time = time.time() - epoch_start
 
