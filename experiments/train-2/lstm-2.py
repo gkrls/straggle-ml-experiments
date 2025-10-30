@@ -359,7 +359,7 @@ def get_dataloaders(args, vocab: dict):
 
 class SimpleDDP(DDP):
     def __init__(self, module, **kwargs):
-        super().__init__(module, broadcast_buffers=False, **kwargs)
+        super().__init__(module, **kwargs)
         self.require_forward_param_sync = False
     
     def _sync_params(self):
