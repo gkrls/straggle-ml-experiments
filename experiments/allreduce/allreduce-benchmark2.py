@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from contextlib import nullcontext
 from datetime import datetime
+import json
 import os
 import sys
 import time
@@ -96,12 +97,7 @@ def init(args):
 
     print(f"[Rank {args.rank}] Initialized {args.backend}... ")
 
-def benchmark(args):
-    results = {
-        'time' : datetime.now().strftime("%B %d, %Y at %I:%M:%S %p"),
-        'args' : vars(args)
-    }
-    
+def benchmark(args):    
     dist.barrier()
     print(f"[Rank {args.rank}] {args.world_size} ranks ready...")
 
@@ -385,13 +381,23 @@ if __name__ == "__main__":
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
     
     args = parser.parse_args()
-    args.json = args.json if args.json is not None else os.path.join(os.path.dirname(__file__), "results.json")
+    args.json = args.json if args.json is not None else os.path.join(os.path.dirname(__file__), "allreduce-benchmark2.json")
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
     args.dpa_qnt = args.type == "float32"     # ignore user. just enable quant if floats or disable if not
     
+
+
     # Validation
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
     
+    results = {
+        'time' : datetime.now().strftime("%B %d, %Y at %I:%M:%S %p"),
+        'args' : vars(args)
+    }
+
     init(args)
     benchmark(args)
+
+    with open(args.json, 'w') as f:
+        json.dump(results, f, indent=2)
