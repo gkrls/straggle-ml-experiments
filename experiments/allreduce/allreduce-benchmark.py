@@ -159,7 +159,8 @@ def benchmark(args):
             avg_time = total_time / args.iters
             # For batch mode, we only have one aggregate measurement
             times = [avg_time]
-        
+            for i in range(args.warmup + args.iters): 
+                print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
         # Per-iteration mode (sync each)
         else:
             for i in range(args.warmup):
@@ -187,8 +188,10 @@ def benchmark(args):
                 elapsed = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
                 times.append(elapsed)
                 
-                if args.rank == 0 and args.verbose: 
-                    print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
+                for i in range(args.warmup + args.iters): 
+                    print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "", "t: {elapsed:.1f} ms")
+                # if args.rank == 0 and args.verbose: 
+                #     print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     # if args.batch:
     #     jobs = []
         
@@ -233,8 +236,7 @@ def benchmark(args):
     #             print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     
     # Print the results
-    for i in range(args.warmup + args.iters): 
-        print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
+
 
     # Calculate metrics
     bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
