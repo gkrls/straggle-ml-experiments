@@ -167,29 +167,31 @@ def benchmark(args):
                 dist.all_reduce(tensors[i], op=op, async_op=True).wait()
                 # run_allreduce(tensors[i]).wait()
 
+            # Use consistent timing for both CPU and CUDA
+            torch.cuda.synchronize()
+
             times = []
             for i in range(args.iters):
+                t_start = time.time_ns()
+
                 if args.straggle_ms and args.straggle_rank == args.rank:
-                    if args.straggle_num is None:
-                        time.sleep(args.straggle_ms / 1000)
+                    if args.straggle_num is None: time.sleep(args.straggle_ms / 1000)
                     elif args.straggle_num > 0:
                         args.straggle_num -= 1
                         time.sleep(args.straggle_ms / 1000)
-                
-                # Use consistent timing for both CPU and CUDA
-                if args.device == "cuda": torch.cuda.synchronize()
-                
-                t_start = time.time_ns()
+
                 dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True).wait()
                 # run_allreduce(tensors[args.warmup + i]).wait()
                 
-                if args.device == "cuda": torch.cuda.synchronize()
+                torch.cuda.synchronize()
                 
                 elapsed = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
                 times.append(elapsed)
                 
-            for i in range(args.warmup + args.iters): 
-                print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "", f"t: {elapsed:.1f} ms")
+            for i in range(args.warmup):
+                print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)")
+            for i in range(args.iters): 
+                print(f"[Rank {args.rank}] Output {i}:", tensors[i], f"({times[i]} ms)")
                 # if args.rank == 0 and args.verbose: 
                 #     print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     # if args.batch:
