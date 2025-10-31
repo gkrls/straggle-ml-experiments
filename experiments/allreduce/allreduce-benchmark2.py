@@ -381,6 +381,12 @@ if __name__ == "__main__":
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
     
     args = parser.parse_args()
+    results = {
+        'time' : datetime.now().strftime("%B %d, %Y at %I:%M:%S %p"),
+        'args' : vars(args)
+    }
+    
+
     args.json = args.json if args.json is not None else os.path.join(os.path.dirname(__file__), "allreduce-benchmark2.json")
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
     args.dpa_qnt = args.type == "float32"     # ignore user. just enable quant if floats or disable if not
@@ -391,13 +397,27 @@ if __name__ == "__main__":
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
     
-    results = {
-        'time' : datetime.now().strftime("%B %d, %Y at %I:%M:%S %p"),
-        'args' : vars(args)
-    }
-
     init(args)
     benchmark(args)
+
+    print(f"\n{'='*50}")
+    print(f"Backend: {args.backend}")
+    if args.backend.startswith("nccl"):
+        transport = "RDMA" if args.backend == "nccl_rdma" else "TCP" if args.backend == "nccl_tcp" else "auto"
+        print(f"NCCL Transport: {transport}")
+    elif args.backend == "gloo" and args.gloo_socket_ifname:
+        print(f"Gloo Interface: {args.gloo_socket_ifname}")
+    print(f"Device: {args.device}")
+    print(f"Data Type: {args.type}")
+    print(f"Size: {args.size} elements ({(args.size * 4) / 1e6:.2f} MB)")
+    print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
+    if args.backend.startswith("dpa"):
+        print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
+    
+    print(f"\nArguments:")
+    for k, v in results['args'].items():
+        print(f"  --{k.replace('_', '-')} {v}")
+    print(f"{'='*50}")
 
     with open(args.json, 'w') as f:
         json.dump(results, f, indent=2)
