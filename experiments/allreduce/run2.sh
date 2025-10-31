@@ -69,7 +69,7 @@ WORLD=6
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
-PROG=experiments/allreduce/allreduce-benchmark.py
+PROG=experiments/allreduce/allreduce-benchmark2.py
 # CONF=experiments/allreduce/edgecore.json
 CONF=configs/edgecore.json
 # CONF=experiments/allreduce/netberg.json
