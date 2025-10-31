@@ -188,8 +188,8 @@ def benchmark(args):
                 elapsed = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
                 times.append(elapsed)
                 
-                for i in range(args.warmup + args.iters): 
-                    print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "", "t: {elapsed:.1f} ms")
+            for i in range(args.warmup + args.iters): 
+                print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "", f"t: {elapsed:.1f} ms")
                 # if args.rank == 0 and args.verbose: 
                 #     print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
     # if args.batch:
