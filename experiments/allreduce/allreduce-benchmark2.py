@@ -97,6 +97,91 @@ def init(args):
 
     print(f"[Rank {args.rank}] Initialized {args.backend}... ")
 
+def results(args, data):
+    
+    def make_serializable(obj):
+        if isinstance(obj, torch.dtype): return str(obj).split('.')[-1]  # e.g., "float32"
+        elif isinstance(obj, torch.device): return str(obj)
+        else: return obj
+
+    out = {k: make_serializable(v) for k, v in vars(args).items()}
+    out['data'] = data
+    # up
+    
+    # {
+    #     'time' : ,
+    #     'args' : ,
+    #     'data' : data
+    # }
+
+    with open(args.json, 'w') as f:
+        json.dump(out, f, indent=2)
+
+    print(json.dumps(out, indent=2))
+
+    # Results output
+    # print(f"\n{'='*50}")
+    # print(f"Backend: {args.backend}")
+    # if args.backend.startswith("nccl"):
+    #     transport = "RDMA" if args.backend == "nccl_rdma" else "TCP" if args.backend == "nccl_tcp" else "auto"
+    #     print(f"NCCL Transport: {transport}")
+    # elif args.backend == "gloo" and args.gloo_socket_ifname:
+    #     print(f"Gloo Interface: {args.gloo_socket_ifname}")
+    # print(f"Device: {args.device}")
+    # print(f"Data Type: {args.type}")
+    # print(f"Size: {args.size} elements ({data["bytes"]/1e6:.2f} MB)")
+    # print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
+    # if args.backend.startswith("dpa"): print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
+    # print(f"{'='*50}")
+    
+    # # Local results (always printed)
+    # print(f"[Rank {args.rank}] Local Results:")
+    # if args.batch:
+    #     print(f"  Time (ms):      {data['time_mean']:.4f} (batch mode - single aggregate measurement)")
+    # else:
+    #     print(f"  Time (ms):      mean={data['time_mean']:.4f}, std={data['time_std']:.4f}")
+    #     print(f"                  min={data['time_min']:.4f}, max={data['time_max']:.4f}")
+    #     print(f"                  p50={data['time_p50']:.4f}, p95={data['time_p95']:.4f}, p99={data['time_p99']:.4f}")
+    # print(f"  Throughput:     {data['elem_per_sec']:.0f} elements/sec")
+    # print(f"  Bandwidth:      {data['bits_per_sec']/1e9:.3f} GB/s ({data['bits_per_sec']/1e9*8:.3f} Gbps)")
+    # if args.global_stats:
+    #     # Allreduce all metrics (average everything)
+    #     metrics_tensor = torch.tensor([
+    #         time_mean, time_std, time_min, time_max, time_p50, time_p95, time_p99,
+    #         throughput, bandwidth
+    #     ], dtype=torch.float64, device=device)  # Use same device as the allreduce operations
+        
+    #     dist.all_reduce(metrics_tensor, op=dist.ReduceOp.SUM)
+    #     metrics_tensor /= args.world_size
+        
+    #     # Also get global min/max of each worker's mean performance
+    #     worker_perf = torch.tensor([time_mean, throughput, bandwidth], dtype=torch.float64, device=device)
+    #     worker_min = worker_perf.clone()
+    #     worker_max = worker_perf.clone()
+    #     dist.all_reduce(worker_min, op=dist.ReduceOp.MIN)
+    #     dist.all_reduce(worker_max, op=dist.ReduceOp.MAX)
+        
+    #     print(f"\nGlobal Results (averaged across {args.world_size} ranks):")
+    #     if args.batch:
+    #         print(f"  Time (ms):      {metrics_tensor[0]:.4f} (worker min={worker_min[0]:.4f}, max={worker_max[0]:.4f})")
+    #     else:
+    #         print(f"  Time (ms):      mean={metrics_tensor[0]:.4f}, std={metrics_tensor[1]:.4f}")
+    #         print(f"                  min={metrics_tensor[2]:.4f}, max={metrics_tensor[3]:.4f}")
+    #         print(f"                  p50={metrics_tensor[4]:.4f}, p95={metrics_tensor[5]:.4f}, p99={metrics_tensor[6]:.4f}")
+    #         print(f"                  worker min={worker_min[0]:.4f}, max={worker_max[0]:.4f}")
+    #     print(f"  Throughput:     {metrics_tensor[7]:.0f} elements/sec (worker min={worker_min[1]:.0f}, max={worker_max[1]:.0f})")
+    #     print(f"  Bandwidth:      {metrics_tensor[8]/1e9:.3f} GB/s ({metrics_tensor[8]/1e9*8:.3f} Gbps)")
+    #     print(f"                  worker min={worker_min[2]/1e9:.3f}, max={worker_max[2]/1e9:.3f} GB/s")
+    # print(f"{'='*50}\n")
+
+    # def run_allreduce(t):
+    #     if args.backend.startswith("dpa"):
+    #         with dpa.DataplaneContext(**dpa_ctx):
+    #             return dist.all_reduce(t, op=dist.ReduceOp.SUM, async_op=True)
+    #     else:
+    #         return dist.all_reduce(t, op=dist.ReduceOp.SUM, async_op=True)
+    
+
 def benchmark(args):    
     dist.barrier()
     print(f"[Rank {args.rank}] {args.world_size} ranks ready...")
@@ -118,13 +203,6 @@ def benchmark(args):
     dpa_ctx = {"quantization": args.dpa_qnt, "averaging": args.dpa_avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, 
                "straggle": args.world_size if not args.straggle_k else args.straggle_k}
 
-    def run_allreduce(t):
-        if args.backend.startswith("dpa"):
-            with dpa.DataplaneContext(**dpa_ctx):
-                return dist.all_reduce(t, op=dist.ReduceOp.SUM, async_op=True)
-        else:
-            return dist.all_reduce(t, op=dist.ReduceOp.SUM, async_op=True)
-    
     # Batch mode - fire all, sync once (like DDP)
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
 
@@ -135,20 +213,22 @@ def benchmark(args):
             jobs = []
             
             # Warmup
-            for i in range(args.warmup): 
-                jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
+            for i in range(args.warmup): jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
             for j in jobs: j.wait()
             jobs.clear()
             
             # Timed iterations - use same timing method for both CPU and CUDA
             t_start = time.time_ns()
             for i in range(args.iters):
-                if args.straggle_ms and args.straggle_rank == args.rank:
-                    if args.straggle_num is None:
-                        time.sleep(args.straggle_ms / 1000)
-                    elif args.straggle_num > 0:
-                        args.straggle_num -= 1
-                        time.sleep(args.straggle_ms / 1000)
+                if args.straggle_rank == args.rank and args.straggle_num > 0:
+                    args.straggle_num -= 1
+                    time.sleep(args.straggle_ms / 1000)
+                # if args.straggle_ms and args.straggle_rank == args.rank:
+                #     if args.straggle_num is None:
+                #         time.sleep(args.straggle_ms / 1000)
+                #     elif args.straggle_num > 0:
+                #         args.straggle_num -= 1
+                #         time.sleep(args.straggle_ms / 1000)
                 jobs.append(dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True))
 
             for j in jobs: j.wait()
@@ -174,15 +254,17 @@ def benchmark(args):
             for i in range(args.iters):
                 t_start = time.time_ns()
 
-                if args.straggle_ms and args.straggle_rank == args.rank:
-                    if args.straggle_num is None: time.sleep(args.straggle_ms / 1000)
-                    elif args.straggle_num > 0:
-                        args.straggle_num -= 1
-                        time.sleep(args.straggle_ms / 1000)
+                if args.straggle_rank == args.rank and args.straggle_num > 0:
+                    args.straggle_num -= 1
+                    time.sleep(args.straggle_ms / 1000)
 
-                dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True).wait()
-                # run_allreduce(tensors[args.warmup + i]).wait()
-                
+                # if args.straggle_ms and args.straggle_rank == args.rank:
+                #     if args.straggle_num is None: time.sleep(args.straggle_ms / 1000)
+                #     elif args.straggle_num > 0:
+                #         args.straggle_num -= 1
+                #         time.sleep(args.straggle_ms / 1000)
+
+                dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True).wait()                
                 torch.cuda.synchronize()
                 
                 elapsed = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
@@ -196,7 +278,6 @@ def benchmark(args):
             
                 # if args.rank == 0 and args.verbose: 
                 #     print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
-
 
     # Calculate metrics
     bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
@@ -235,68 +316,24 @@ def benchmark(args):
     throughput = args.size / (time_mean / 1000)  # elements/sec
     bandwidth = network_bytes_received / (time_mean / 1000)  # bytes/sec
     
-    # Results output
-    print(f"\n{'='*50}")
-    print(f"Backend: {args.backend}")
-    if args.backend.startswith("nccl"):
-        transport = "RDMA" if args.backend == "nccl_rdma" else "TCP" if args.backend == "nccl_tcp" else "auto"
-        print(f"NCCL Transport: {transport}")
-    elif args.backend == "gloo" and args.gloo_socket_ifname:
-        print(f"Gloo Interface: {args.gloo_socket_ifname}")
-    print(f"Device: {args.device}")
-    print(f"Data Type: {args.type}")
-    print(f"Size: {args.size} elements ({tensor_bytes/1e6:.2f} MB)")
-    print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
-    if args.backend.startswith("dpa"):
-        print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
-    print(f"{'='*50}")
     
-    # Local results (always printed)
-    print(f"[Rank {args.rank}] Local Results:")
-    if args.batch:
-        print(f"  Time (ms):      {time_mean:.4f} (batch mode - single aggregate measurement)")
-    else:
-        print(f"  Time (ms):      mean={time_mean:.4f}, std={time_std:.4f}")
-        print(f"                  min={time_min:.4f}, max={time_max:.4f}")
-        print(f"                  p50={time_p50:.4f}, p95={time_p95:.4f}, p99={time_p99:.4f}")
-    print(f"  Throughput:     {throughput:.0f} elements/sec")
-    print(f"  Bandwidth:      {bandwidth/1e9:.3f} GB/s ({bandwidth/1e9*8:.3f} Gbps)")
-    
-    # Global statistics if requested
-    if args.global_stats:
-        # Allreduce all metrics (average everything)
-        metrics_tensor = torch.tensor([
-            time_mean, time_std, time_min, time_max, time_p50, time_p95, time_p99,
-            throughput, bandwidth
-        ], dtype=torch.float64, device=device)  # Use same device as the allreduce operations
-        
-        dist.all_reduce(metrics_tensor, op=dist.ReduceOp.SUM)
-        metrics_tensor /= args.world_size
-        
-        # Also get global min/max of each worker's mean performance
-        worker_perf = torch.tensor([time_mean, throughput, bandwidth], dtype=torch.float64, device=device)
-        worker_min = worker_perf.clone()
-        worker_max = worker_perf.clone()
-        dist.all_reduce(worker_min, op=dist.ReduceOp.MIN)
-        dist.all_reduce(worker_max, op=dist.ReduceOp.MAX)
-        
-        print(f"\nGlobal Results (averaged across {args.world_size} ranks):")
-        if args.batch:
-            print(f"  Time (ms):      {metrics_tensor[0]:.4f} (worker min={worker_min[0]:.4f}, max={worker_max[0]:.4f})")
-        else:
-            print(f"  Time (ms):      mean={metrics_tensor[0]:.4f}, std={metrics_tensor[1]:.4f}")
-            print(f"                  min={metrics_tensor[2]:.4f}, max={metrics_tensor[3]:.4f}")
-            print(f"                  p50={metrics_tensor[4]:.4f}, p95={metrics_tensor[5]:.4f}, p99={metrics_tensor[6]:.4f}")
-            print(f"                  worker min={worker_min[0]:.4f}, max={worker_max[0]:.4f}")
-        print(f"  Throughput:     {metrics_tensor[7]:.0f} elements/sec (worker min={worker_min[1]:.0f}, max={worker_max[1]:.0f})")
-        print(f"  Bandwidth:      {metrics_tensor[8]/1e9:.3f} GB/s ({metrics_tensor[8]/1e9*8:.3f} Gbps)")
-        print(f"                  worker min={worker_min[2]/1e9:.3f}, max={worker_max[2]/1e9:.3f} GB/s")
-    
-    print(f"{'='*50}\n")
-    
+    data = {
+        "bytes" : tensor_bytes,
+        "times" : times,
+        "time_mean" : time_mean,
+        "time_std"  : time_std,
+        "time_min"  : time_min,
+        "time_max"  : time_max,
+        "time_p50"  : time_p50,
+        "time_p95"  : time_p95,
+        "time_p99"  : time_p99,
+        "elem_per_sec" : args.size / (time_mean / 1000),
+        "bits_per_sec" : tensor_bytes * 8 / (time_mean / 1000) / 1e9
+    }
+
+
     if args.verify:
-        if op != dist.ReduceOp.SUM:
-            raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
+        if op != dist.ReduceOp.SUM: raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
 
         local_ok, first_failure = True, True
         original = PATTERN[args.pattern](args)
@@ -331,7 +368,8 @@ def benchmark(args):
             if args.rank == 0: 
                 print("❌ Verification FAILED (simple SUM). See rank logs above.")
 
-    dist.destroy_process_group()
+    results(args, data)
+    
 
 
 if __name__ == "__main__":
@@ -377,10 +415,11 @@ if __name__ == "__main__":
 
     parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
     parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle before each allreduce call")
-    parser.add_argument("--straggle_num", type=int, default=0, help="Number of straggles")
+    parser.add_argument("--straggle_num", type=int, default=2 ** 32 - 1, help="Number of straggles")
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
     
     args = parser.parse_args()
+    args.date = datetime.now().strftime("%B %d, %Y at %I:%M:%S %p")
     args.json = args.json if args.json is not None else os.path.join(os.path.dirname(__file__), "allreduce-benchmark2.json")
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
     args.dpa_qnt = args.type == "float32"     # ignore user. just enable quant if floats or disable if not
@@ -389,20 +428,7 @@ if __name__ == "__main__":
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
     
-
-    def make_serializable(obj):
-        if isinstance(obj, torch.dtype):
-            return str(obj).split('.')[-1]  # e.g., "float32"
-        elif isinstance(obj, torch.device):
-            return str(obj)
-        else:
-            return obj
-    out = {
-        'time' : datetime.now().strftime("%B %d, %Y at %I:%M:%S %p"),
-        'args' : {k: make_serializable(v) for k, v in vars(args).items()}
-    }
-    
     init(args)
     benchmark(args)
-    with open(args.json, 'w') as f:
-        json.dump(out, f, indent=2)
+
+    dist.destroy_process_group()
