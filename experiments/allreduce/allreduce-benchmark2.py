@@ -220,7 +220,7 @@ def benchmark(args):
             # Timed iterations - use same timing method for both CPU and CUDA
             t_start = time.time_ns()
             for i in range(args.iters):
-                if args.straggle_rank == args.rank and args.straggle_num > 0:
+                if args.straggle_rank == args.rank and args.straggle_num > 0 and i >= args.straggle_start:
                     args.straggle_num -= 1
                     time.sleep(args.straggle_ms / 1000)
                 # if args.straggle_ms and args.straggle_rank == args.rank:
@@ -254,7 +254,7 @@ def benchmark(args):
             for i in range(args.iters):
                 t_start = time.time_ns()
 
-                if args.straggle_rank == args.rank and args.straggle_num > 0:
+                if args.straggle_rank == args.rank and args.straggle_num > 0 and i >= args.straggle_start:
                     args.straggle_num -= 1
                     time.sleep(args.straggle_ms / 1000)
 
@@ -416,6 +416,7 @@ if __name__ == "__main__":
     parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
     parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle before each allreduce call")
     parser.add_argument("--straggle_num", type=int, default=2 ** 32 - 1, help="Number of straggles")
+    parser.add_argument("--straggle_start", type=int, default=0, help="iter id to start straggling")
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
     
     args = parser.parse_args()
