@@ -51,8 +51,8 @@ data = {
       1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1500-1500.rank-1.json"))),
     }
   },
-  "1500" : {
-    "sa-250" : {
+  "250" : {
+    "sa-1500" : {
       0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1500-1500.rank-0.json"))),
       1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1500-1500.rank-1.json"))),
     }
