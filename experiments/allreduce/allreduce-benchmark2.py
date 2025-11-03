@@ -98,7 +98,6 @@ def init(args):
     print(f"[Rank {args.rank}] Initialized {args.backend}... ")
 
 def results(args, data):
-    
     def make_serializable(obj):
         if isinstance(obj, torch.dtype): return str(obj).split('.')[-1]  # e.g., "float32"
         elif isinstance(obj, torch.device): return str(obj)
@@ -106,80 +105,14 @@ def results(args, data):
 
     out = {k: make_serializable(v) for k, v in vars(args).items()}
     out['data'] = data
-    # up
-    
-    # {
-    #     'time' : ,
-    #     'args' : ,
-    #     'data' : data
-    # }
+
+    with open(args.dpa_conf) as f:
+        out['dpa'] = json.load(f)['dpdk']
 
     with open(args.json, 'w') as f:
         json.dump(out, f, indent=2)
 
     print(json.dumps(out, indent=2))
-
-    # Results output
-    # print(f"\n{'='*50}")
-    # print(f"Backend: {args.backend}")
-    # if args.backend.startswith("nccl"):
-    #     transport = "RDMA" if args.backend == "nccl_rdma" else "TCP" if args.backend == "nccl_tcp" else "auto"
-    #     print(f"NCCL Transport: {transport}")
-    # elif args.backend == "gloo" and args.gloo_socket_ifname:
-    #     print(f"Gloo Interface: {args.gloo_socket_ifname}")
-    # print(f"Device: {args.device}")
-    # print(f"Data Type: {args.type}")
-    # print(f"Size: {args.size} elements ({data["bytes"]/1e6:.2f} MB)")
-    # print(f"Mode: {'batch (single sync)' if args.batch else 'per-iteration'}")
-    # if args.backend.startswith("dpa"): print(f"DPA: quant={args.dpa_qnt}, avg={args.dpa_avg}, pipes={args.dpa_pipes}, prescaled={args.dpa_pre}")
-    # print(f"{'='*50}")
-    
-    # # Local results (always printed)
-    # print(f"[Rank {args.rank}] Local Results:")
-    # if args.batch:
-    #     print(f"  Time (ms):      {data['time_mean']:.4f} (batch mode - single aggregate measurement)")
-    # else:
-    #     print(f"  Time (ms):      mean={data['time_mean']:.4f}, std={data['time_std']:.4f}")
-    #     print(f"                  min={data['time_min']:.4f}, max={data['time_max']:.4f}")
-    #     print(f"                  p50={data['time_p50']:.4f}, p95={data['time_p95']:.4f}, p99={data['time_p99']:.4f}")
-    # print(f"  Throughput:     {data['elem_per_sec']:.0f} elements/sec")
-    # print(f"  Bandwidth:      {data['bits_per_sec']/1e9:.3f} GB/s ({data['bits_per_sec']/1e9*8:.3f} Gbps)")
-    # if args.global_stats:
-    #     # Allreduce all metrics (average everything)
-    #     metrics_tensor = torch.tensor([
-    #         time_mean, time_std, time_min, time_max, time_p50, time_p95, time_p99,
-    #         throughput, bandwidth
-    #     ], dtype=torch.float64, device=device)  # Use same device as the allreduce operations
-        
-    #     dist.all_reduce(metrics_tensor, op=dist.ReduceOp.SUM)
-    #     metrics_tensor /= args.world_size
-        
-    #     # Also get global min/max of each worker's mean performance
-    #     worker_perf = torch.tensor([time_mean, throughput, bandwidth], dtype=torch.float64, device=device)
-    #     worker_min = worker_perf.clone()
-    #     worker_max = worker_perf.clone()
-    #     dist.all_reduce(worker_min, op=dist.ReduceOp.MIN)
-    #     dist.all_reduce(worker_max, op=dist.ReduceOp.MAX)
-        
-    #     print(f"\nGlobal Results (averaged across {args.world_size} ranks):")
-    #     if args.batch:
-    #         print(f"  Time (ms):      {metrics_tensor[0]:.4f} (worker min={worker_min[0]:.4f}, max={worker_max[0]:.4f})")
-    #     else:
-    #         print(f"  Time (ms):      mean={metrics_tensor[0]:.4f}, std={metrics_tensor[1]:.4f}")
-    #         print(f"                  min={metrics_tensor[2]:.4f}, max={metrics_tensor[3]:.4f}")
-    #         print(f"                  p50={metrics_tensor[4]:.4f}, p95={metrics_tensor[5]:.4f}, p99={metrics_tensor[6]:.4f}")
-    #         print(f"                  worker min={worker_min[0]:.4f}, max={worker_max[0]:.4f}")
-    #     print(f"  Throughput:     {metrics_tensor[7]:.0f} elements/sec (worker min={worker_min[1]:.0f}, max={worker_max[1]:.0f})")
-    #     print(f"  Bandwidth:      {metrics_tensor[8]/1e9:.3f} GB/s ({metrics_tensor[8]/1e9*8:.3f} Gbps)")
-    #     print(f"                  worker min={worker_min[2]/1e9:.3f}, max={worker_max[2]/1e9:.3f} GB/s")
-    # print(f"{'='*50}\n")
-
-    # def run_allreduce(t):
-    #     if args.backend.startswith("dpa"):
-    #         with dpa.DataplaneContext(**dpa_ctx):
-    #             return dist.all_reduce(t, op=dist.ReduceOp.SUM, async_op=True)
-    #     else:
-    #         return dist.all_reduce(t, op=dist.ReduceOp.SUM, async_op=True)
     
 
 def benchmark(args):    
@@ -315,7 +248,7 @@ def benchmark(args):
         
     data = {
         "bytes" : tensor_bytes,
-        "times" : times,
+        "times" : times_np,
         "time_unit" : "ms",
         "time_mean" : time_mean,
         "time_std"  : time_std,
