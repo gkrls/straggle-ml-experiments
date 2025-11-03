@@ -2,14 +2,14 @@ import json, os
 import matplotlib.pyplot as plt
 
 
-data_lt_0 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.5000-2.rank0.json")))
-data_lt_1 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.5000-2.rank1.json")))
-data_lb_0 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-6.5000-2.rank0.json")))
-data_lb_1 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-6.5000-2.rank1.json")))
-data_rt_0 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.5000-4.rank0.json")))
-data_rt_1 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.5000-4.rank1.json")))
-data_rb_0 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-6.5000-4.rank0.json")))
-data_rb_1 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-6.5000-4.rank1.json")))
+data_lt_0 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.0-2-5000.rank0.json")))
+data_lt_1 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.0-2-5000.rank1.json")))
+data_lb_0 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-6.0-2-5000.rank0.json")))
+data_lb_1 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-6.0-2-5000.rank1.json")))
+data_rt_0 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.0-4-5000.rank0.json")))
+data_rt_1 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.0-4-5000.rank1.json")))
+data_rb_0 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.4-4-5000.rank0.json")))
+data_rb_1 = json.load(open(os.path.join(os.path.dirname(__file__), "data/allreduce-benchmark2.k-5.4-4-5000.rank1.json")))
 times_lt_0 = data_lt_0['data']['times']
 times_lt_1 = data_lt_1['data']['times']
 times_lb_0 = data_lb_0['data']['times']
@@ -36,7 +36,7 @@ axes[3].plot(list(range(len(times_rb_1))), times_rb_1, 'd-', color='tab:red', li
 
 
 axes[0].set_ylabel('Time (s)')
-axes[3].set_ylabel('Time (s)')
+axes[2].set_ylabel('Time (s)')
 axes[0].set_title(f"Straggler mitigation ON ({data_lt_0['straggle_num']}x{data_lt_0['straggle_ms']} at rank {data_lt_0['straggle_rank']})")
 axes[1].set_title(f"Straggler mitigation ON ({data_rb_0['straggle_num']}x{data_rb_0['straggle_ms']} at rank {data_rb_0['straggle_rank']})")
 axes[2].set_title("Straggler mitigation OFF")
