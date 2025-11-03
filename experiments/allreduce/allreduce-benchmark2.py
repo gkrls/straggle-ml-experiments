@@ -228,27 +228,32 @@ def benchmark(args):
     
     # Compute all local metrics
     time_mean = np.mean(times_np) #* 1000  # ms
-    
-    if args.batch:
-        # In batch mode, we only have one measurement
-        time_std = 0.0
-        time_min = time_mean
-        time_max = time_mean
-        time_p50 = time_mean
-        time_p95 = time_mean
-        time_p99 = time_mean
-    else:
-        # Per-iteration mode has multiple measurements
-        time_std = np.std(times_np) #* 1000
-        time_min = np.min(times_np) #* 1000
-        time_max = np.max(times_np) #* 1000
-        time_p50 = np.percentile(times_np, 50) #* 1000
-        time_p95 = np.percentile(times_np, 95) #* 1000
-        time_p99 = np.percentile(times_np, 99) #* 1000
+    time_std = np.std(times_np) #* 1000
+    time_min = np.min(times_np) #* 1000
+    time_max = np.max(times_np) #* 1000
+    time_p50 = np.percentile(times_np, 50) #* 1000
+    time_p95 = np.percentile(times_np, 95) #* 1000
+    time_p99 = np.percentile(times_np, 99) #* 1000    
+    # if args.batch:
+    #     # In batch mode, we only have one measurement
+    #     time_std = 0.0
+    #     time_min = time_mean
+    #     time_max = time_mean
+    #     time_p50 = time_mean
+    #     time_p95 = time_mean
+    #     time_p99 = time_mean
+    # else:
+    #     # Per-iteration mode has multiple measurements
+    #     time_std = np.std(times_np) #* 1000
+    #     time_min = np.min(times_np) #* 1000
+    #     time_max = np.max(times_np) #* 1000
+    #     time_p50 = np.percentile(times_np, 50) #* 1000
+    #     time_p95 = np.percentile(times_np, 95) #* 1000
+    #     time_p99 = np.percentile(times_np, 99) #* 1000
         
     data = {
         "bytes" : tensor_bytes,
-        "times" : times_np,
+        "times" : times * 1000,
         "time_unit" : "ms",
         "time_mean" : time_mean,
         "time_std"  : time_std,
