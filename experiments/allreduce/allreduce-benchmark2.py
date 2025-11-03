@@ -115,7 +115,8 @@ def results(args, data):
     print(json.dumps(out, indent=2))
     
 
-def benchmark(args):    
+def benchmark(args):
+    
     dist.barrier()
     print(f"[Rank {args.rank}] {args.world_size} ranks ready...")
 
@@ -130,18 +131,17 @@ def benchmark(args):
     # Print the inputs
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Input {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
 
-    dist.barrier()
-    
     # DPA context options
     dpa_ctx = {"quantization": args.dpa_qnt, "averaging": args.dpa_avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, 
                "straggle": args.world_size if not args.straggle_k else args.straggle_k}
 
-    # Batch mode - fire all, sync once (like DDP)
-    print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
-
     op = dist.ReduceOp.AVG if (args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre)) else dist.ReduceOp.SUM
 
+    dist.barrier()
+    
     with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
+        print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
+
         if args.batch:
             jobs = []
             
@@ -157,31 +157,19 @@ def benchmark(args):
                 if args.straggle_rank == args.rank and args.straggle_num > 0 and i >= args.straggle_start:
                     args.straggle_num -= 1
                     time.sleep(args.straggle_ms / 1000)
-                # if args.straggle_ms and args.straggle_rank == args.rank:
-                #     if args.straggle_num is None:
-                #         time.sleep(args.straggle_ms / 1000)
-                #     elif args.straggle_num > 0:
-                #         args.straggle_num -= 1
-                #         time.sleep(args.straggle_ms / 1000)
                 jobs.append(dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True))
 
             for j in jobs: j.wait()
-            # for j in jobs: j.synchronize()
             torch.cuda.synchronize()
             total_time = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
-            
-            avg_time = total_time / args.iters
+
             # For batch mode, we only have one aggregate measurement
-            times = [avg_time]
+            times = [total_time / args.iters]
             for i in range(args.warmup + args.iters): 
                 print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
         # Per-iteration mode (sync each)
         else:
-            for i in range(args.warmup):
-                dist.all_reduce(tensors[i], op=op, async_op=True).wait()
-                # run_allreduce(tensors[i]).wait()
-
-            # Use consistent timing for both CPU and CUDA
+            for i in range(args.warmup): dist.all_reduce(tensors[i], op=op, async_op=True).wait()
             torch.cuda.synchronize()
 
             times = []
@@ -192,32 +180,18 @@ def benchmark(args):
                     args.straggle_num -= 1
                     time.sleep(args.straggle_ms / 1000)
 
-                # if args.straggle_ms and args.straggle_rank == args.rank:
-                #     if args.straggle_num is None: time.sleep(args.straggle_ms / 1000)
-                #     elif args.straggle_num > 0:
-                #         args.straggle_num -= 1
-                #         time.sleep(args.straggle_ms / 1000)
-
                 dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True).wait()                
                 torch.cuda.synchronize()
                 
                 elapsed = (time.time_ns() - t_start) / 1e9  # Convert ns to seconds
                 times.append(elapsed)
                 
-            for i in range(args.warmup):
-                print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)")
-            for i in range(args.iters): 
-                print(f"[Rank {args.rank}] Output {i}:", tensors[i], f"({times[i]} ms)")
+            for i in range(args.warmup): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)")
+            for i in range(args.iters):  print(f"[Rank {args.rank}] Output {i}:", tensors[i], f"({times[i]} ms)")
 
-            
-                # if args.rank == 0 and args.verbose: 
-                #     print(f"  Iter {i+1}: {elapsed*1000:.2f} ms")
 
-    # Calculate metrics
-    bytes_per_elem = 4  # Both float32 and int32 are 4 bytes
-    tensor_bytes = args.size * bytes_per_elem
-    
-    # Network bytes received depends on backend algorithm
+    tensor_bytes = args.size * 4
+
     if args.backend.startswith("dpa"):
         # DPA: each node sends the full tensor and receives the full tensor once
         network_bytes_received = tensor_bytes * 2
@@ -235,22 +209,6 @@ def benchmark(args):
     time_p50 = np.percentile(times_np, 50) #* 1000
     time_p95 = np.percentile(times_np, 95) #* 1000
     time_p99 = np.percentile(times_np, 99) #* 1000    
-    # if args.batch:
-    #     # In batch mode, we only have one measurement
-    #     time_std = 0.0
-    #     time_min = time_mean
-    #     time_max = time_mean
-    #     time_p50 = time_mean
-    #     time_p95 = time_mean
-    #     time_p99 = time_mean
-    # else:
-    #     # Per-iteration mode has multiple measurements
-    #     time_std = np.std(times_np) #* 1000
-    #     time_min = np.min(times_np) #* 1000
-    #     time_max = np.max(times_np) #* 1000
-    #     time_p50 = np.percentile(times_np, 50) #* 1000
-    #     time_p95 = np.percentile(times_np, 95) #* 1000
-    #     time_p99 = np.percentile(times_np, 99) #* 1000
         
     data = {
         "bytes" : tensor_bytes,
@@ -264,7 +222,7 @@ def benchmark(args):
         "time_p95"  : time_p95,
         "time_p99"  : time_p99,
         "elem_per_sec" : args.size / (time_mean / 1000),
-        "bits_per_sec" : tensor_bytes * 8 / (time_mean / 1000) / 1e9
+        "gbit_per_sec" : tensor_bytes * 8 / (time_mean / 1000) / 1e9
     }
 
 
