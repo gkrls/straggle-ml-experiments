@@ -316,6 +316,7 @@ def benchmark(args):
     data = {
         "bytes" : tensor_bytes,
         "times" : times,
+        "time_unit" : "ms",
         "time_mean" : time_mean,
         "time_std"  : time_std,
         "time_min"  : time_min,
