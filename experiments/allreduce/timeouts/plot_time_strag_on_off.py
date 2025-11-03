@@ -45,6 +45,18 @@ data = {
       1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1000-1500.rank-1.json"))),
     }
   },
+  "1500" : {
+    "sa-1500" : {
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1500-1500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1500-1500.rank-1.json"))),
+    }
+  },
+  "1500" : {
+    "sa-250" : {
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1500-1500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1500-1500.rank-1.json"))),
+    }
+  }
 }
 
 
@@ -79,10 +91,12 @@ axes[0].plot(range(xmax), sa_0500, 's-', color='deepskyblue', linewidth=2, marke
 su           = data['500']['su'][RANK]['data']['times'][:xmax]
 sa_0500_1500 = data['500']['sa-1500'][RANK]['data']['times'][:xmax]
 sa_1000_1500 = data['1000']['sa-1500'][RANK]['data']['times'][:xmax]
+sa_1500_1500 = data['1500']['sa-1500'][RANK]['data']['times'][:xmax]
 
 axes[1].plot(range(xmax), su, 'd-', color='tab:red', linewidth=2, markersize=4, label="baseline-su")
 axes[1].plot(range(xmax), sa_0500_1500, 's-', color='midnightblue', linewidth=2, markersize=4, label="0.5/1.5 ms")
 axes[1].plot(range(xmax), sa_1000_1500, 's-', color='blue', linewidth=2, markersize=4, label="1.0/1.5 ms")
+axes[1].plot(range(xmax), sa_1500_1500, 's-', color='tab:blue', linewidth=2, markersize=4, label="1.5/1.5 ms")
 
 
 
