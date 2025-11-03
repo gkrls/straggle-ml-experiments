@@ -291,10 +291,10 @@ def benchmark(args):
         # NCCL/Gloo use ring allreduce: each node receives (N-1)/N of the data
         network_bytes_received = tensor_bytes * (args.world_size - 1) / args.world_size
     
-    times_np = np.array(times)
+    times_np = np.array(times) * 1000 # ms
     
     # Compute all local metrics
-    time_mean = np.mean(times_np) * 1000  # ms
+    time_mean = np.mean(times_np) #* 1000  # ms
     
     if args.batch:
         # In batch mode, we only have one measurement
@@ -306,17 +306,13 @@ def benchmark(args):
         time_p99 = time_mean
     else:
         # Per-iteration mode has multiple measurements
-        time_std = np.std(times_np) * 1000
-        time_min = np.min(times_np) * 1000
-        time_max = np.max(times_np) * 1000
-        time_p50 = np.percentile(times_np, 50) * 1000
-        time_p95 = np.percentile(times_np, 95) * 1000
-        time_p99 = np.percentile(times_np, 99) * 1000
-    
-    throughput = args.size / (time_mean / 1000)  # elements/sec
-    bandwidth = network_bytes_received / (time_mean / 1000)  # bytes/sec
-    
-    
+        time_std = np.std(times_np) #* 1000
+        time_min = np.min(times_np) #* 1000
+        time_max = np.max(times_np) #* 1000
+        time_p50 = np.percentile(times_np, 50) #* 1000
+        time_p95 = np.percentile(times_np, 95) #* 1000
+        time_p99 = np.percentile(times_np, 99) #* 1000
+        
     data = {
         "bytes" : tensor_bytes,
         "times" : times,
