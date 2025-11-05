@@ -19,6 +19,13 @@ data = {
         'sy' : [0],
         'ol' : [0]
       },
+      500 : {
+        'ok' : [258490320,258490320],
+        're' : [3130,2360],
+        'to' : [0],
+        'sy' : [0],
+        'ol' : [0]
+      },
     }
   },
   'sa-1500' : {
@@ -62,8 +69,8 @@ sa_1500 = data['sa-1500'][PIPES]
 barWidth = 0.25
 
 # Use sorted timeouts to keep order stable
-timeouts = sorted(sa_1500.keys())          # [250, 500, 750]
-x = np.arange(len(timeouts))
+sa_1500_x = sorted(sa_1500.keys())          # [250, 500, 750]
+x = np.arange(len(sa_1500_x))
 
 # Bar positions: center each group at x
 sa_1500_br_ok = x - barWidth
@@ -71,9 +78,9 @@ sa_1500_br_re = x
 sa_1500_br_to = x + barWidth
 
 # Values in the same order as 'timeouts'
-sa_1500_ok = [np.mean(sa_1500[t]['ok']) for t in timeouts]
-sa_1500_re = [np.mean(sa_1500[t]['re']) for t in timeouts]
-sa_1500_to = [np.mean(sa_1500[t]['to']) for t in timeouts]
+sa_1500_ok = [np.mean(sa_1500[t]['ok']) for t in sa_1500_x]
+sa_1500_re = [np.mean(sa_1500[t]['re']) for t in sa_1500_x]
+sa_1500_to = [np.mean(sa_1500[t]['to']) for t in sa_1500_x]
 
 axes[0].bar(sa_1500_br_ok, sa_1500_ok, label='ok', width=barWidth, edgecolor='grey')
 axes[0].bar(sa_1500_br_re, sa_1500_re, label='re', width=barWidth, edgecolor='grey')
@@ -85,8 +92,22 @@ axes[0].set_ylabel('Number of packets', fontweight='bold')
 
 # Make the x ticks the retransmission timeouts
 axes[0].set_xticks(x)
-axes[0].set_xticklabels([f"{t} us" for t in timeouts])
+axes[0].set_xticklabels([f"{t} us" for t in sa_1500_x])
 
 axes[0].legend()
 axes[0].grid(True, alpha=0.3)
+
+
+
+
+ns = data['ns'][PIPES]
+ns_x = sorted(ns.keys())
+x = np.arange(len(ns_x))
+ns_br_ok = x - barWidth
+ns_br_re = x
+ns_ok = [np.mean(ns[t]['ok']) for t in ns_x]
+ns_re = [np.mean(ns[t]['re']) for t in ns_x]
+# axes[1].bar(ns_br_ok, ns_ok, label='ok', width=barWidth, edgecolor='grey')
+axes[1].bar(ns_br_re, ns_re, label='re', width=barWidth, edgecolor='grey')
+axes[1].legend()
 plt.show()
