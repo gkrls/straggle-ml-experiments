@@ -2,66 +2,67 @@ import json, os
 import matplotlib.pyplot as plt
 import numpy as np
 
+PIPES=4
 RANK=0
 
 data = {
   '500' : {
     'ns' : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "ns.t-500.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "ns.t-500.rank-1.json")))
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "ns.t-500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "ns.t-500.rank-1.json")))
     },
     'su' : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "su.straggle-10-10-2000.t-500-1500.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "su.straggle-10-10-2000.t-500-1500.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "su.straggle-10-10-2000.t-500-1500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "su.straggle-10-10-2000.t-500-1500.rank-1.json"))),
     },
     "sa-3000" : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-3000.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-3000.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-3000.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-3000.rank-1.json"))),
     },
     "sa-1500" : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-1500.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-1500.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-1500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-1500.rank-1.json"))),
     },
     "sa-1000" : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-1000.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-1000.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-1000.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-1000.rank-1.json"))),
     },
     "sa-0750" : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-0750.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-0750.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-0750.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-0750.rank-1.json"))),
     },
     "sa-0500" : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-0500.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-500-0500.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-0500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-500-0500.rank-1.json"))),
     }
   },
   "1000" : {
     "su" : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "su.straggle-10-10-2000.t-1000-1500.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "su.straggle-10-10-2000.t-1000-1500.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "su.straggle-10-10-2000.t-1000-1500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "su.straggle-10-10-2000.t-1000-1500.rank-1.json"))),
     },
     "sa-1500" : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1000-1500.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1000-1500.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-1000-1500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-1000-1500.rank-1.json"))),
     }
   },
   "1500" : {
     "sa-1500" : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1500-1500.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-1500-1500.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-1500-1500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-1500-1500.rank-1.json"))),
     }
   },
   "250" : {
     "sa-1500" : {
-      0 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-250-1500.rank-0.json"))),
-      1 : json.load(open(os.path.join(os.path.dirname(__file__), "sa.straggle-10-10-2000.t-250-1500.rank-1.json"))),
+      0 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-250-1500.rank-0.json"))),
+      1 : json.load(open(os.path.join(os.path.dirname(__file__), f"pipe-{PIPES}", "sa.straggle-10-10-2000.t-250-1500.rank-1.json"))),
     }
   }
 }
 
 
 
-fig, axes = plt.subplots(2, 2, figsize=(10, 8), sharex=False)
+fig, axes = plt.subplots(2, 2, figsize=(20, 10), sharex=False)
 axes = axes.flatten()
 
 xmax = 100
@@ -154,5 +155,7 @@ for ax in axes:
   # ax.set_xlim(0, xmax)
   ax.grid(True, alpha=0.3)
   ax.legend()
+
+plt.suptitle(f"Allreduce latency with various timeout configurations (rank {RANK})", fontweight='bold')
 plt.tight_layout()
 plt.show()
