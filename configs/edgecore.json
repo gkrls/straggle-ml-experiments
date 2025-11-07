@@ -81,7 +81,7 @@
     "drain_queues": true,
     "timeout_us": 1250,
     "threads": 4,
-    "window":   128,
+    "window":   64,
     "tx_burst": 32,
     "rx_burst": 16,
     "rx_pool_size": 65536,
