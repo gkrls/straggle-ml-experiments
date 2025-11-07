@@ -68,7 +68,7 @@ WORLD=6
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
-PROG=experiments/allreduce/allreduce-benchmark.py
+PROG=experiments/allreduce-perf/allreduce-benchmark.py
 # CONF=experiments/allreduce/edgecore.json
 CONF=configs/edgecore.json
 # CONF=experiments/allreduce/netberg.json
@@ -82,7 +82,8 @@ PERF="perf stat -d --"
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 25000000 -w 10 -i 100 \
-  --gloo_socket_ifname=$IFACE --global_stats --batch --pattern 2 --verify 
+  --gloo_socket_ifname=$IFACE --pattern 3 --batch
+  # --global_stats --batch --pattern 2 --verify 
 
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
 #   --d_conf configs/config-edgecore.json -b nccl -d cuda -t float32 -s 1000 -i 5 -w 3 -v "$@"
