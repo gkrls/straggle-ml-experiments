@@ -228,6 +228,7 @@ def benchmark(args):
 
     if args.verify:
         if op != dist.ReduceOp.SUM: raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
+        if args.pattern not in [1,2]: raise RuntimeError("Can only verify pattern 1 and pattern 2")
 
         local_ok, first_failure = True, True
         original = PATTERN[args.pattern](args)
