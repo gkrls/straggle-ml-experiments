@@ -4,28 +4,27 @@ import numpy as np
 
 data = {
   'ns' : {
-    4 : {
-      100 : {
-        'ok' : [258490320,258490320],
-        're' : [1415268,1547444],
-        'to' : [0],
-        'sy' : [0],
-        'ol' : [0]
-      },
-      250 : {
-        'ok' : [258490320,258490320],
-        're' : [19516,20428],
-        'to' : [0],
-        'sy' : [0],
-        'ol' : [0]
-      },
-      500 : {
-        'ok' : [258490320,258490320],
-        're' : [3130,2360],
-        'to' : [0],
-        'sy' : [0],
-        'ol' : [0]
-      },
+    4 : { # pipes
+      64 : { # burst (per thread)
+        20 : { # tx interval
+          100 : { # timeout
+            'ok' : [258490320,258490320],
+            're' : [1415268,1547444],
+          },
+          200 : {
+            'ok' : [258490320,258490320,258490320,258490320],
+            're' : [62888,83080,55404,75136],
+          },
+          250 : {
+            'ok' : [258490320,258490320],
+            're' : [19516,20428],
+          },
+          500 : {
+            'ok' : [258490320,258490320],
+            're' : [3130,2360],
+          },
+        }
+      }
     }
   },
   'sa-1500' : {
@@ -62,7 +61,7 @@ data = {
   }
 }
 
-fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=False)
+fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharex=False)
 
 PIPES = 4
 sa_1500 = data['sa-1500'][PIPES]
@@ -82,20 +81,18 @@ sa_1500_ok = [np.mean(sa_1500[t]['ok']) for t in sa_1500_x]
 sa_1500_re = [np.mean(sa_1500[t]['re']) for t in sa_1500_x]
 sa_1500_to = [np.mean(sa_1500[t]['to']) for t in sa_1500_x]
 
-axes[0].bar(sa_1500_br_ok, sa_1500_ok, label='ok', width=barWidth, edgecolor='grey')
-axes[0].bar(sa_1500_br_re, sa_1500_re, label='re', width=barWidth, edgecolor='grey')
-axes[0].bar(sa_1500_br_to, sa_1500_to, label='to', width=barWidth, edgecolor='grey')
-
-axes[0].set_title("Straggler timeout 1500us", fontweight='bold')
-axes[0].set_xlabel('Retransmission timeout', fontweight='bold')
-axes[0].set_ylabel('Number of packets', fontweight='bold')
+axes[0][0].bar(sa_1500_br_ok, sa_1500_ok, label='ok', width=barWidth, edgecolor='grey')
+axes[0][0].bar(sa_1500_br_re, sa_1500_re, label='re', width=barWidth, edgecolor='grey')
+axes[0][0].bar(sa_1500_br_to, sa_1500_to, label='to', width=barWidth, edgecolor='grey')
+axes[0][0].set_title("Straggler timeout 1500us", fontweight='bold')
+axes[0][0].set_xlabel('Retransmission timeout', fontweight='bold')
+axes[0][0].set_ylabel('Number of packets', fontweight='bold')
 
 # Make the x ticks the retransmission timeouts
-axes[0].set_xticks(x)
-axes[0].set_xticklabels([f"{t} us" for t in sa_1500_x])
-
-axes[0].legend()
-axes[0].grid(True, alpha=0.3)
+axes[0][0].set_xticks(x)
+axes[0][0].set_xticklabels([f"{t} us" for t in sa_1500_x])
+axes[0][0].legend()
+axes[0][0].grid(True, alpha=0.3)
 
 
 
@@ -108,6 +105,19 @@ ns_br_re = x
 ns_ok = [np.mean(ns[t]['ok']) for t in ns_x]
 ns_re = [np.mean(ns[t]['re']) for t in ns_x]
 # axes[1].bar(ns_br_ok, ns_ok, label='ok', width=barWidth, edgecolor='grey')
-axes[1].bar(ns_br_re, ns_re, label='re', width=barWidth, edgecolor='grey')
-axes[1].legend()
+axes[1][0].bar(ns_br_re, ns_re, label='re', width=barWidth, edgecolor='grey')
+axes[1][0].set_xticklabels([f"{t} us" for t in ns_x])
+axes[1][0].set_xticks(x)
+axes[1][0].set_title("No stragglers", fontweight='bold')
+axes[1][0].set_xlabel('Retransmission timeout', fontweight='bold')
+axes[1][0].set_ylabel('Number of packets', fontweight='bold')
+axes[1][0].legend()
+
+
+
+data_2_2 = {
+
+}
+
+
 plt.show()
