@@ -37,7 +37,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
-        -DDPA_PROFILE=ON \
+        -DDPA_PROFILE=OFF \
         -DDPA_DPDK_RE_DISABLE=ON \
         -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
@@ -71,7 +71,7 @@ WORLD=6
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
-PROG=experiments/allreduce-timeout/allreduce-benchmark2.py
+PROG=experiments/allreduce/allreduce-benchmark2.py
 # CONF=experiments/allreduce/edgecore.json
 CONF=configs/edgecore.json
 # CONF=experiments/allreduce/netberg.json
