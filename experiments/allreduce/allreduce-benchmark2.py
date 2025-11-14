@@ -137,11 +137,11 @@ def benchmark(args):
 
     op = dist.ReduceOp.AVG if (args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre)) else dist.ReduceOp.SUM
 
-    # dist.barrier()
+    print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
+
+    dist.barrier()
     
     with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
-        print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
-
         if args.batch:
             jobs = []
             
