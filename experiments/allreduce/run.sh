@@ -38,6 +38,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
         -DDPA_PROFILE=ON \
+        -DDPA_PROFILE_FIRST=OFF \
         -DDPA_DPDK_RE_DISABLE=ON \
         -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
@@ -72,11 +73,8 @@ MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
 PROG=experiments/allreduce/allreduce-benchmark2.py
-# CONF=experiments/allreduce/edgecore.json
 CONF=configs/edgecore.json
-# CONF=experiments/allreduce/netberg.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
-# PROF="nsys profile -o myprofile -t cuda,osrt --stats=true --force-overwrite=true"
 NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true --sampling-period=200000 -d 30 -o $HOME/nsys_profile -f true"
 PERF="perf stat -d --"
 
@@ -84,7 +82,7 @@ PERF="perf stat -d --"
 # export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 25000000 -w 10 -i 100 --batch # --dpa_avg 
+  --dpa_conf $CONF --dpa_pipes 1 -b dpa_dpdk -d cuda -t int32 -s 25000000 -w 10 -i 100 --batch # --dpa_avg 
   #--gloo_socket_ifname=$IFACE --global_stats --pattern 3  --straggle_k 5 --straggle_rank 1 --straggle_ms 2000 --straggle_num 10 --straggle_start 10
   # --batch #--verify
 
