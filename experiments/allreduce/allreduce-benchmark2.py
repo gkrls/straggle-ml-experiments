@@ -187,7 +187,7 @@ def benchmark(args):
                 times.append(elapsed)
                 
             for i in range(args.warmup): print(f"[Rank {args.rank}] Output {i}:", tensors[i], "(warmup)")
-            for i in range(args.iters):  print(f"[Rank {args.rank}] Output {i}:", tensors[i], f"({times[i]} ms)")
+            for i in range(args.iters):  print(f"[Rank {args.rank}] Output {i}:", tensors[i], f"({times[i] * 1000} ms)")
 
 
     tensor_bytes = args.size * 4
