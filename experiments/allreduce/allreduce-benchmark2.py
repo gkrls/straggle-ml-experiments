@@ -326,4 +326,6 @@ if __name__ == "__main__":
     init(args)
     benchmark(args)
 
+    time.sleep(10)
+
     dist.destroy_process_group()
