@@ -39,8 +39,9 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_AVX=ON \
         -DDPA_PROFILE=OFF \
         -DDPA_PROFILE_FIRST=OFF \
-        -DDPA_DPDK_RE_DISABLE=OFF \
         -DDPA_FASTESTK_EXIT=OFF \
+        -DDPA_FASTESTK_BULK=ON \
+        -DDPA_DPDK_RE_DISABLE=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
