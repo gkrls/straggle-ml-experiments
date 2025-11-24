@@ -26,6 +26,12 @@ PATTERN = {
     3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * (args.rank + 1)
 }
 
+PATTERN_OUT = {
+    1: lambda args: PATTERN[1](args) * args.world_size,
+    2: lambda args: PATTERN[2](args) * args.world_size,
+    3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1)))
+}
+
 def init(args):
     os.environ["MASTER_ADDR"] = args.master_addr
     os.environ["MASTER_PORT"] = str(args.master_port)
@@ -233,7 +239,7 @@ def benchmark(args):
         original = PATTERN[args.pattern](args)
 
         for i, out in enumerate(tensors):
-            expected = original * args.world_size
+            expected = PATTERN_OUT[args.pattern](args) #original * args.world_size
             tol = 1e-5 if args.dtype == torch.float32 else 0
             diff = (out - expected).abs()
             max_err = diff.max().item()
