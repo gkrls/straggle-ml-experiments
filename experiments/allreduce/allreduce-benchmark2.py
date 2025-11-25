@@ -66,13 +66,13 @@ def init(args):
         else:
             print(f"[Rank {args.rank}] Using Gloo with default interface")
         
+        if args.gloo_num_threads: os.environ["GLOO_NUM_THREADS"] = str(args.gloo_num_threads)
+
         dist.init_process_group(backend="gloo", init_method=init_method, rank=args.rank, world_size=args.world_size)
     
     elif args.backend.startswith("nccl"):
         # Handle NCCL with RDMA or TCP
         actual_backend = "nccl"
-
-
 
         # Set socket interface for TCP operations (used by all NCCL modes)
         if args.nccl_socket_ifname: os.environ["NCCL_SOCKET_IFNAME"] = args.nccl_socket_ifname
@@ -83,8 +83,8 @@ def init(args):
             if args.nccl_socket_ifname: print(f"[Rank {args.rank}] NCCL TCP using interface: {args.nccl_socket_ifname}")
             print(f"[Rank {args.rank}] Using NCCL with TCP (IB disabled)")
 
-            os.environ["NCCL_SOCKET_NTHREADS"] = str(args.nccl_socket_nthreads)
-            os.environ["NCCL_NSOCKS_PERTHREAD"] = str(args.nccl_nsocks_perthread)
+            if args.nccl_socket_nthreads: os.environ["NCCL_SOCKET_NTHREADS"] = str(args.nccl_socket_nthreads)
+            if args.nccl_nsocks_perthread: os.environ["NCCL_NSOCKS_PERTHREAD"] = str(args.nccl_nsocks_perthread)
         
             
         elif args.backend == "nccl_rdma":
@@ -321,6 +321,7 @@ if __name__ == "__main__":
     
     # Gloo specific arguments
     parser.add_argument("--gloo_socket_ifname", help="Network interface for Gloo backend (e.g., ens4f1, eth0)")
+    parser.add_argument("--gloo_num_threads", type=int, default=None)
     
     # DPA specific arguments
     parser.add_argument("--dpa_conf", help="DPA config file")

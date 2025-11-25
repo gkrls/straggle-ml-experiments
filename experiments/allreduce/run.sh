@@ -87,7 +87,8 @@ GDB="gdb --args"
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 4 -b nccl_rdma -d cuda -t float32 -s 25000000 -w 10 -i 100 --straggle_k 6 \
   --pattern 1 --batch \
-  --nccl_ib_qps_per_connection 4 --nccl_max_channels 16
+  --gloo_socket_ifname $IFACE --gloo_num_threads 1
+  # --nccl_ib_qps_per_connection 2
   # --nccl_socket_nthreads 6 --nccl_nsocks_perthread 2
 
   #--verify
