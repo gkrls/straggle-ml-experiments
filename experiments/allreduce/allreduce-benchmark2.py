@@ -96,7 +96,10 @@ def init(args):
             if args.nccl_socket_ifname: print(f"[Rank {args.rank}] NCCL socket interface: {args.nccl_socket_ifname}")
             print(f"[Rank {args.rank}] Using NCCL with RDMA (IB enabled)")
 
-            os.environ["NCCL_IB_QPS_PER_CONNECTION"] = str(args.nccl_ib_qps_per_connection)
+            if args.nccl_max_channels: os.environ["NCCL_MAX_CHANNELS"] = args.nccl_max_channels
+            if args.nccl_buffsize: os.environ["NCCL_BUFFSIZE"] = args.nccl_buffsize
+            if args.nccl_ib_qps_per_connection: os.environ["NCCL_IB_QPS_PER_CONNECTION"] = args.nccl_ib_qps_per_connection
+
             
         else:  # Plain "nccl" - use default auto-detection
             print(f"[Rank {args.rank}] Using NCCL with auto-detected transport")
@@ -313,6 +316,8 @@ if __name__ == "__main__":
     parser.add_argument("--nccl_debug", action="store_true", help="Enable NCCL debug output")
     parser.add_argument("--nccl_nsocks_perthread", type=int, default=1)
     parser.add_argument("--nccl_socket_nthreads", type=int, default=1)
+    parser.add_argument("--nccl_max_channels", type=int, default=None)
+    parser.add_argument("--nccl_buffsize", type=int, default=None)
     
     # Gloo specific arguments
     parser.add_argument("--gloo_socket_ifname", help="Network interface for Gloo backend (e.g., ens4f1, eth0)")

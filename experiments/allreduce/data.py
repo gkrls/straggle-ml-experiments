@@ -1,7 +1,20 @@
 PERF_OTHER = {
-  "batch" : {
-    "sum" : {
-      "nccl-tcp-1.1" : {}
+  "batch" :{
+    "sum" :{
+      # tcp-threads.nsocks_per_thread
+      # rdma-qps
+      "nccl-tcp-1.1" :{"bytes":100000000,"times":[68.10635509],"time_unit":"ms","time_mean":68.10635509,"time_std":0.0,"time_min":68.10635509,"time_max":68.10635509,"time_p50":68.10635509,"time_p95":68.10635509,"time_p99":68.10635509,"elem_per_sec":367072940.0650415,"gbit_per_sec":11.746334082081328},
+      "nccl-tcp-2.1" :{"bytes":100000000,"times":[40.33034333],"time_unit":"ms","time_mean":40.33034333,"time_std":0.0,"time_min":40.33034333,"time_max":40.33034333,"time_p50":40.33034333,"time_p95":40.33034333,"time_p99":40.33034333,"elem_per_sec":619880663.9318535,"gbit_per_sec":19.83618124581931},
+      "nccl-tcp-4.1" :{"bytes":100000000,"times":[33.56237415],"time_unit":"ms","time_mean":33.56237415,"time_std":0.0,"time_min":33.56237415,"time_max":33.56237415,"time_p50":33.56237415,"time_p95":33.56237415,"time_p99":33.56237415,"elem_per_sec":744881750.267956,"gbit_per_sec":23.836216008574592},
+      "nccl-tcp-6.1" :{"bytes":100000000,"times":[29.27695321],"time_unit":"ms","time_mean":29.27695321,"time_std":0.0,"time_min":29.27695321,"time_max":29.27695321,"time_p50":29.27695321,"time_p95":29.27695321,"time_p99":29.27695321,"elem_per_sec":853913992.3706563,"gbit_per_sec":27.325247755861},
+      "nccl-tcp-6.2" :{"bytes":100000000,"times":[28.31856874],"time_unit":"ms","time_mean":28.31856874,"time_std":0.0,"time_min":28.31856874,"time_max":28.31856874,"time_p50":28.31856874,"time_p95":28.31856874,"time_p99":28.31856874,"elem_per_sec":882812977.9273583,"gbit_per_sec":28.250015293675464},
+      "nccl-tcp-6.4" :{"bytes":100000000,"times":[30.26422596],"time_unit":"ms","time_mean":30.26422596,"time_std":0.0,"time_min":30.26422596,"time_max":30.26422596,"time_p50":30.26422596,"time_p95":30.26422596,"time_p99":30.26422596,"elem_per_sec":826057802.801311,"gbit_per_sec":26.433849689641953},
+      "nccl-tcp-8.1" :{"bytes":100000000,"times":[29.17467469],"time_unit":"ms","time_mean":29.17467469,"time_std":0.0,"time_min":29.17467469,"time_max":29.17467469,"time_p50":29.17467469,"time_p95":29.17467469,"time_p99":29.17467469,"elem_per_sec":856907583.9110925,"gbit_per_sec":27.421042685154962},
+      "nccl-tcp-8.2" :{"bytes":100000000,"times":[28.31505563],"time_unit":"ms","time_mean":28.31505563,"time_std":0.0,"time_min":28.31505563,"time_max":28.31505563,"time_p50":28.31505563,"time_p95":28.31505563,"time_p99":28.31505563,"elem_per_sec":882922510.4368973,"gbit_per_sec":28.253520333980713},
+      "nccl-tcp-8.4" :{"bytes":100000000,"times":[30.293317310000003],"time_unit":"ms","time_mean":30.293317310000003,"time_std":0.0,"time_min":30.293317310000003,"time_max":30.293317310000003,"time_p50":30.293317310000003,"time_p95":30.293317310000003,"time_p99":30.293317310000003,"elem_per_sec":825264521.0218477,"gbit_per_sec":26.40846467269913},
+      "nccl-rdma-1" :{"bytes":100000000,"times":[18.83008499],"time_unit":"ms","time_mean":18.83008499,"time_std":0.0,"time_min":18.83008499,"time_max":18.83008499,"time_p50":18.83008499,"time_p95":18.83008499,"time_p99":18.83008499,"elem_per_sec":1327662621.4526715,"gbit_per_sec":42.485203886485486},
+      "nccl-rdma-2" :{"bytes":100000000,"times":[18.798314819999998],"time_unit":"ms","time_mean":18.798314819999998,"time_std":0.0,"time_min":18.798314819999998,"time_max":18.798314819999998,"time_p50":18.798314819999998,"time_p95":18.798314819999998,"time_p99":18.798314819999998,"elem_per_sec":1329906443.1776552,"gbit_per_sec":42.55700618168497},
+      "nccl-rdma-4" :{"bytes":100000000,"times":[18.76085257],"time_unit":"ms","time_mean":18.76085257,"time_std":0.0,"time_min":18.76085257,"time_max":18.76085257,"time_p50":18.76085257,"time_p95":18.76085257,"time_p99":18.76085257,"elem_per_sec":1332562041.4488444,"gbit_per_sec":42.64198532636302}
     }
   }
 }
