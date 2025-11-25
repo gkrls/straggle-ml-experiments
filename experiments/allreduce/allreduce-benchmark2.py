@@ -83,8 +83,8 @@ def init(args):
             if args.nccl_socket_ifname: print(f"[Rank {args.rank}] NCCL TCP using interface: {args.nccl_socket_ifname}")
             print(f"[Rank {args.rank}] Using NCCL with TCP (IB disabled)")
 
-            os.environ["NCCL_SOCKET_NTHREADS"] = str(args.nccl_tcp_socket_nthreads)
-            os.environ["NCCL_NSOCKS_PERTHREAD"] = str(args.nccl_tcp_socks_perthread)
+            os.environ["NCCL_SOCKET_NTHREADS"] = str(args.nccl_socket_nthreads)
+            os.environ["NCCL_NSOCKS_PERTHREAD"] = str(args.nccl_socks_perthread)
         
             
         elif args.backend == "nccl_rdma":
@@ -311,8 +311,8 @@ if __name__ == "__main__":
     parser.add_argument("--nccl_ib_hca", help="RDMA HCA device for NCCL RDMA mode (e.g., mlx5_0, mlx5_1)")
     parser.add_argument("--nccl_ib_qps_per_connection", type=int, default=1)
     parser.add_argument("--nccl_debug", action="store_true", help="Enable NCCL debug output")
-    parser.add_argument("--nccl_tcp_nsocks_perthread", type=int, default=1)
-    parser.add_argument("--nccl_tcp_socket_nthreads", type=int, default=1)
+    parser.add_argument("--nccl_nsocks_perthread", type=int, default=1)
+    parser.add_argument("--nccl_socket_nthreads", type=int, default=1)
     
     # Gloo specific arguments
     parser.add_argument("--gloo_socket_ifname", help="Network interface for Gloo backend (e.g., ens4f1, eth0)")

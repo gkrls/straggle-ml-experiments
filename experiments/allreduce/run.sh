@@ -85,8 +85,8 @@ GDB="gdb --args"
 # export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
 sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cpu -t float32 -s 25000000 -w 10 -i 100 --straggle_k 6 \
-  --pattern 1 #--batch #--verify 
+  --dpa_conf $CONF --dpa_pipes 4 -b nccl_tcp -d cuda -t float32 -s 25000000 -w 10 -i 100 --straggle_k 6 \
+  --pattern 1 --batch #--verify 
   # --gloo_socket_ifname=$IFACE --global_stats --straggle_rank 1 --straggle_ms 2000 --straggle_num 10 --straggle_start 10 --batch
   # --batch #--verify
 
