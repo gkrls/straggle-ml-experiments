@@ -84,7 +84,7 @@ def init(args):
             print(f"[Rank {args.rank}] Using NCCL with TCP (IB disabled)")
 
             os.environ["NCCL_SOCKET_NTHREADS"] = str(args.nccl_socket_nthreads)
-            os.environ["NCCL_NSOCKS_PERTHREAD"] = str(args.nccl_socks_perthread)
+            os.environ["NCCL_NSOCKS_PERTHREAD"] = str(args.nccl_nsocks_perthread)
         
             
         elif args.backend == "nccl_rdma":
