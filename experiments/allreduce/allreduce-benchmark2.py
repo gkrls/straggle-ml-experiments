@@ -96,9 +96,9 @@ def init(args):
             if args.nccl_socket_ifname: print(f"[Rank {args.rank}] NCCL socket interface: {args.nccl_socket_ifname}")
             print(f"[Rank {args.rank}] Using NCCL with RDMA (IB enabled)")
 
-            if args.nccl_max_channels: os.environ["NCCL_MAX_CHANNELS"] = args.nccl_max_channels
-            if args.nccl_buffsize: os.environ["NCCL_BUFFSIZE"] = args.nccl_buffsize
-            if args.nccl_ib_qps_per_connection: os.environ["NCCL_IB_QPS_PER_CONNECTION"] = args.nccl_ib_qps_per_connection
+            if args.nccl_max_channels: os.environ["NCCL_MAX_CHANNELS"] = str(args.nccl_max_channels)
+            if args.nccl_buffsize: os.environ["NCCL_BUFFSIZE"] = str(args.nccl_buffsize)
+            if args.nccl_ib_qps_per_connection: os.environ["NCCL_IB_QPS_PER_CONNECTION"] = str(args.nccl_ib_qps_per_connection)
 
             
         else:  # Plain "nccl" - use default auto-detection
