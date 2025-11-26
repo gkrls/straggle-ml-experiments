@@ -21,8 +21,10 @@ styles = [
     {'color': 'green', 'linestyle': '-', 'marker': 'o', 'linewidth': 0.8,  'markersize': 8 },
     {'linestyle': '-', 'marker': 'o', 'linewidth': 0.8,  'markersize': 5 },
     {'color': 'red', 'linestyle': '-', 'marker': 's', 'linewidth': 0.5,  'markersize': 5 },
-    {'color': 'red', 'linestyle': '-', 'marker': 'd', 'linewidth': 0.5,  'markersize': 5 },
+
     # {'linestyle': '-', 'marker': 'd', 'linewidth': 0.5,  'markersize': 5 },
+    {'linestyle': '-', 'marker': 'x', 'linewidth': 0.5,  'markersize': 6 },
+    {'linestyle': '-', 'marker': 'x', 'linewidth': 0.5,  'markersize': 6 },
     {'linestyle': '-', 'marker': 'x', 'linewidth': 0.5,  'markersize': 6 },
     {'linestyle': '-', 'marker': 'x', 'linewidth': 0.5,  'markersize': 6 },
     {'linestyle': '-', 'marker': 'x', 'linewidth': 0.5,  'markersize': 6 },
