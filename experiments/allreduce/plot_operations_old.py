@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
-from data import OPER
+from data_old import operation
 import numpy as np
 
 
 # pipes|threads|window|tx|rx|type
-dat = OPER[4][6][64][64][64]
+dat = operation[1][8][128][128][64]
 
 
 
