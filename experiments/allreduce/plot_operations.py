@@ -36,6 +36,7 @@ styles = [
     {'linestyle': '-', 'marker': 'X', 'linewidth': 0.5,  'markersize': 6 },
     {'linestyle': '-', 'marker': 'X', 'linewidth': 0.5,  'markersize': 6 },
     {'linestyle': '-', 'marker': 'X', 'linewidth': 0.5,  'markersize': 6 },
+    {'linestyle': '-', 'marker': 'X', 'linewidth': 0.5,  'markersize': 6 },
 ]
 # ---------------------------------------------------------
 # Left: Float (X = Operation Index, Y = Duration)
