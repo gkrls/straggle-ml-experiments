@@ -51,49 +51,66 @@ ax.legend()
 # ---------------------------------------------------------
 # Top-Middle: Heatmap
 # ---------------------------------------------------------
+from matplotlib.colors import ListedColormap, BoundaryNorm
 ax = axes[0,1]
+# Regex to capture X and Y from the label (e.g., "5-250/01000us.yes")
+problem_configs = [(50,25000)]
+
 heatmap_data = {}
 x_values = set()
 y_values = set()
-
-# Regex to capture X and Y from the label (e.g., "5-250/01000us.yes")
 pattern = re.compile(r"^\d+-(\d+)/(\d+)us\.yes$")
 
 for label, data in dat.items():
-    match = pattern.match(label)
-    if match:
-        x = int(match.group(1))
-        y = int(match.group(2))
-        if y > 30000: continue
-        
-        # Calculate and store the mean time
-        mean_time = np.mean(data['times'])
-        heatmap_data[(x, y)] = mean_time
-        
-        # Collect all unique values
+    if (match := pattern.match(label)):
+        x, y = int(match.group(1)), int(match.group(2))
+        heatmap_data[(x, y)] = np.mean(data['times'])
         x_values.add(x)
         y_values.add(y)
+
 sorted_x = sorted(list(x_values))
 sorted_y = sorted(list(y_values))
 x_map = {val: i for i, val in enumerate(sorted_x)}
 y_map = {val: i for i, val in enumerate(sorted_y)}
-heatmap_matrix = np.full((len(sorted_y), len(sorted_x)), np.nan) 
-# Populate the matrix (Y maps to rows, X maps to columns)
-for (x, y), mean_time in heatmap_data.items():
-    row_idx = y_map[y]
-    col_idx = x_map[x]
-    heatmap_matrix[row_idx, col_idx] = mean_time
 
-im = ax.imshow(heatmap_matrix, cmap="viridis", aspect='auto')
+# Build the Heatmap Matrix AND the Problem Mask Matrix
+heatmap_matrix = np.full((len(sorted_y), len(sorted_x)), np.nan) 
+problem_mask = np.full((len(sorted_y), len(sorted_x)), False, dtype=bool) 
+
+for (x, y), mean_time in heatmap_data.items():
+    row_idx, col_idx = y_map[y], x_map[x]
+    heatmap_matrix[row_idx, col_idx] = mean_time
+    if (x, y) in problem_configs:
+        problem_mask[row_idx, col_idx] = True
+
+# --- 2. Heatmap Plotting with Red Highlight ---
+
+
+# Plot the main heatmap (all non-problem data)
+im = ax.imshow(
+    np.ma.masked_where(problem_mask, heatmap_matrix), # Mask out problem data
+    cmap="viridis", 
+    aspect='auto', 
+    interpolation='nearest'
+)
+
+# Plot the problematic points on top in red
+problem_values = np.ma.masked_where(~problem_mask, heatmap_matrix) # Only show problem data
+red_cmap = ListedColormap(['red']) 
+ax.imshow(problem_values, cmap=red_cmap, aspect='auto', interpolation='nearest')
+
+
+# Configure ticks and labels
 ax.set_xticks(np.arange(len(sorted_x)))
 ax.set_yticks(np.arange(len(sorted_y)))
 ax.set_xticklabels(sorted_x, rotation=45, ha="right")
 ax.set_yticklabels(sorted_y)
-ax.figure.colorbar(im, ax=ax, label="Mean Operation Latency")
-ax.set_xlabel("Worker Timeout (us)")
-ax.set_ylabel("Switch Timeout (us)")
-ax.set_title("Heatmap of Mean AllReduce Latency Switch and Worker Timeout")
 
+# Add colorbar and titles
+ax.figure.colorbar(im, ax=ax, label="Mean Duration")
+ax.set_xlabel("X value (e.g., burst limit)")
+ax.set_ylabel("Y value (e.g., delay parameter)")
+ax.set_title("Heatmap of Mean Duration (Red = Problem Config)")
 # ---------------------------------------------------------
 # Bottom-Left: Float (X = Cumulative Time, Y = Duration)
 # ---------------------------------------------------------
