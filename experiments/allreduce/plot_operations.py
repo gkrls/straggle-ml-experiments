@@ -6,7 +6,7 @@ from matplotlib.colors import ListedColormap
 
 
 # pipes|threads|window|tx|rx|type|problems
-problem_configs=[]
+problem_configs=[(50,125)]
 row_0 = 4,6,64,64,64,problem_configs
 
 fig, axes = plt.subplots(3,3, figsize=(35, 16))
