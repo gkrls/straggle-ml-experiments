@@ -275,6 +275,7 @@ def do_row(axes, row, pipes, threads, wnd, tx, rx, problem_configs,
 
 
 problem_configs_row_0 = [
+  "5-050/00750us.yes",
   "5-075/00750us.yes"
 ]
 
@@ -290,19 +291,11 @@ problem_configs_row_1 =[
   "5-075/00500us.yes", # sometimes
 ]
 row_1= 4,6,32,32,32,problem_configs_row_1
-
 do_row(axes, 1, *row_1, False)
+
+
 do_row(axes, 2, *row_0, False)
 
-# handles, labels = axes[0,0].get_legend_handles_labels()
-# fig.legend(
-#     handles, labels,
-#     loc="center right",        # use the right side of the legend box
-#     bbox_to_anchor=(0.1, 0.5),  # place that point just left of the figure
-#     frameon=False,
-#     borderaxespad=0.
-# )
-# fig.subplots_adjust(left=0.15)  # tweak 0.25 as you like (0.2–0.3)
 fig.subplots_adjust(
     left=0.1,   # space for legend
     right=0.98,  # reduce right whitespace
