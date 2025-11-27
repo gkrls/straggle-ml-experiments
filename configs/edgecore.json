@@ -78,7 +78,7 @@
     "iface": "ens4f1",
     "port" : 4242,
     "async": true,
-    "drain_queues": false,
+    "drain_queues": true,
     "timeout_us": 75,
     "threads": 6,
     "window":  32,
