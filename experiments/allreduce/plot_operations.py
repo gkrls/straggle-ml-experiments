@@ -275,8 +275,10 @@ def do_row(axes, row, pipes, threads, wnd, tx, rx, problem_configs,
 
 
 problem_configs_row_0 = [
+  "5-050/00250us.yes",
   "5-050/00500us.yes",
   "5-050/00750us.yes",
+  "5-075/00250us.yes",
   "5-075/00500us.yes",
   "5-075/00750us.yes",
   "5-100/00500us.yes"
