@@ -6,15 +6,7 @@ from matplotlib.colors import ListedColormap
 import matplotlib.patches as patches
 
 # pipes|threads|window|tx|rx|type|problems
-problem_configs=[
-  "5-050/00125us.yes",
-  "5-050/00250us.yes",
-  "5-050/00500us.yes",
-  "5-050/00750us.yes",
-  "5-075/00500us.yes", # sometimes
-]
 
-row_0 = 4,6,64,64,64,problem_configs
 
 fig, axes = plt.subplots(3,3, figsize=(35, 16))
 
@@ -284,9 +276,22 @@ def do_row(axes, row, pipes, threads, wnd, tx, rx, problem_configs,
 
 
 
+row_0 = 4,6,64,64,64,[]
 do_row(axes, 0, *row_0, False)
-do_row(axes, 1, *row_0, False)
+
+
+problem_configs_row_1 =[
+  "5-050/00125us.yes",
+  "5-050/00250us.yes",
+  "5-050/00500us.yes",
+  "5-050/00750us.yes",
+  "5-075/00500us.yes", # sometimes
+]
+row_1= 4,6,32,32,32,problem_configs_row_1
+
+do_row(axes, 1, *row_1, False)
 do_row(axes, 2, *row_0, False)
+
 # handles, labels = axes[0,0].get_legend_handles_labels()
 # fig.legend(
 #     handles, labels,
