@@ -289,7 +289,6 @@ problem_configs_row_1 =[
   "5-050/00250us.yes",
   "5-050/00500us.yes",
   "5-050/00750us.yes",
-  "5-075/00500us.yes", # sometimes
 ]
 row_1= 4,6,32,32,32,problem_configs_row_1
 do_row(axes, 1, *row_1, False)
