@@ -274,9 +274,11 @@ def do_row(axes, row, pipes, threads, wnd, tx, rx, problem_configs,
   do_heatmap(axes, row, pipes, threads, wnd, tx, rx, problem_configs)
 
 
+problem_configs_row_0 = [
+  "5-075/00750us.yes"
+]
 
-
-row_0 = 4,6,64,64,64,[]
+row_0 = 4,6,64,64,64,problem_configs_row_0
 do_row(axes, 0, *row_0, False)
 
 
