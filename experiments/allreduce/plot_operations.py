@@ -167,7 +167,7 @@ def do_heatmap(axes, row, pipes, threads, wnd, tx, rx, problem_configs):
       # If there is NO data: fill red + hatch.
       if not np.isnan(cell_val):
           facecolor = 'none'
-          edgecolor = 'red'
+          edgecolor = 'black'
           alpha = 1.0
       else:
           facecolor = 'red'
