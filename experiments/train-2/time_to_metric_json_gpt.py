@@ -256,7 +256,7 @@ y_bottom = plt.ylim()[0]
 # if time_no_straggle_target:
 #     plt.axvline(x=time_no_straggle_target, color='#67A25A', linestyle=':', linewidth=1.5, alpha=0.6)
 #     plt.text(time_no_straggle_target, y_bottom + (TARGET - y_bottom) * 0.05, 
-#              f'{time_no_straggle_target:.1f} min', rotation=90, 
+#              f'{time_no_straggle_target:.1f} min', rotation=90, {'linestyle': '-', 'marker': 'X', 'linewidth': 0.5,  'markersize': 6 },
 #              verticalalignment='bottom', horizontalalignment='right', 
 #              color='#67A25A', fontsize=9, fontweight='bold')
 
