@@ -8,7 +8,8 @@ import matplotlib.patches as patches
 # pipes|threads|window|tx|rx|type|problems
 problem_configs=[
   "5-050/00125us.yes",
-  "5-050/00250us.yes"
+  "5-050/00250us.yes",
+  "5-050/00500us.yes"
 ]
 
 row_0 = 4,6,64,64,64,problem_configs
