@@ -281,7 +281,8 @@ problem_configs_row_0 = [
   "5-075/00250us.yes",
   "5-075/00500us.yes",
   "5-075/00750us.yes",
-  "5-100/00500us.yes"
+  "5-100/00250us.yes",
+  "5-100/00500us.yes",
   # "5-125/00500us.yes", # sometimes
 ]
 
