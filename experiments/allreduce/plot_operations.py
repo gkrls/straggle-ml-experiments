@@ -3,10 +3,14 @@ from data import OPER
 import numpy as np
 import re
 from matplotlib.colors import ListedColormap
-
+import matplotlib.patches as patches
 
 # pipes|threads|window|tx|rx|type|problems
-problem_configs=[(50,125)]
+problem_configs=[
+  "5-050/00125us.yes",
+  "5-050/00250us.yes"
+]
+
 row_0 = 4,6,64,64,64,problem_configs
 
 fig, axes = plt.subplots(3,3, figsize=(35, 16))
@@ -26,17 +30,57 @@ def get_style(label):
      return {'marker': 'd', 'linewidth': 0.4,  'markersize': 3 }
   return {}
 
-def do_plots(axes, row, pipes, threads, wnd, tx, rx):
+# def do_plots(axes, row, pipes, threads, wnd, tx, rx):
+#   dat = OPER[pipes][threads][wnd][tx][rx]
+#   # operations plot
+#   ax = axes[row,0]
+#   ax.set_title(f"Duration per Operation - dpa{pipes * 64}-{wnd * threads}({threads})-{tx}/{rx}")
+#   ax.set_ylim(0,125)
+#   for i, (label, data) in enumerate(dat.items()):
+#       if not label.startswith('no.') and label.endswith('.no'): continue
+#       style = get_style(label)
+#       label = label[:-4] if label.endswith("yes") else label
+#       ax.plot(range(len(data['times'])), data['times'], label=label, **style)
+#       ax.grid(True, alpha=0.3)
+#   ax.set_ylabel("Duration")
+#   ax.set_xlabel("Operation ID")
+
+#   # operations cumulative
+#   ax = axes[row,1]
+#   ax.set_title("Duration vs Cumulative Time")
+#   ax.set_ylim(0,125)
+#   for i, (label, data) in enumerate(dat.items()):
+#       if not label.startswith('no.') and label.endswith('.no'): continue
+#       style = get_style(label)
+#       label = label[:-4] if label.endswith("yes") else label
+#       times = data['times']
+#       cumulative_times = np.cumsum(times)
+#       ax.plot(cumulative_times, times, label=label, **style)
+#       ax.grid(True, alpha=0.3)
+#   ax.set_ylabel("Duration")
+#   ax.set_xlabel("Cumulative Time")
+
+
+def do_plots(axes, row, pipes, threads, wnd, tx, rx,
+             problem_configs,
+             include_problem_configs_in_plots=True):
   dat = OPER[pipes][threads][wnd][tx][rx]
+
   # operations plot
   ax = axes[row,0]
   ax.set_title(f"Duration per Operation - dpa{pipes * 64}-{wnd * threads}({threads})-{tx}/{rx}")
   ax.set_ylim(0,125)
   for i, (label, data) in enumerate(dat.items()):
-      if not label.startswith('no.') and label.endswith('.no'): continue
+      if not label.startswith('no.') and label.endswith('.no'):
+          continue
+
+      is_problem = label in problem_configs
+      if not include_problem_configs_in_plots and is_problem:
+          continue
+
       style = get_style(label)
-      label = label[:-4] if label.endswith("yes") else label
-      ax.plot(range(len(data['times'])), data['times'], label=label, **style)
+      display_label = label[:-4] if label.endswith("yes") else label
+      ax.plot(range(len(data['times'])), data['times'], label=display_label, **style)
       ax.grid(True, alpha=0.3)
   ax.set_ylabel("Duration")
   ax.set_xlabel("Operation ID")
@@ -46,75 +90,102 @@ def do_plots(axes, row, pipes, threads, wnd, tx, rx):
   ax.set_title("Duration vs Cumulative Time")
   ax.set_ylim(0,125)
   for i, (label, data) in enumerate(dat.items()):
-      if not label.startswith('no.') and label.endswith('.no'): continue
+      if not label.startswith('no.') and label.endswith('.no'):
+          continue
+
+      is_problem = label in problem_configs
+      if not include_problem_configs_in_plots and is_problem:
+          continue
+
       style = get_style(label)
-      label = label[:-4] if label.endswith("yes") else label
+      display_label = label[:-4] if label.endswith("yes") else label
       times = data['times']
       cumulative_times = np.cumsum(times)
-      ax.plot(cumulative_times, times, label=label, **style)
+      ax.plot(cumulative_times, times, label=display_label, **style)
       ax.grid(True, alpha=0.3)
   ax.set_ylabel("Duration")
   ax.set_xlabel("Cumulative Time")
 
-
 def do_heatmap(axes, row, pipes, threads, wnd, tx, rx, problem_configs):
   dat = OPER[pipes][threads][wnd][tx][rx]
-  # heatmap
   ax = axes[row,2]
+
   pattern = re.compile(r"^\d+-(\d+)/(\d+)us\.yes$")
   coords = {}
   x_vals, y_vals = set(), set()
 
-  # Collect all data points and axis values
+  # Collect all data points and axis values (from actual data)
   for label, data in dat.items():
       if (match := pattern.match(label)):
           x, y = int(match.group(1)), int(match.group(2))
           coords[(x, y)] = np.mean(data['times'])
           x_vals.add(x); y_vals.add(y)
 
-  # Ensure ALL problem X and Y values are included in the axes, 
-  # even if no data exists for them.
-  for x, y in problem_configs:
-      x_vals.add(x); y_vals.add(y)
+  # Ensure ALL problem X and Y values are included in the axes,
+  # even if there is no data in `dat` for them.
+  for plabel in problem_configs:
+      pm = pattern.match(plabel)
+      if pm:
+          x = int(pm.group(1))
+          y = int(pm.group(2))
+          x_vals.add(x)
+          y_vals.add(y)
 
   # Axis setup
   sorted_x, sorted_y = sorted(list(x_vals)), sorted(list(y_vals))
   x_map = {val: i for i, val in enumerate(sorted_x)}
   y_map = {val: i for i, val in enumerate(sorted_y)}
 
-  # Build the Main Data Matrix (NaN where no data exists)
-  matrix = np.full((len(sorted_y), len(sorted_x)), np.nan) 
+  # Build the Data Matrix (NaN where no data exists)
+  matrix = np.full((len(sorted_y), len(sorted_x)), np.nan)
   for (x, y), val in coords.items():
       matrix[y_map[y], x_map[x]] = val
 
-  # Build the Problem Highlight Matrix (True where red is needed)
-  problem_matrix = np.full((len(sorted_y), len(sorted_x)), False, dtype=bool)
-  for x, y in problem_configs:
-      problem_matrix[y_map[y], x_map[x]] = True
-
-  # --- 2. Heatmap Plotting (Two Layers) ---
-  # fig, ax = plt.subplots(figsize=(8, 6))
-
-  # Layer 1: Plot the main data (masked to hide problem areas)
-  # Using 'viridis' colormap
+  # Main heatmap layer
   im = ax.imshow(
-      np.ma.masked_where(problem_matrix, matrix), 
-      cmap="viridis", 
-      aspect='auto', 
+      matrix,
+      cmap="viridis",
+      aspect='auto',
       interpolation='nearest',
-      # Set vmin/vmax to ensure consistent color scale across all plots
-      vmin=np.nanmin(matrix), 
+      vmin=np.nanmin(matrix),
       vmax=np.nanmax(matrix)
   )
 
-  # Layer 2: Plot the problem areas (masked to only show where problems exist)
-  # Use a custom colormap that is ONLY red. We use a dummy value (1) for plotting.
-  problem_highlight = np.ma.masked_where(~problem_matrix, np.ones_like(matrix))
-  red_cmap = ListedColormap(['red']) 
-  ax.imshow(problem_highlight, cmap=red_cmap, aspect='auto', interpolation='nearest')
+  # Overlay: diagonal-hatched rectangles for all problem configs
+  for plabel in problem_configs:
+      pm = pattern.match(plabel)
+      if not pm:
+          continue  # skip labels that don't encode timeouts
+      x = int(pm.group(1))
+      y = int(pm.group(2))
 
+      i = y_map[y]  # row index
+      j = x_map[x]  # column index
+      cell_val = matrix[i, j]
 
-  # --- 3. Configure Axes and Labels ---
+      # If there is data: keep heatmap color, draw hatched border.
+      # If there is NO data: fill red + hatch.
+      if not np.isnan(cell_val):
+          facecolor = 'none'
+          edgecolor = 'red'
+          alpha = 1.0
+      else:
+          facecolor = 'red'
+          edgecolor = 'black'
+          alpha = 0.8
+
+      rect = patches.Rectangle(
+          (j - 0.5, i - 0.5),  # (x, y) in image coordinates
+          1, 1,
+          linewidth=1.5,
+          edgecolor=edgecolor,
+          facecolor=facecolor,
+          hatch='///',
+          alpha=alpha
+      )
+      ax.add_patch(rect)
+
+  # Axes and labels
   ax.set_xticks(np.arange(len(sorted_x)))
   ax.set_yticks(np.arange(len(sorted_y)))
 
@@ -123,24 +194,96 @@ def do_heatmap(axes, row, pipes, threads, wnd, tx, rx, problem_configs):
 
   ax.set_xlabel("Worker Timeout (us)")
   ax.set_ylabel("Switch Timeout (us)")
-  ax.set_title("Mean Duration Heatmap (Red = Problem Config)")
+  ax.set_title("Mean Duration Heatmap (Diagonal = Problem Config)")
 
-  # Add colorbar (only based on the main data layer)
+  # Colorbar based on the main data layer
   cbar = ax.figure.colorbar(im, ax=ax)
   cbar.ax.set_ylabel("Mean Duration", rotation=-90, va="bottom")
 
 
-def do_row(axes, row, pipes, threads, wnd, tx, rx, problem_configs):
-  do_plots(axes, row, pipes, threads, wnd, tx, rx)
+# def do_heatmap(axes, row, pipes, threads, wnd, tx, rx, problem_configs):
+#   dat = OPER[pipes][threads][wnd][tx][rx]
+#   # heatmap
+#   ax = axes[row,2]
+#   pattern = re.compile(r"^\d+-(\d+)/(\d+)us\.yes$")
+#   coords = {}
+#   x_vals, y_vals = set(), set()
+
+#   # Collect all data points and axis values
+#   for label, data in dat.items():
+#       if (match := pattern.match(label)):
+#           x, y = int(match.group(1)), int(match.group(2))
+#           coords[(x, y)] = np.mean(data['times'])
+#           x_vals.add(x); y_vals.add(y)
+
+#   for x, y in problem_configs:
+#       x_vals.add(x); y_vals.add(y)
+
+#   # Axis setup
+#   sorted_x, sorted_y = sorted(list(x_vals)), sorted(list(y_vals))
+#   x_map = {val: i for i, val in enumerate(sorted_x)}
+#   y_map = {val: i for i, val in enumerate(sorted_y)}
+
+#   # Build the Main Data Matrix (NaN where no data exists)
+#   matrix = np.full((len(sorted_y), len(sorted_x)), np.nan) 
+#   for (x, y), val in coords.items():
+#       matrix[y_map[y], x_map[x]] = val
+
+#   # Build the Problem Highlight Matrix (True where red is needed)
+#   problem_matrix = np.full((len(sorted_y), len(sorted_x)), False, dtype=bool)
+#   for x, y in problem_configs:
+#       problem_matrix[y_map[y], x_map[x]] = True
+
+#   im = ax.imshow(
+#       np.ma.masked_where(problem_matrix, matrix), 
+#       cmap="viridis", 
+#       aspect='auto', 
+#       interpolation='nearest',
+#       # Set vmin/vmax to ensure consistent color scale across all plots
+#       vmin=np.nanmin(matrix), 
+#       vmax=np.nanmax(matrix)
+#   )
+
+#   # Layer 2: Plot the problem areas (masked to only show where problems exist)
+#   # Use a custom colormap that is ONLY red. We use a dummy value (1) for plotting.
+#   problem_highlight = np.ma.masked_where(~problem_matrix, np.ones_like(matrix))
+#   red_cmap = ListedColormap(['red']) 
+#   ax.imshow(problem_highlight, cmap=red_cmap, aspect='auto', interpolation='nearest')
+
+
+#   # --- 3. Configure Axes and Labels ---
+#   ax.set_xticks(np.arange(len(sorted_x)))
+#   ax.set_yticks(np.arange(len(sorted_y)))
+
+#   ax.set_xticklabels([str(x) for x in sorted_x], rotation=45, ha="right")
+#   ax.set_yticklabels([str(y) for y in sorted_y])
+
+#   ax.set_xlabel("Worker Timeout (us)")
+#   ax.set_ylabel("Switch Timeout (us)")
+#   ax.set_title("Mean Duration Heatmap (Red = Problem Config)")
+
+#   # Add colorbar (only based on the main data layer)
+#   cbar = ax.figure.colorbar(im, ax=ax)
+#   cbar.ax.set_ylabel("Mean Duration", rotation=-90, va="bottom")
+
+
+# def do_row(axes, row, pipes, threads, wnd, tx, rx, problem_configs):
+#   do_plots(axes, row, pipes, threads, wnd, tx, rx)
+#   do_heatmap(axes, row, pipes, threads, wnd, tx, rx, problem_configs)
+
+def do_row(axes, row, pipes, threads, wnd, tx, rx, problem_configs,
+           include_problem_configs_in_plots=True):
+  do_plots(axes, row, pipes, threads, wnd, tx, rx,
+           problem_configs,
+           include_problem_configs_in_plots=include_problem_configs_in_plots)
   do_heatmap(axes, row, pipes, threads, wnd, tx, rx, problem_configs)
 
 
 
 
-
-do_row(axes, 0, *row_0)
-do_row(axes, 1, *row_0)
-do_row(axes, 2, *row_0)
+do_row(axes, 0, *row_0, False)
+do_row(axes, 1, *row_0, False)
+do_row(axes, 2, *row_0, False)
 # handles, labels = axes[0,0].get_legend_handles_labels()
 # fig.legend(
 #     handles, labels,
