@@ -9,7 +9,8 @@ import matplotlib.patches as patches
 problem_configs=[
   "5-050/00125us.yes",
   "5-050/00250us.yes",
-  "5-050/00500us.yes"
+  "5-050/00500us.yes",
+  "5-050/00750us.yes"
 ]
 
 row_0 = 4,6,64,64,64,problem_configs
