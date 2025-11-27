@@ -6,16 +6,10 @@ from matplotlib.colors import ListedColormap
 
 
 # pipes|threads|window|tx|rx|type|problems
-row_0 = 4,6,64,64,64,[(100,500)]
+problem_configs=[]
+row_0 = 4,6,64,64,64,problem_configs
 
 fig, axes = plt.subplots(3,3, figsize=(35, 16))
-plot_style = {
-    'linestyle': '-',
-    'marker': 'o',       # Use 'o' or '.'
-    'alpha': 0.6,        # 0.0 is invisible, 1.0 is solid. 0.6 is a sweet spot.
-    'linewidth': 0.8,    # Thinner lines reduce clutter
-    'markersize': 2      # Tiny markers so they don't hide the line
-}
 
 def get_style(label):
   if label == "no.no": 
