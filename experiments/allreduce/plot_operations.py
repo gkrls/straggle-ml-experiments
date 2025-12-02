@@ -8,7 +8,7 @@ import matplotlib.patches as patches
 # pipes|threads|window|tx|rx|type|problems
 
 
-fig, axes = plt.subplots(3,3, figsize=(35, 16))
+fig, axes = plt.subplots(2,3, figsize=(35, 16))
 
 def get_style(label):
   if label == "no.no": 
@@ -300,7 +300,7 @@ row_1= 4,6,32,32,32,problem_configs_row_1
 do_row(axes, 1, *row_1, False)
 
 
-do_row(axes, 2, *row_0, False)
+# do_row(axes, 2, *row_0, False)
 
 fig.subplots_adjust(
     left=0.1,   # space for legend
