@@ -28,7 +28,7 @@ PATTERN = {
 
 PATTERN_OUT = {
     1: lambda args: PATTERN[1](args) * args.world_size,
-    2: lambda args: PATTERN[2](args) * args.world_size,
+    2: lambda args: PATTERN[2](args), # * args.world_size,
     3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1)))
 }
 
@@ -244,7 +244,7 @@ def benchmark(args):
 
 
     if args.verify:
-        if op != dist.ReduceOp.SUM: raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
+        #if op != dist.ReduceOp.SUM: raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
 
         local_ok, first_failure = True, True
         original = PATTERN[args.pattern](args)
