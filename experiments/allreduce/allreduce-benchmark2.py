@@ -157,17 +157,17 @@ def benchmark(args):
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
 
     dist.barrier()
-    
+
     with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
         if args.batch:
             jobs = []
-            
+
             # Warmup
             for i in range(args.warmup): jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
             for j in jobs: j.wait()
             jobs.clear()
             torch.cuda.synchronize()
-            
+
             # Timed iterations - use same timing method for both CPU and CUDA
             t_start = time.time_ns()
             for i in range(args.iters):
