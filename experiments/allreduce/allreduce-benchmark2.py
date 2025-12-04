@@ -27,10 +27,12 @@ PATTERN = {
 }
 
 PATTERN_OUT = {
-    1: lambda args: PATTERN[1](args) * args.world_size,
-    2: lambda args: PATTERN[2](args), # * args.world_size,
+    1: lambda args: PATTERN[1](args) * (args.world_size if not args.avg else 1),
+    2: lambda args: PATTERN[2](args) * (args.world_size if not args.avg else 1),
     3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1)))
 }
+
+PATTERN_NOVERIFY_IF_STRAG = (3)
 
 def init(args):
     os.environ["MASTER_ADDR"] = args.master_addr
@@ -152,7 +154,7 @@ def benchmark(args):
     dpa_ctx = {"quantization": args.dpa_qnt, "averaging": args.dpa_avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, 
                "straggle": args.world_size if not args.straggle_k else args.straggle_k}
 
-    op = dist.ReduceOp.AVG if (args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre)) else dist.ReduceOp.SUM
+    op = dist.ReduceOp.AVG if args.avg else dist.ReduceOp.SUM # if (args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre)) else dist.ReduceOp.SUM
 
     print(f"[Rank {args.rank}] Running {args.warmup} warmup jobs and {args.iters} timed jobs...")
 
@@ -308,6 +310,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--batch", action="store_true",  help="Queue all ops, single sync (like DDP)")
 
+    parser.add_argument("--avg", help="perform averaging")
     parser.add_argument("--verify", action="store_true", help="Verify output. Only works for SUM operation (no averaging/prescaling)")
     parser.add_argument("--json", type=str, default=None)
     
@@ -337,7 +340,6 @@ if __name__ == "__main__":
     # DPA specific arguments
     parser.add_argument("--dpa_conf", help="DPA config file")
     parser.add_argument("--dpa_qnt", action="store_true", help="Quantization (single exponent)")
-    parser.add_argument("--dpa_avg", action="store_true", help="Averaging")
     parser.add_argument("--dpa_pre", action="store_true", help="Prescaling")
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
 
@@ -356,6 +358,7 @@ if __name__ == "__main__":
     # Validation
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
+    if args.verify and args.pattern in PATTERN_NOVERIFY_IF_STRAG: raise RuntimeError(f"Cannot reliably verify pattern {args.pattern} with straggle awareness enabled")
     
     init(args)
     benchmark(args)
