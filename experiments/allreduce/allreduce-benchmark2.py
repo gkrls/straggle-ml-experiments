@@ -32,7 +32,7 @@ PATTERN_OUT = {
     3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1)))
 }
 
-PATTERN_NOVERIFY_IF_STRAG = (3)
+PATTERN_NOVERIFY_IF_STRAG = [3]
 
 def init(args):
     os.environ["MASTER_ADDR"] = args.master_addr
@@ -358,7 +358,7 @@ if __name__ == "__main__":
     # Validation
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
-    if args.verify and args.pattern in PATTERN_NOVERIFY_IF_STRAG: raise RuntimeError(f"Cannot reliably verify pattern {args.pattern} with straggle awareness enabled")
+    if args.verify and (args.pattern in PATTERN_NOVERIFY_IF_STRAG): raise RuntimeError(f"Cannot reliably verify pattern {args.pattern} with straggle awareness enabled")
     
     init(args)
     benchmark(args)
