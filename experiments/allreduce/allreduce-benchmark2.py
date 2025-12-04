@@ -277,7 +277,7 @@ def benchmark(args):
             print("✅ Verification PASSED")
         else:
             print("❌ Verification FAILED:")
-            print(first_failure)
+            if first_failure: print(first_failure)
 
         # ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
         # dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
