@@ -151,7 +151,7 @@ def benchmark(args):
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Input {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
 
     # DPA context options
-    dpa_ctx = {"quantization": args.dpa_qnt, "averaging": args.dpa_avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, 
+    dpa_ctx = {"quantization": args.dpa_qnt, "averaging": args.avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, 
                "straggle": args.world_size if not args.straggle_k else args.straggle_k}
 
     op = dist.ReduceOp.AVG if args.avg else dist.ReduceOp.SUM # if (args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre)) else dist.ReduceOp.SUM
