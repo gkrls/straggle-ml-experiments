@@ -246,7 +246,7 @@ def benchmark(args):
     if args.verify:
         #if op != dist.ReduceOp.SUM: raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
 
-        local_ok, first_failure = True, True
+        local_ok, first_failure = True, None
         original = PATTERN[args.pattern](args)
         expected = PATTERN_OUT[args.pattern](args)
 
@@ -257,7 +257,7 @@ def benchmark(args):
             max_err = diff.max().item()
             ok = (max_err <= tol) if out.is_floating_point() else (max_err == 0)
             
-            if not ok and local_ok:
+            if not ok and first_failure == None:
                 bad = (diff > tol).nonzero(as_tuple=False).flatten()
                 idx = bad[:min(10, len(bad))].tolist()  # Show up to 10 errors
                 flat_out = out.flatten()
@@ -269,8 +269,12 @@ def benchmark(args):
                                 f"  Bad samples (index, original, expected, actual): {samples}")
                 local_ok = False
 
+        ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
+        dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
+        local_ok = ok_tensor.item()
+
         if local_ok:
-            print("✅ Verification PASSED (simple SUM).")
+            print("✅ Verification PASSED")
         else:
             print("❌ Verification FAILED:")
             print(first_failure)
