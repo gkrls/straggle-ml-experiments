@@ -66,7 +66,7 @@
     "timeout_us": 50,
     "threads": 6,
     "window":  64,
-    "tx_burst": 64,
+    "tx_burst": 124,
     "rx_burst": 64,
     "rx_pool_size": 65536,
     "rx_pool_cache": 512,
