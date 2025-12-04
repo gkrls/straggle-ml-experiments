@@ -248,9 +248,10 @@ def benchmark(args):
 
         local_ok, first_failure = True, True
         original = PATTERN[args.pattern](args)
+        expected = PATTERN_OUT[args.pattern](args)
 
         for i, out in enumerate(tensors):
-            expected = PATTERN_OUT[args.pattern](args) #original * args.world_size
+            # expected = PATTERN_OUT[args.pattern](args) #original * args.world_size
             tol = 1e-5 if args.dtype == torch.float32 else 0
             diff = (out - expected).abs()
             max_err = diff.max().item()
@@ -271,8 +272,9 @@ def benchmark(args):
         if local_ok:
             print("✅ Verification PASSED (simple SUM).")
         else:
-            print("❌ Verification FAILED (simple SUM). See rank logs above.")
-            
+            print("❌ Verification FAILED:")
+            print(first_failure)
+
         # ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
         # dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
         # if ok_tensor.item() == 1:
