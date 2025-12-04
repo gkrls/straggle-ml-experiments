@@ -310,7 +310,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--batch", action="store_true",  help="Queue all ops, single sync (like DDP)")
 
-    parser.add_argument("--avg", help="perform averaging")
+    parser.add_argument("--avg", action="store_true", help="perform averaging")
     parser.add_argument("--verify", action="store_true", help="Verify output. Only works for SUM operation (no averaging/prescaling)")
     parser.add_argument("--json", type=str, default=None)
     
