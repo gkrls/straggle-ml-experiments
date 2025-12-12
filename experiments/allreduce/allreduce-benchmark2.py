@@ -167,8 +167,8 @@ def benchmark(args):
             # Warmup
             for i in range(args.warmup): jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
             for j in jobs: j.wait()
-            jobs.clear()
             torch.cuda.synchronize()
+            jobs.clear()
 
             # Timed iterations - use same timing method for both CPU and CUDA
             t_start = time.time_ns()
