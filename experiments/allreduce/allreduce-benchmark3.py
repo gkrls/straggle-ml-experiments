@@ -167,8 +167,8 @@ def benchmark(args):
         # Warmup
         for i in range(args.warmup): jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
         for j in jobs: j.wait()
-        jobs.clear()
         torch.cuda.synchronize()
+        jobs.clear()
 
         batch_i = -1
         for i in range(args.iters):
@@ -177,13 +177,15 @@ def benchmark(args):
                 t_start = time.time_ns()
 
                 # Per-batch straggle sim
-                if args.straggle_mode == 'batch' and args.straggle_rank == args.rank and args.straggle_num > 0 and batch_i >= args.straggle_start:
+                if args.straggle_mode == 'batch':
+                  if args.straggle_rank == args.rank and args.straggle_num > 0 and batch_i >= args.straggle_start:
                     print("straggling batch!!!")
                     args.straggle_num -= 1
                     time.sleep(args.straggle_ms / 1000)
 
             # Per-operation straggle sim
-            if args.straggle_mode == 'op' and args.straggle_rank == args.rank and args.straggle_num > 0 and i >= args.straggle_start:
+            if args.straggle_mode == 'op':
+              if args.straggle_rank == args.rank and args.straggle_num > 0 and i >= args.straggle_start:
                 print("straggling batch!!!")
                 args.straggle_num -= 1
                 time.sleep(args.straggle_ms / 1000)
