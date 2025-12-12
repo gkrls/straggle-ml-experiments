@@ -330,7 +330,7 @@ if __name__ == "__main__":
     parser.add_argument("--straggle_num", type=int, default=0, help="Number of straggling batches/operations")
     parser.add_argument("--straggle_start", type=int, default=0, help="Batch/Op id to start straggling")
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
-    parser.add_argument("--straggle_mode", choices=["op", "batch"], help="Apply straggle sim per batch or per op")
+    parser.add_argument("--straggle_mode", choices=["op", "batch"], default="batch", help="Apply straggle sim per batch or per op")
     
     args = parser.parse_args()
     args.date = datetime.now().strftime("%B %d, %Y at %I:%M:%S %p")
