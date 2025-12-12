@@ -178,11 +178,13 @@ def benchmark(args):
 
                 # Per-batch straggle sim
                 if args.straggle_mode == 'batch' and args.straggle_rank == args.rank and args.straggle_num > 0 and batch_i >= args.straggle_start:
+                    print("straggling batch!!!")
                     args.straggle_num -= 1
                     time.sleep(args.straggle_ms / 1000)
 
             # Per-operation straggle sim
             if args.straggle_mode == 'op' and args.straggle_rank == args.rank and args.straggle_num > 0 and i >= args.straggle_start:
+                print("straggling batch!!!")
                 args.straggle_num -= 1
                 time.sleep(args.straggle_ms / 1000)
                 

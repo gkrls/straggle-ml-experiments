@@ -74,7 +74,7 @@ WORLD=6
 MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
-PROG=experiments/allreduce/allreduce-benchmark2.py
+PROG=experiments/allreduce/allreduce-benchmark3.py
 CONF=configs/edgecore.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true --sampling-period=200000 -d 30 -o $HOME/nsys_profile -f true"
