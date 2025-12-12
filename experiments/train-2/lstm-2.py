@@ -725,15 +725,12 @@ def main():
     # Args sanity checks/corrections
     if args.device == 'cuda' and not torch.cuda.is_available():
         args.device = 'cpu'
-        if args.rank == 0:
-            print("[Info] Using device=cpu because CUDA is not available", flush=True)
+        print("[Info] Using device=cpu because CUDA is not available", flush=True)
     if args.amp and args.device == 'cpu':
         args.amp = False
-        if args.rank == 0:
-            print("[Info] Disabling AMP because CUDA is not available", flush=True)
+        print("[Info] Disabling AMP because CUDA is not available", flush=True)
     if args.workers < 1:
-        if args.rank == 0:
-            print("[Info] Workers requested < 1; using workers=1", flush=True)
+        print("[Info] Workers requested < 1; using workers=1", flush=True)
         args.workers = 1
 
     sys.stdout.reconfigure(line_buffering=True)
