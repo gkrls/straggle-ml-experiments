@@ -174,6 +174,7 @@ def benchmark(args):
             t_start = time.time_ns()
             for i in range(args.iters):
                 if args.straggle_rank == args.rank and args.straggle_num > 0 and i >= args.straggle_start:
+                    print("straggling")
                     args.straggle_num -= 1
                     time.sleep(args.straggle_ms / 1000)
                 jobs.append(dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True))
