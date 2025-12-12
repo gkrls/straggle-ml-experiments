@@ -209,6 +209,7 @@ def benchmark(args):
             for i in range(args.iters):  print(f"[Rank {args.rank}] Output {i}:", tensors[i], f"({times[i] * 1000} ms)")
 
 
+    print("DONE")
     tensor_bytes = args.size * 4
 
     if args.backend.startswith("dpa"):
