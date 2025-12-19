@@ -116,6 +116,23 @@ def init(args):
 
     print(f"[Rank {args.rank}] Initialized {args.backend}... ")
 
+def dumps_inline_lists(o, indent=2, default=None, _lvl=0):
+    sp = " " * (indent * _lvl)
+
+    if isinstance(o, dict):
+        if not o: return "{}"
+        lines = []
+        for k, v in o.items():
+            k_s = json.dumps(k, ensure_ascii=False)
+            v_s = dumps_inline_lists(v, indent, default, _lvl + 1)
+            lines.append(f"{sp}{' ' * indent}{k_s}: {v_s}")
+        return "{\n" + ",\n".join(lines) + "\n" + sp + "}"
+
+    if isinstance(o, list):
+        return json.dumps(o, ensure_ascii=False, separators=(",", ":"), default=default)
+
+    return json.dumps(o, ensure_ascii=False, default=default)
+
 def results(args, data):
     def make_serializable(obj):
         if isinstance(obj, torch.dtype): return str(obj).split('.')[-1]  # e.g., "float32"
@@ -128,11 +145,14 @@ def results(args, data):
     with open(args.dpa_conf) as f:
         out['dpa'] = json.load(f)['dpdk']
 
-    with open(args.json, 'w') as f:
-        json.dump(out, f, indent=2)
+    s = dumps_inline_lists(out, indent=2, default=make_serializable)
 
-    print(json.dumps(out, indent=2))
-    
+    # with open(args.json, 'w') as f:
+    #     json.dump(out, f, indent=2)
+    # print(json.dumps(out, indent=2))
+    with open(args.json, "w") as f:
+        f.write(s + "\n")
+    print(s)
 
 def benchmark(args):
     
