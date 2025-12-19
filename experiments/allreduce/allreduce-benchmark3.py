@@ -218,7 +218,7 @@ def benchmark(args):
                 torch.cuda.synchronize()
                 elapsed = (time.time_ns() - t_start) / 1e9
                 per_op_time = elapsed / len(jobs)
-                times.extend([per_op_time] * len(jobs))
+                times.extend([per_op_time])
                 jobs.clear()
 
 
