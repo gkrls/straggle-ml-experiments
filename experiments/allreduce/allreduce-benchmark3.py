@@ -183,6 +183,7 @@ def benchmark(args):
     with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
         jobs = []
         times = []
+        counts = []
 
         # Warmup
         for i in range(args.warmup): jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
@@ -217,18 +218,21 @@ def benchmark(args):
                 for j in jobs: j.wait()
                 torch.cuda.synchronize()
                 elapsed = (time.time_ns() - t_start) / 1e9
-                per_op_time = elapsed / len(jobs)
-                times.extend([per_op_time])
+                times.append(elapsed / len(jobs) * 1000.0)
+                counts.append(len(jobs))
                 jobs.clear()
 
 
     tensor_bytes = args.size * 4
 
-    times_np = np.array(times) * 1000 # ms
+    times_np = np.array(times, dtype=np.float64)
+    counts_np = np.array(counts, dtype=np.float64)
     
     # Compute all local metrics
-    time_mean = np.mean(times_np) #* 1000  # ms
-    time_std = np.std(times_np) #* 1000
+    # time_mean = np.mean(times_np) #* 1000  # ms
+    time_mean = np.average(times_np, weights=counts_np)
+    # time_std = np.std(times_np) #* 1000
+    time_std  = np.sqrt(np.average((times_np - time_mean)**2, weights=counts_np))
     time_min = np.min(times_np) #* 1000
     time_max = np.max(times_np) #* 1000
     time_p50 = np.percentile(times_np, 50) #* 1000
@@ -238,6 +242,7 @@ def benchmark(args):
     data = {
         "bytes" : tensor_bytes,
         "times" : times_np.tolist(),
+        "counts": counts_np.tolist(),
         "time_unit" : "ms",
         "time_mean" : time_mean,
         "time_std"  : time_std,
