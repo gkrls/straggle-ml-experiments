@@ -234,7 +234,7 @@ def benchmark(args):
     if args.verify:
         #if op != dist.ReduceOp.SUM: raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
 
-        local_ok, first_failure = True, None
+        local_ok, dist_ok, local_first_failure = True, True, None
         original = PATTERN[args.pattern](args)
         expected = PATTERN_OUT[args.pattern](args)
 
@@ -245,27 +245,32 @@ def benchmark(args):
             max_err = diff.max().item()
             ok = (max_err <= tol) if out.is_floating_point() else (max_err == 0)
             
-            if not ok and first_failure == None:
+            if not ok and local_first_failure == None:
                 bad = (diff > tol).nonzero(as_tuple=False).flatten()
                 idx = bad[:min(10, len(bad))].tolist()  # Show up to 10 errors
                 flat_out = out.flatten()
                 flat_exp = expected.flatten()
                 flat_orig = original.flatten()
                 samples = [(j, float(flat_orig[j].item()), float(flat_exp[j].item()), float(flat_out[j].item())) for j in idx]
-                first_failure = (f"[Rank {args.rank}] Verification FAILED at tensor {i}: "
+                local_first_failure = (f"[Rank {args.rank}] Verification FAILED at tensor {i}: "
                                 f"max_err={max_err:.3e}\n"
                                 f"  Bad samples (index, original, expected, actual): {samples}")
                 local_ok = False
 
-        ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
-        dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
-        local_ok = ok_tensor.item()
-
         if local_ok:
-            print("✅ Verification PASSED")
+            print("✅ Local Verification PASSED")
         else:
-            print("❌ Verification FAILED:")
-            if first_failure: print(first_failure)
+            print("❌ Local verification FAILED at:")
+            print(local_first_failure)
+
+
+        if args.verify_dist:
+            ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
+            dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
+            dist_ok = ok_tensor.item()
+            if dist_ok: print("✅ Global Verification PASSED")
+            else: print("❌ Global Verification FAILED at ranks: ", ok_tensor.item())
+
 
         # ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
         # dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
@@ -298,6 +303,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--avg", action="store_true", help="perform averaging")
     parser.add_argument("--verify", action="store_true", help="Verify output. Only works for SUM operation (no averaging/prescaling)")
+    parser.add_argument("--verify_dist", action="store_true", help="Distributed verification")
     parser.add_argument("--json", type=str, default=None)
     
     # Statistics aggregation
@@ -330,11 +336,11 @@ if __name__ == "__main__":
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
 
     parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
-    parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle before each batch/operation")
+    parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle amount (in ms)")
     parser.add_argument("--straggle_num", type=int, default=0, help="Number of straggling batches/operations")
     parser.add_argument("--straggle_start", type=int, default=0, help="Batch/Op id to start straggling")
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
-    parser.add_argument("--straggle_mode", choices=["op", "batch"], default="batch", help="Apply straggle sim per batch or per op")
+    # parser.add_argument("--straggle_mode", choices=["op", "batch"], default="batch", help="Apply straggle sim per batch or per op")
     
     args = parser.parse_args()
     args.date = datetime.now().strftime("%B %d, %Y at %I:%M:%S %p")

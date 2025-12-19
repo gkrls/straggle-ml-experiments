@@ -75,6 +75,7 @@ MASTER_ADDR=42.0.1.1
 MASTER_PORT=29500
 
 PROG=experiments/allreduce/allreduce-benchmark2.py
+PROG3=experiments/allreduce/allreduce-benchmark3.py
 CONF=configs/edgecore.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true --sampling-period=200000 -d 30 -o $HOME/nsys_profile -f true"
@@ -84,7 +85,7 @@ GDB="gdb --args"
 # export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8  # or .so.6 depending on your GCC version
 # export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
-sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+sudo -E $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 25000000 -w 0 -i 100 --pattern 2 --avg --verify --batch \
   --straggle_k 5 --straggle_rank 1 --straggle_ms 2000 --straggle_num 10 --straggle_start 10
   # --gloo_socket_ifname $IFACE --gloo_num_threads 2
