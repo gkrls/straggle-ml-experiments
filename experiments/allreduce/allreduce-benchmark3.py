@@ -184,11 +184,11 @@ def benchmark(args):
                     time.sleep(args.straggle_ms / 1000)
 
             # Per-operation straggle sim
-            if args.straggle_mode == 'op':
-              if args.straggle_rank == args.rank and args.straggle_num > 0 and i >= args.straggle_start:
-                print("straggling batch!!!")
-                args.straggle_num -= 1
-                time.sleep(args.straggle_ms / 1000)
+            # if args.straggle_mode == 'op':
+            #   if args.straggle_rank == args.rank and args.straggle_num > 0 and i >= args.straggle_start:
+            #     print("straggling batch!!!")
+            #     args.straggle_num -= 1
+            #     time.sleep(args.straggle_ms / 1000)
                 
             jobs.append(dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True))
 
@@ -337,8 +337,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
     parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle amount (in ms)")
-    parser.add_argument("--straggle_num", type=int, default=0, help="Number of straggling batches/operations")
-    parser.add_argument("--straggle_start", type=int, default=0, help="Batch/Op id to start straggling")
+    parser.add_argument("--straggle_num", type=int, default=0, help="Number of straggling operation batches. We sleep once per batch")
+    parser.add_argument("--straggle_start", type=int, default=0, help="Batch id to start straggling")
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
     # parser.add_argument("--straggle_mode", choices=["op", "batch"], default="batch", help="Apply straggle sim per batch or per op")
     
