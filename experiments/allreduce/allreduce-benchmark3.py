@@ -368,6 +368,8 @@ if __name__ == "__main__":
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
     args.dpa_qnt = args.type == "float32"     # ignore user. just enable quant if floats or disable if not
 
+    if args.batch == 0: args.batch = args.iters
+
     # Validation
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
