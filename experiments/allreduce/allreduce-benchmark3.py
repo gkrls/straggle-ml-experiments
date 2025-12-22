@@ -256,7 +256,7 @@ def benchmark(args):
     }
 
 
-    if args.verify:
+    if args.verify > 0:
         #if op != dist.ReduceOp.SUM: raise RuntimeError("Verification only supports simple SUM. Disable DPA averaging/prescaling")
 
         local_ok, dist_ok, local_first_failure = True, True, None
@@ -289,7 +289,7 @@ def benchmark(args):
             print(local_first_failure)
 
 
-        if args.verify_dist:
+        if args.verify == 2:
             ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
             dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
             dist_ok = ok_tensor.item()
@@ -327,8 +327,8 @@ if __name__ == "__main__":
     parser.add_argument("--batch", nargs="?", const=0, type=int, default=1, help="Number of allreduce calls before sync (default=1)")
 
     parser.add_argument("--avg", action="store_true", help="perform averaging")
-    parser.add_argument("--verify", action="store_true", help="Verify output. Only works for SUM operation (no averaging/prescaling)")
-    parser.add_argument("--verify_dist", action="store_true", help="Distributed verification")
+    parser.add_argument("--verify", nargs="?", const=1, type=int, choises=[0,1,2], default=0, action="store_true", help="Verify output. Only works for SUM operation (no averaging/prescaling)")
+    # parser.add_argument("--verify_dist", action="store_true", help="Distributed verification")
     parser.add_argument("--json", type=str, default=None)
     
     # Statistics aggregation
