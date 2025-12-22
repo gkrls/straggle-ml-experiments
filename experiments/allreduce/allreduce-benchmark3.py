@@ -291,10 +291,21 @@ def benchmark(args):
 
         if args.verify == 2:
             ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
-            dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
-            dist_ok = ok_tensor.item()
-            if dist_ok: print("✅ Global Verification PASSED")
-            else: print("❌ Global Verification FAILED at ranks: ", ok_tensor.item())
+            # Gather flags from all ranks
+            gathered = [torch.empty_like(ok_tensor) for _ in range(args.world_size)]
+            dist.all_gather(gathered, ok_tensor)
+
+            ok_list = [t.item() for t in gathered]
+            bad_ranks = [r for r, ok in enumerate(ok_list) if ok == 0]
+            if not bad_ranks:
+                print("✅ Global Verification PASSED")
+            else:
+                print(f"❌ Global Verification FAILED on ranks: {bad_ranks}")
+
+            # dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
+            # dist_ok = ok_tensor.item()
+            # if dist_ok: print("✅ Global Verification PASSED")
+            # else: print("❌ Global Verification FAILED at ranks: ", ok_tensor.item())
 
 
         # ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
