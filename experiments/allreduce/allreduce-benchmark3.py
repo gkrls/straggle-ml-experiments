@@ -22,17 +22,15 @@ torch.set_printoptions(
 
 PATTERN = {
     1: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)),                    # 1,1,1,1...
-    2: lambda args: torch.arange(args.size, device=torch.device(args.device)).remainder(5).add(1).to(args.dtype), # 1,2,3,4,5,1,2,3...
-    3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * (args.rank + 1)   # rank+1,rank+1,rank+1...
+    2: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * (args.rank + 1),  # rank+1,rank+1,rank+1...
+    3: lambda args: torch.arange(args.size, device=torch.device(args.device)).remainder(5).add(1).to(args.dtype), # 1,2,3,4,5,1,2,3...
 }
 
 PATTERN_OUT = {
     1: lambda args: PATTERN[1](args) * (args.world_size if not args.avg else 1),
+    2: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1))),
     2: lambda args: PATTERN[2](args) * (args.world_size if not args.avg else 1),
-    3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1)))
 }
-
-PATTERN_NOVERIFY_IF_STRAG = [3]
 
 def init(args):
     os.environ["MASTER_ADDR"] = args.master_addr
@@ -389,7 +387,7 @@ if __name__ == "__main__":
     # Validation
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
-    # if args.verify and (args.pattern in PATTERN_NOVERIFY_IF_STRAG): raise RuntimeError(f"Cannot reliably verify pattern {args.pattern} with straggle awareness enabled")
+    if args.verify and args.straggle_k not in [0, args.world_size]: raise RuntimeError(f"Cannot reliably verify results with straggle awareness enabled")
     
     init(args)
     benchmark(args)
