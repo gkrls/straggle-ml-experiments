@@ -327,7 +327,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch", nargs="?", const=0, type=int, default=1, help="Number of allreduce calls before sync (default=1)")
 
     parser.add_argument("--avg", action="store_true", help="perform averaging")
-    parser.add_argument("--verify", nargs="?", const=1, type=int, choises=[0,1,2], default=0, help="Verify output. 0=no verification 1=local only, 2=local + global (default=0)")
+    parser.add_argument("--verify", nargs="?", const=1, type=int, choices=[0,1,2], default=0, help="Verify output. 0=no verification 1=local only, 2=local + global (default=0)")
     # parser.add_argument("--verify_dist", action="store_true", help="Distributed verification")
     parser.add_argument("--json", type=str, default=None)
     
