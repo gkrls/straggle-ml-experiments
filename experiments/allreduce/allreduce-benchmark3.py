@@ -21,9 +21,9 @@ torch.set_printoptions(
 )
 
 PATTERN = {
-    1: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)),
-    2: lambda args: torch.arange(args.size, device=torch.device(args.device)).remainder(5).add(1).to(args.dtype),
-    3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * (args.rank + 1)
+    1: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)),                    # 1,1,1,1...
+    2: lambda args: torch.arange(args.size, device=torch.device(args.device)).remainder(5).add(1).to(args.dtype), # 1,2,3,4,5,1,2,3...
+    3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * (args.rank + 1)   # rank+1,rank+1,rank+1...
 }
 
 PATTERN_OUT = {
@@ -226,7 +226,7 @@ def benchmark(args):
     tensor_bytes = args.size * 4
 
     times_np = np.array(times, dtype=np.float64)
-    counts_np = np.array(counts, dtype=np.float64)
+    counts_np = np.array(counts, dtype=np.int32)
     
     # Compute all local metrics
     # time_mean = np.mean(times_np) #* 1000  # ms
