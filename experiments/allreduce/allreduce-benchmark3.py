@@ -53,7 +53,7 @@ def init(args):
         pg_options.hint_pinned_tensor_size = args.size * 4
         pg_options.hint_pinned_tensor_pool_size = args.warmup + args.iters
 
-        print(f"[Rank {args.rank}] DPA: {backend.addr}:{backend.port}, backend: {args.backend}")
+        print(f"[Rank {args.rank}] Using DPA with {'dpdk' if args.dpa_dpdk else 'socket'} backend") #
 
         os.environ["GLOO_SOCKET_IFNAME"] = backend['iface']
         dist.init_process_group(backend=args.backend, init_method=init_method, 
