@@ -78,7 +78,6 @@ PROG=experiments/allreduce/allreduce-benchmark2.py
 PROG3=experiments/allreduce/allreduce-benchmark3.py
 CONF=configs/edgecore.json
 CONF_NS=configs/edgecore-ns.json
-CONF=$CONF_SU
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true --sampling-period=200000 -d 30 -o $HOME/nsys_profile -f true"
 PERF="perf stat -d --"
