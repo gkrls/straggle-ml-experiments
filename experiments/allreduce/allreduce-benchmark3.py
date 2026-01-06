@@ -44,8 +44,8 @@ def init(args):
         if not dpa: raise RuntimeError(f"DPA module not found!")
         if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
         with open(args.dpa_conf) as f:
-            conf = json.loads(f)
-            if not conf["switch"]["program"].get("straggle_aware", False) and args.dpa_world_k and args.dpa_world_k < args.world_size:
+            conf = json.loads(f.read())
+            if not conf["switch"]["program"].get("straggle_aware", False) and args.dpa_world_k < args.world_size:
                 raise RuntimeError(f"--dpa_world_k cannot be used with straggle unaware program")
 
         # Load DPA config
@@ -387,6 +387,7 @@ if __name__ == "__main__":
     args.json = args.json if args.json is not None else os.path.join(os.path.dirname(__file__), "allreduce-benchmark3-out.json")
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
     args.batch = args.iters if args.batch == 0 else args.batch
+    args.dpa_world_k = args.world_size if args.dpa_world_k == 0 else args.dpa_world_k
 
     # Validation
     if args.dpa_pre and not args.avg: raise RuntimeError("--dpa_pre only available with --avg")
