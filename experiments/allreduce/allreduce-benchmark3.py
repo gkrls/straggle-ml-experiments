@@ -41,8 +41,13 @@ def init(args):
     init_method = f"tcp://{args.master_addr}:{args.master_port}"
     
     if args.backend.startswith("dpa"):
-        if not dpa or not args.dpa_conf: raise RuntimeError(f"DPA module and --dpa_conf required for {args.backend}")
-        
+        if not dpa: raise RuntimeError(f"DPA module not found!")
+        if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
+        with open(args.dpa_conf) as f:
+            conf = json.loads(f)
+            if not conf["switch"]["program"].get("straggle_aware", False) and args.dpa_world_k and args.dpa_world_k < args.world_size:
+                raise RuntimeError(f"--dpa_world_k cannot be used with straggle unaware program")
+
         # Load DPA config
         dpdk = args.backend == "dpa_dpdk"
         device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
@@ -169,8 +174,8 @@ def benchmark(args):
     for i in range(args.warmup + args.iters): print(f"[Rank {args.rank}] Input {i}:", tensors[i], "(warmup)" if i < args.warmup else "")
 
     # DPA context options
-    dpa_ctx = {"quantization": args.dpa_qnt, "averaging": args.avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, 
-               "straggle": args.world_size if not args.straggle_k else args.straggle_k}
+    dpa_ctx = {"quantization": 'float' in args.type, "averaging": args.avg, "prescaled": args.dpa_pre,
+               "pipes": args.dpa_pipes, "straggle": args.dpa_world_k}
 
     op = dist.ReduceOp.AVG if args.avg else dist.ReduceOp.SUM # if (args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre)) else dist.ReduceOp.SUM
 
@@ -229,26 +234,26 @@ def benchmark(args):
     # Compute all local metrics
     # time_mean = np.mean(times_np) #* 1000  # ms
     time_mean = np.average(times_np, weights=counts_np)
-    # time_std = np.std(times_np) #* 1000
-    time_std  = np.sqrt(np.average((times_np - time_mean)**2, weights=counts_np))
-    time_min = np.min(times_np) #* 1000
-    time_max = np.max(times_np) #* 1000
-    time_p50 = np.percentile(times_np, 50) #* 1000
-    time_p95 = np.percentile(times_np, 95) #* 1000
-    time_p99 = np.percentile(times_np, 99) #* 1000    
+    time_std = np.std(times_np) #* 1000
+    # time_std  = np.sqrt(np.average((times_np - time_mean)**2, weights=counts_np))
+    # time_min = np.min(times_np) #* 1000
+    # time_max = np.max(times_np) #* 1000
+    # time_p50 = np.percentile(times_np, 50) #* 1000
+    # time_p95 = np.percentile(times_np, 95) #* 1000
+    # time_p99 = np.percentile(times_np, 99) #* 1000    
         
     data = {
         "bytes" : tensor_bytes,
         "times" : times_np.tolist(),
         "counts": counts_np.tolist(),
         "time_unit" : "ms",
-        "time_mean" : time_mean,
+        "time_mean" : time_mean, #np.average(times_np, weights=counts_np),
         "time_std"  : time_std,
-        "time_min"  : time_min,
-        "time_max"  : time_max,
-        "time_p50"  : time_p50,
-        "time_p95"  : time_p95,
-        "time_p99"  : time_p99,
+        "time_min"  : np.min(times_np) ,
+        "time_max"  : np.max(times_np),
+        "time_p50"  : np.percentile(times_np, 50),
+        "time_p95"  : np.percentile(times_np, 95),
+        "time_p99"  : np.percentile(times_np, 99),
         "elem_per_sec" : args.size / (time_mean / 1000),
         "gbit_per_sec" : tensor_bytes * 8 / (time_mean / 1000) / 1e9
     }
@@ -337,7 +342,6 @@ if __name__ == "__main__":
 
     parser.add_argument("--avg", action="store_true", help="perform averaging")
     parser.add_argument("--verify", nargs="?", const=1, type=int, choices=[0,1,2], default=0, help="Verify output. 0=no verification 1=local only, 2=local + global (default=0)")
-    # parser.add_argument("--verify_dist", action="store_true", help="Distributed verification")
     parser.add_argument("--json", type=str, default=None)
     
     # Statistics aggregation
@@ -365,11 +369,13 @@ if __name__ == "__main__":
     
     # DPA specific arguments
     parser.add_argument("--dpa_conf", help="DPA config file")
-    parser.add_argument("--dpa_qnt", action="store_true", help="Quantization (single exponent)")
-    parser.add_argument("--dpa_pre", action="store_true", help="Prescaling")
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
+    parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
 
-    parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
+    # parser.add_argument("--dpa_qnt", action="store_true", help="Quantization (single exponent)")
+    parser.add_argument("--dpa_pre", action="store_true", help="Enable prescaling on averaging operations (--avg)")
+
+    # parser.add_argument("--straggle_k", type=int, default=0, help="Straggle K value")
     parser.add_argument("--straggle_ms", type=float, default=0, help="Straggle amount (in ms)")
     parser.add_argument("--straggle_num", type=int, default=0, help="Number of straggling batches/operations")
     parser.add_argument("--straggle_start", type=int, default=0, help="Batch/Op id to start straggling")
@@ -378,13 +384,12 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     args.date = datetime.now().strftime("%B %d, %Y at %I:%M:%S %p")
-    args.json = args.json if args.json is not None else os.path.join(os.path.dirname(__file__), "allreduce-benchmark2.json")
+    args.json = args.json if args.json is not None else os.path.join(os.path.dirname(__file__), "allreduce-benchmark3-out.json")
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
-    args.dpa_qnt = args.type == "float32"     # ignore user. just enable quant if floats or disable if not
-
-    if args.batch == 0: args.batch = args.iters
+    args.batch = args.iters if args.batch == 0 else args.batch
 
     # Validation
+    if args.dpa_pre and not args.avg: raise RuntimeError("--dpa_pre only available with --avg")
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
     if args.verify and args.straggle_k not in [0, args.world_size]: raise RuntimeError(f"Cannot reliably verify results with straggle awareness enabled")
