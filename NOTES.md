@@ -19,3 +19,19 @@ dpa: new-task allreduce.1130 [7087872 x f32] 0x7fca84000000 > 0x7fca84000000 4-p
 dpa: new-task allreduce.1131 [7087872 x f32] 0x7fca82000000 > 0x7fca82000000 4-pipe average quant.1 no-straggle 
 dpa: new-task allreduce.1132 [39385344 x f32] 0x7fca72000000 > 0x7fca72000000 4-pipe average quant.1 no-straggle 
 ```
+
+
+### Switch timeout profile
+
+|  Timeout (ms)  | tsc | 100 batch        | 100               | 1                |
+|----------------|-----|------------------|-------------------|------------------|
+|  0.05 (0.065)  | 1   | 58800834 / 23766 | 58709251 / 115349 | 585589 / 2657    |
+|  0.1  (0.13)   | 2   | 58808118 / 16482 | 58789741 / 34859  | 586780 / 1466    |
+|  0.2  (0.26)   | 4   | 58814431 / 10169 | 58822561 / 2039 * | 586648 / 1598    |
+|  0.3  (0.32)   | 5   | 58813042 / 11558 | 58823413 / 1187   | 587100 / 1146    |
+|  0.5  (0.52)   | 8   | 58815840 / 8760  | 58823452 / 1148   | 587670 / 576 *** |    <---
+
+
+* sometimes, not all pipelines agree on timeout
+** sometimes timeouts are (relatively) much higher (~ 2x)
+*** sometimes timeouts can be both 2x higher or lower 

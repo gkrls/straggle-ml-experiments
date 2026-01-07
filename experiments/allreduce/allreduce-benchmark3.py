@@ -226,6 +226,8 @@ def benchmark(args):
                 jobs.clear()
 
 
+    print("done")
+    
     tensor_bytes = args.size * 4
 
     times_np = np.array(times, dtype=np.float64)
