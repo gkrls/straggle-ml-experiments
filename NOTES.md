@@ -34,8 +34,8 @@ dpa: new-task allreduce.1132 [39385344 x f32] 0x7fca72000000 > 0x7fca72000000 4-
 |  1.5  (1.50)   | 23  |
 
 
-1.0 / 0.250  -->  62Gb
-1.5 / 0.250  -->
+1.0 / 0.250  (4-5) -->  62Gb
+1.5 / 0.250  (6-7) -->  
 
 * sometimes, not all pipelines agree on timeout
 ** sometimes timeouts are (relatively) much higher (~ 2x)
