@@ -48,7 +48,7 @@
         "ports": ["1/0", "2/0", "3/0", "4/0", "5/0", "6/0"],
         "pool_base": 0,
         "pool_size": 16384,
-        "straggle_timeout_ms": 2,
+        "straggle_timeout_ms": 1.5,
         "mgid": 2,
         "dropsim": {
           "ingress": 0.0,
