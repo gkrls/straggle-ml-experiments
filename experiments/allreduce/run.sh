@@ -42,7 +42,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_FASTESTK_BULK=OFF \
         -DDPA_SYNCHRON_BULK=OFF \
-        -DDPA_DPDK_RE_DISABLE=ΟΝ \
+        -DDPA_DPDK_RE_DISABLE=ΟFF \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
@@ -89,7 +89,7 @@ GDB="gdb --args"
 # normal run
 echo "[STRAGGLE AWARE BENCHMARK]"
 sudo -E $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 25000000 -w 0 -i 1 --pattern 3 --batch \
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 25000000 -w 0 -i 100 --pattern 3 --batch \
   --dpa_world_k 5 --avg --straggle_rank 1 --straggle_ms 2000 --straggle_num 10 --straggle_start 10 --straggle_mode op
   # --gloo_socket_ifname $IFACE --gloo_num_threads 2
   # --nccl_socket_nthreads 6 --nccl_nsocks_perthread 2
