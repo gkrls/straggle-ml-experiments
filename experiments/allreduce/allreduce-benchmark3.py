@@ -28,8 +28,8 @@ PATTERN = {
 
 PATTERN_OUT = {
     1: lambda args: PATTERN[1](args) * (args.world_size if not args.avg else 1),
-    2: lambda args: PATTERN[2](args) * (args.world_size if not args.avg else 1),
-    3: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1))),
+    2: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1))),
+    3: lambda args: PATTERN[2](args) * (args.world_size if not args.avg else 1),
 }
 
 def init(args):
