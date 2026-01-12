@@ -32,8 +32,8 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DDPA_TRACE=OFF \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DDPA_TRACE=ON \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
