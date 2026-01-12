@@ -70,18 +70,18 @@ def init(args):
             print(f"[Rank {args.rank}] Using Gloo with interface: {args.gloo_socket_ifname}")
         else:
             print(f"[Rank {args.rank}] Using Gloo with default interface")
-        
+
         if args.gloo_num_threads: os.environ["GLOO_NUM_THREADS"] = str(args.gloo_num_threads)
 
         dist.init_process_group(backend="gloo", init_method=init_method, rank=args.rank, world_size=args.world_size)
-    
+
     elif args.backend.startswith("nccl"):
         # Handle NCCL with RDMA or TCP
         actual_backend = "nccl"
 
         # Set socket interface for TCP operations (used by all NCCL modes)
         if args.nccl_socket_ifname: os.environ["NCCL_SOCKET_IFNAME"] = args.nccl_socket_ifname
-        
+
         if args.backend == "nccl_tcp":
             # Force TCP mode by disabling InfiniBand
             os.environ["NCCL_IB_DISABLE"] = "1"
@@ -90,8 +90,7 @@ def init(args):
 
             if args.nccl_socket_nthreads: os.environ["NCCL_SOCKET_NTHREADS"] = str(args.nccl_socket_nthreads)
             if args.nccl_nsocks_perthread: os.environ["NCCL_NSOCKS_PERTHREAD"] = str(args.nccl_nsocks_perthread)
-        
-            
+
         elif args.backend == "nccl_rdma":
             # Enable RDMA mode (default for NCCL if IB/RoCE available)
             os.environ["NCCL_IB_DISABLE"] = "0"

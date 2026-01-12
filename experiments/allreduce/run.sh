@@ -32,7 +32,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
-        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_BUILD_TYPE=Release \
         -DDPA_TRACE=ON \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
@@ -80,7 +80,7 @@ CONF=configs/edgecore.json
 CONF_NS=configs/edgecore-ns.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true --sampling-period=200000 -d 30 -o $HOME/nsys_profile -f true"
-PERF="perf stat -d --"
+PERF="perf stat -d --" # perf stat -e cache-misses,cache-references
 GDB="gdb --args"
 
 # export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8  # or .so.6 depending on your GCC version
@@ -98,7 +98,7 @@ echo "[STRAGGLE AWARE BENCHMARK]"
 # ns run
 # echo "[STRAGGLE UNAWARE BENCHMARK]"
 sudo -E $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF_NS --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 1024 -w 0 -i 1 --pattern 3 --batch --verify \
+  --dpa_conf $CONF_NS --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 1280 -w 0 -i 1 --pattern 3 --batch --verify \
   --straggle_rank 1 --straggle_ms 2000 --straggle_num 10 --straggle_start 10 --straggle_mode op
 
 # sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
@@ -117,7 +117,7 @@ sudo -E $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $M
 # sudo -E $(which python) experiments/allreduce-benchmark.py --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
 #   --d_conf configs/config-edgecore.json -b nccl -d cuda -t float32 -s 1000 -i 5 -w 3 -v "$@"
 
-# perf stat -e cache-misses,cache-references
+
 # dpa: backend finished with pool[0:16] seqnums: 6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1...
 
 
