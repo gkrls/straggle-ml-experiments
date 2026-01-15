@@ -39,19 +39,24 @@ dpa: new-task allreduce.1132 [39385344 x f32] 0x7fca72000000 > 0x7fca72000000 4-
 | 10.0  (10.02)  | 153 | 58824600 / 0 *   | 58824600 / 0      | 588246 / 0       |
 | 12.5  (12.51)  | 191 | 58824600 / 0     | 58824600 / 0      | 588246 / 0       |
 
-```
-1.0 / 0.250  (4-5)    -->  62Gb
-1.0 / 0.125  (8-9)    -->  
-1.5 / 0.400  (4)      -->  61Gb
-1.5 / 0.250  (6-7)    -->  60Gb
-1.5 / 0.125  (12-13)  -->  61Gb
-2.0 / 0.500  (4-5)    -->  57Gb
-2.0 / 0.250  (8-9)    -->  58Gb
-2.0 / 0.125  (16-17)  -->  59Gb
-12.5/ 0.125  (124-125)-->  34Gb
-12.5/ 1.250  (10-11)  -->  33Gb 
-```
+\* sometimes, not all pipelines agree on timeout <br/>
+** sometimes timeouts are higher (~ 2x)          <br/>
+*** sometimes timeouts can be both 2x higher or lower
 
-* sometimes, not all pipelines agree on timeout
-** sometimes timeouts are higher (~ 2x)
-*** sometimes timeouts can be both 2x higher or lower 
+**Aggregation throughput at rank 0**
+
+| Switch timeout (ms) | Worker timeout (ms) |  rtx  | Throughput (Gb/s) |
+|---------------------|---------------------|-------|-------------------|
+| 1.0                 | 0.250               | 4-5   | 62                |
+| 1.0                 | 0.125               | 8-9   | 63                |
+| 1.5                 | 0.400               | 4     | 61                |
+| 1.5                 | 0.250               | 6-7   | 60                |
+| 1.5                 | 0.125               | 12-13 | 61                |
+| 2.0                 | 0.500               | 4-5   | 57                |
+| 2.0                 | 0.250               | 8-9   | 58                |
+| 2.0                 | 0.125               | 16-17 | 59                |
+| 12.5                | 1.250               | 10-11 | 33                |
+| 12.5                | 0.125               |124-125| 34                |
+
+
+ 
