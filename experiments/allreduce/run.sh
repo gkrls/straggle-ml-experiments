@@ -42,7 +42,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_FASTESTK_BULK=OFF \
         -DDPA_SYNCHRON_BULK=OFF \
-        -DDPA_DPDK_RE_DISABLE=ON \
+        -DDPA_DPDK_RE_DISABLE=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
@@ -83,22 +83,21 @@ NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=tr
 PERF="perf stat -d --" # perf stat -e cache-misses,cache-references
 GDB="gdb --args"
 
-# export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8  # or .so.6 depending on your GCC version
+# export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8
 # export ASAN_OPTIONS=symbolize=1,abort_on_error=1,print_stats=1,check_initialization_order=1
 
-# normal run
-# echo "[STRAGGLE AWARE BENCHMARK]"
-# sudo -E $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-#   --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 25000000 -w 0 -i 100 --pattern 3 --batch \
-#   --dpa_world_k 5 --avg --straggle_rank 1 --straggle_ms 2000 --straggle_num 10 --straggle_start 10 --straggle_mode op
+echo "[STRAGGLE AWARE BENCHMARK]"
+sudo -E $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+  --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 25000000 -w 0 -i 20 --pattern 1 --batch \
+  --dpa_world_k 5 --avg --straggle_rank 1 --straggle_ms 2000 --straggle_num 10 --straggle_start 0 --straggle_mode op
 #   # --gloo_socket_ifname $IFACE --gloo_num_threads 2
   # --nccl_socket_nthreads 6 --nccl_nsocks_perthread 2
   # --pattern 1 --nccl_ib_qps_per_connection 1
 
 # ns run
-echo "[STRAGGLE UNAWARE BENCHMARK]"
-sudo -E $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  --dpa_conf $CONF_NS --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 1024000 -w 0 -i 1 --pattern 3 --batch --verify 
+# echo "[STRAGGLE UNAWARE BENCHMARK]"
+# sudo -E $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+#   --dpa_conf $CONF_NS --dpa_pipes 4 -b dpa_dpdk -d cuda -t int32 -s 25000000 -w 0 -i 1 --pattern 1 --batch --verify 
   # --straggle_rank 1 --straggle_ms 2000 --straggle_num 10 --straggle_start 10 --straggle_mode op
 
 # sudo -E $(which python) $PROG --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
