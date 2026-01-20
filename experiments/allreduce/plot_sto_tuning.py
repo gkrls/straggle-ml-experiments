@@ -58,7 +58,6 @@ data = {
     "6.00": {"tsc":92, "real":6.029, "rto":3.05,"all":11764920,"to":[ 384,   0, 291,   0],"gbit":[59.60,60.27,56.99,61.48],"time":[13.42,13.27,14.03,13.01]},
     "7.00": {"tsc":107,"real":7.012, "rto":3.55,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[61.06,61.09,61.48,61.28],"time":[13.10,13.09,13.01,13.05]},
   },
-
   "batch-natural-sa-half-async": {
     "3.50": {"tsc":54, "real":3.538, "rto":1.80,"all":11764920,"to":[ 512, 338, 896,1921],"gbit":[59.06,59.46,57.74,60.85],"time":[13.54,13.45,13.85,13.14]},
     # "4.00": {"tsc":62, "real":4.063, "rto":2.05,"all":11764920,"to":[ 128,   0,   1, 640],"gbit":[60.84,61.13,60.40,59.39],"time":[13.14,13.08,13.24,13.46]},
@@ -67,6 +66,8 @@ data = {
     # "5.50": {"tsc":84, "real":5.505, "rto":2.80,"all":11764920,"to":[   0, 320,  64,  64],"gbit":[61.45,61.33,60.13,60.77],"time":[13.01,13.04,13.30,13.16]},
     # "6.00": {"tsc":92, "real":6.029, "rto":3.05,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[60.40,61.14,61.08,61.71],"time":[13.24,13.34,13.09,12.96]},
   },
+  ######################
+  ######################
   "batch-force1-sa-1.00-async": {
     "1.00": {"tsc":16, "real":1.048, "rto":0.53,"all":11764920,"gbit":[55.34],"time":[14.45]},
     "1.50": {"tsc":16, "real":1.048, "rto":0.53,"all":11764920,"gbit":[55.22,55.31],"time":[14.48,14.46]},
@@ -75,7 +76,10 @@ data = {
     "7.00": {"tsc":107,"real":7.012, "rto":1.00,"all":11764920,"gbit":[39.14,39.71,39.67,39.45],"time":[20.43,20.14,20.16,20.27]},
   },
   "batch-force1-sa-0.15-async": {
-    "1.00": {"tsc":16, "real":1.048, "rto":0.53,"all":11764920,"gbit":[55.34],"time":[14.45]},
+    "1.00": {"tsc":16, "real":1.048,"rto":0.15,"all":11764920,"gbit":[57.68,57.74,57.56,57.56],"time":[13.86,13.85,13.89,13.89]},
+  },
+  "batch-force1-sa-half-async": {
+    "1.00": {"tsc":16, "real":1.048,"rto":0.55,"all":11764920,"gbit":[],"time":[]},
   }
 }
 
@@ -123,14 +127,16 @@ axr = axl.twinx()
 axr.set_ylim(30, 65)
 
 # success packets sync
-x,y = get_series(data["batch-natural-nosa-nore-sync"], "to")
-axl.plot(x, y, marker="o", label="natural-nosa-nore-sync (left)")
+# x,y = get_series(data["batch-natural-nosa-nore-sync"], "to")
+# axl.plot(x, y, marker="o", label="natural-nosa-nore-sync (left)")
 x,y = get_series(data["batch-natural-nosa-nore-async"], "to")
 axl.plot(x, y, marker="^", label="natural-nosa-nore-async (left)")
 x,y = get_series(data["batch-natural-sa-1.00-async"], "gbit")
 axr.plot(x, y, marker="^", label="batch-natural-sa-1.00-async (right)")
 x,y = get_series(data["batch-force1-sa-1.00-async"], "gbit")
-axr.plot(x, y, marker="v", label="batch-force1-sa-1.00-async (right)")
+axr.plot(x, y, marker="+", label="batch-force1-sa-1.00-async (right)")
+x,y = get_series(data["batch-force1-sa-0.15-async"], "gbit")
+axr.plot(x, y, marker="*", color="purple", label="batch-force1-sa-0.15-async (right)")
 
 plt.legend()
 # plt.tight_layout()
