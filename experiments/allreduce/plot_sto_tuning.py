@@ -51,6 +51,12 @@ data = {
 
   "batch-natural-sa-1.00-async": {
     "3.50": {"tsc":54, "real":3.538, "rto":1.00,"all":11764920,"to":[ 704,   0,   0,1792],"gbit":[61.45,59.83,60.21,52.63],"time":[13.01,13.36,13.28,15.20]},
+    "4.00": {"tsc":69, "real":4.521, "rto":1.00,"all":11764920,"to":[   0, 760, 320,   0],"gbit":[60.21,54.67,60.51,60.01],"time":[13.28,14.63,13.21,13.32]},
+    "4.50": {"tsc":62, "real":4.063, "rto":2.05,"all":11764920,"to":[ 384,   0,   0, 256],"gbit":[57.34,60.83,60.10,58.11],"time":[13.95,13.15,13.31,13.76]},
+    "5.00": {"tsc":84, "real":5.505, "rto":2.80,"all":11764920,"to":[   0,   0, 512,   0],"gbit":[60.70,60.36,56.40,61.05],"time":[13.17,13.25,14.18,13.10]},
+    "5.50": {"tsc":84, "real":5.505, "rto":2.80,"all":11764920,"to":[   0,   0, 256,   0],"gbit":[60.67,61.80,57.80,61.46],"time":[13.18,12.94,13.83,13.01]},
+    "6.00": {"tsc":92, "real":6.029, "rto":3.05,"all":11764920,"to":[ 384,   0, 291,   0],"gbit":[59.60,60.27,56.99,61.48],"time":[13.42,13.27,14.03,13.01]},
+    "7.00": {"tsc":107,"real":7.012, "rto":3.55,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[61.06,61.09,61.48,61.28],"time":[13.10,13.09,13.01,13.05]},
   },
 
   "batch-natural-sa-half-async": {
@@ -61,6 +67,16 @@ data = {
     # "5.50": {"tsc":84, "real":5.505, "rto":2.80,"all":11764920,"to":[   0, 320,  64,  64],"gbit":[61.45,61.33,60.13,60.77],"time":[13.01,13.04,13.30,13.16]},
     # "6.00": {"tsc":92, "real":6.029, "rto":3.05,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[60.40,61.14,61.08,61.71],"time":[13.24,13.34,13.09,12.96]},
   },
+  "batch-force1-sa-1.00-async": {
+    "1.00": {"tsc":16, "real":1.048, "rto":0.53,"all":11764920,"gbit":[55.34],"time":[14.45]},
+    "1.50": {"tsc":16, "real":1.048, "rto":0.53,"all":11764920,"gbit":[55.22,55.31],"time":[14.48,14.46]},
+    "3.50": {"tsc":54, "real":3.538, "rto":1.00,"all":11764920,"gbit":[49.23],"time":[16.24]},
+    "6.00": {"tsc":92, "real":6.029, "rto":1.00,"all":11764920,"gbit":[40.00,39.68,39.75,39.84],"time":[19.99,20.16,20.12,20.07]},
+    "7.00": {"tsc":107,"real":7.012, "rto":1.00,"all":11764920,"gbit":[39.14,39.71,39.67,39.45],"time":[20.43,20.14,20.16,20.27]},
+  },
+  "batch-force1-sa-0.15-async": {
+    "1.00": {"tsc":16, "real":1.048, "rto":0.53,"all":11764920,"gbit":[55.34],"time":[14.45]},
+  }
 }
 
 
@@ -75,18 +91,25 @@ def series_success(exp):
             pts.append((float(k), (v["all"] - mean(v["to"])) / v["all"]))
     # pts.sort()
     return [x for x,_ in pts], [y for _,y in pts]
+def zoom(ax, ys, pad=0.15):
+    lo, hi = min(ys), max(ys)
+    m = (hi - lo) * pad if hi != lo else 1e-6
+    ax.set_ylim(lo - m, hi + m)
 
-def series_timeout(exp):
+def get_timeouts(exp):
   pts = []
   for k,v in exp.items():
       if "to" in v and v.get("to"):
           pts.append( (float(k), sum(v["to"]) / len(v["to"]) ))
   return [x for x,_ in pts], [y for _,y in pts]
 
-def zoom(ax, ys, pad=0.15):
-    lo, hi = min(ys), max(ys)
-    m = (hi - lo) * pad if hi != lo else 1e-6
-    ax.set_ylim(lo - m, hi + m)
+
+def get_series(data, key):
+  pts = []
+  for k,v in data.items():
+      if key in v and v.get(key):
+          pts.append( ( float(k), sum(v[key]) / len(v[key]) ))
+  return [x for x,_ in pts], [y for _,y in pts]
 
 natural_sync = data["batch-natural-nosa-nore-sync"]
 natural_async = data["batch-natural-nosa-nore-async"]
@@ -97,14 +120,20 @@ axl.set_xlim(0.25, 15.0)
 axl.set_xticks(xt)
 axl.set_xticklabels([f"{v:g}" if i % 4 == 0 else "" for i, v in enumerate(xt, 1)])
 axr = axl.twinx()
+axr.set_ylim(30, 65)
 
 # success packets sync
-x,y = series_timeout(data["batch-natural-nosa-nore-sync"])
-axl.plot(x, y, marker="o", label="sync success")
-x,y = series_timeout(data["batch-natural-nosa-nore-async"])
-axl.plot(x, y, marker="^", label="sync success")
+x,y = get_series(data["batch-natural-nosa-nore-sync"], "to")
+axl.plot(x, y, marker="o", label="natural-nosa-nore-sync (left)")
+x,y = get_series(data["batch-natural-nosa-nore-async"], "to")
+axl.plot(x, y, marker="^", label="natural-nosa-nore-async (left)")
+x,y = get_series(data["batch-natural-sa-1.00-async"], "gbit")
+axr.plot(x, y, marker="^", label="batch-natural-sa-1.00-async (right)")
+x,y = get_series(data["batch-force1-sa-1.00-async"], "gbit")
+axr.plot(x, y, marker="v", label="batch-force1-sa-1.00-async (right)")
 
-plt.tight_layout()
+plt.legend()
+# plt.tight_layout()
 plt.show()
 
 
