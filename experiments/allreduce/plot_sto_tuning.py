@@ -82,7 +82,8 @@ data = {
     "1.00": {"tsc":16, "real":1.048,"rto":0.55,"gbit":[58.83,56.72],"time":[13.79,14.10]},
     "1.50": {"tsc":23, "real":1.507,"rto":0.76,"gbit":[57.50,58.29],"time":[13.91,13.72]},
     "2.00": {"tsc":31, "real":2.031,"rto":1.05,"gbit":[60.98,60.27],"time":[13.11,13.27]},
-    "3.00": {"tsc":46, "real":3.014,"rto":1.55,"gbit":[],"time":[]},
+    "3.00": {"tsc":46, "real":3.014,"rto":1.55,"gbit":[60.93,60.55],"time":[13.12,13.19]},
+    "5.00": {"tsc":77, "real":5.046,"rto":2.55,"gbit":[],"time":[]},
   },
   ######################
   ######################
@@ -123,7 +124,8 @@ data = {
     "1.00": {"tsc":16, "real":1.048,"rto":0.55,"gbit":[57.89,58.66],"time":[13.81,13.63]},
     "1.50": {"tsc":23, "real":1.507,"rto":0.76,"gbit":[54.65,54.71],"time":[14.63,14.62]},
     "2.00": {"tsc":31, "real":2.031,"rto":1.05,"gbit":[55.10,54.82],"time":[14.51,14.59]},
-    "3.00": {"tsc":46, "real":3.014,"rto":1.55,"gbit":[],"time":[]},
+    "3.00": {"tsc":46, "real":3.014,"rto":1.55,"gbit":[52.21,51.99],"time":[15.19,15.05]},
+    "5.00": {"tsc":77, "real":5.046,"rto":2.55,"gbit":[],"time":[]},
   },
 }
 
@@ -148,7 +150,7 @@ def get_timeouts(exp):
   pts = []
   for k,v in exp.items():
       if "to" in v and v.get("to"):
-          pts.append( (float(k), sum(v["to"]) / len(v["to"]) ))
+          pts.append( (float(k), sum(v["to"]) / len(v["to"]) / v['all'] ))
   return [x for x,_ in pts], [y for _,y in pts]
 
 
@@ -164,26 +166,32 @@ natural_async = data["batch-natural-nosa-nore-async"]
 
 fig, axl = plt.subplots()
 xt = [0.25 * i for i in range(1, 61)]   # 0.25 .. 15.0
+axl.set_ylim(0,0.001)
 axl.set_xlim(0.25, 15.0)
 axl.set_xticks(xt)
 axl.set_xticklabels([f"{v:g}" if i % 4 == 0 else "" for i, v in enumerate(xt, 1)])
 axr = axl.twinx()
-axr.set_ylim(30, 65)
+axr.set_ylim(0, 65)
 
 # success packets sync
 # x,y = get_series(data["batch-natural-nosa-nore-sync"], "to")
 # axl.plot(x, y, marker="o", label="natural-nosa-nore-sync (left)")
-x,y = get_series(data["batch-natural-nosa-nore-async"], "to")
+x,y = get_timeouts(data["batch-natural-nosa-nore-async"])
 axl.plot(x, y, marker="^", linestyle="--", color="gray", label="natural-nosa-nore-async (left)")
 
 x,y = get_series(data["batch-natural-sa-0.15-async"], "gbit")
-axr.plot(x, y, marker="*", label="batch-natural-sa-0.15-async (right)")
+axr.plot(x, y, marker="*", color="green", label="batch-natural-sa-0.15-async (right)")
 # x,y = get_series(data["batch-force1-sa-1.00-async"], "gbit")
 # axr.plot(x, y, marker="+", label="batch-force1-sa-1.00-async (right)")
 x,y = get_series(data["batch-force1-sa-0.15-async"], "gbit")
 axr.plot(x, y, marker="*", color="purple", label="batch-force1-sa-0.15-async (right)")
 # x,y = get_series(data["batch-force1-sa-half-async"], "gbit")
 # axr.plot(x, y, marker="*", color="green", label="batch-force1-sa-half-async (right)")
+
+x,y = get_series(data["batch-natural-sa-2nd-async"], "gbit")
+axr.plot(x, y, marker="x", color="green", label="batch-natural-sa-2nd-async (right)")
+x,y = get_series(data["batch-force1-sa-2nd-async"], "gbit")
+axr.plot(x, y, marker="x", color="purple", label="batch-force1-sa-2nd-async (right)")
 
 plt.legend()
 # plt.tight_layout()
