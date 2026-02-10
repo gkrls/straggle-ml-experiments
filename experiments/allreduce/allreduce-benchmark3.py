@@ -374,7 +374,7 @@ if __name__ == "__main__":
     
     # DPA specific arguments
     parser.add_argument("--dpa_conf", help="DPA config file")
-    parser.add_argument("--dpa_timeout", type=int, default=None, help="RTX timeout (ms), overrides dpa_conf")
+    parser.add_argument("--dpa_timeout", type=float, default=None, help="RTX timeout (ms), overrides dpa_conf")
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
     parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
 

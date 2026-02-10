@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.transforms import Bbox
 
 import tuning_data as data
 
@@ -73,9 +74,21 @@ def get_peak(data, key, x0=0, x1=1):
 # axr.legend(loc="lower right", bbox_to_anchor=(1.0, 0.05))
 
 
+def save_subplot(fig, ax, filename="plot.pdf"):
+    fig.canvas.draw()
+    
+    relevant_axes = [a for a in ax.figure.axes if a.get_subplotspec() == ax.get_subplotspec()]
 
-# plt.legend()
-# plt.tight_layout()
+    renderer = ax.figure.canvas.get_renderer()
+    bboxes = [a.get_tightbbox(renderer) for a in relevant_axes]
+    
+    full_bbox = Bbox.union(bboxes)
+    extent = full_bbox.transformed(ax.figure.dpi_scale_trans.inverted())
+    
+    ax.figure.savefig(filename, bbox_inches=extent)
+
+# # 2. CALL THIS BEFORE plt.show()
+# save_subplot_no_bleed(ax, ax2, "straggler_timeout.pdf")
 
 rows, cols = 2, 3
 fig, axs = plt.subplots(rows, cols, figsize=(5.5 * cols, 4.2 * rows), constrained_layout=True)
@@ -126,17 +139,6 @@ ax2.set_yticks(ax.get_yticks())
 ax2.set_yticklabels([f"{(y/total_pkts)*100:.3f}" for y in ax.get_yticks()])
 ax2.set_ylabel("Percentage", fontweight='bold', fontsize='12')
 
-# 3. FIX THE LEGEND: Get handles from ax, draw on ax2 (the top layer)
-handles, labels = ax.get_legend_handles_labels()
-
-
-
-# y1_min, y1_max = ax.get_ylim()
-# ax2.set_ylim((y1_min / total_pkts) * 100, (y1_max / total_pkts) * 100)
-
-
-
-
 
 
 
@@ -146,8 +148,11 @@ handles, labels = ax.get_legend_handles_labels()
 # ax.plot(*get_timeout_count(data["natural-nosa-nore-async-warm-10"]), linestyle='None', marker="s", markerfacecolor='none', markersize=10, color="green", label="natural-nore-async-warm-10")
 # ax.plot(*get_timeout_count(data["natural-nosa-nore-async-warm-20"]), linestyle='None', marker="^", markerfacecolor='none', markersize=10, color="red", label="natural-nore-async-warm-20")
 
-
+save_subplot(fig, ax, "packets.pdf")
 plt.show()
+
+
+
 # import matplotlib.pyplot as plt
 
 # def mean(x): return sum(x)/len(x)
