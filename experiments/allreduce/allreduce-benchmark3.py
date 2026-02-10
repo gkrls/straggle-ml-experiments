@@ -52,6 +52,10 @@ def init(args):
         dpdk = args.backend == "dpa_dpdk"
         device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf) if dpdk else dpa.DPASocketBackendOptions.from_config(args.dpa_conf)
+        if args.dpa_timeout is not None:
+            print(f"WARNING: Overriding config.json timeout_us {backend.timeout_us} -> {args.dpa_timeout * 1000}")
+            backend.timeout_us = args.dpa_timeout * 1000
+
         pg_options = dpa.ProcessGroupDPADpdkOptions(device, backend) if dpdk else dpa.ProcessGroupDPASocketOptions(device, backend)
         pg_options.hint_pinned_tensor_size = args.size * 4
         pg_options.hint_pinned_tensor_pool_size = args.warmup + args.iters
@@ -370,6 +374,7 @@ if __name__ == "__main__":
     
     # DPA specific arguments
     parser.add_argument("--dpa_conf", help="DPA config file")
+    parser.add_argument("--dpa_timeout", type=int, default=None, help="RTX timeout (ms), overrides dpa_conf")
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
     parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
 

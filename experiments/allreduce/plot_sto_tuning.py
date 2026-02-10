@@ -1,158 +1,22 @@
-data = {
-  "batch-natural-nosa-nore-sync": { # batch-20, no induced stragglers, sync threads, sa_disabled, re_disabled
-    "0.25": {"tsc":4,  "real":0.262, "rto":0.14,"all":11764920,"to":[4032,4224,3648,4032],"gbit":[56.96,55.03,55.02,55.55],"time":[14.04,14.53,14.53,14.40]},
-    "0.50": {"tsc":8,  "real":0.524, "rto":0.27,"all":11764920,"to":[2944,4608,3072,4096],"gbit":[56.60,56.75,56.17,56.58],"time":[14.15,14.09,14.24,14.13]},
-    "1.00": {"tsc":16, "real":1.048, "rto":0.53,"all":11764920,"to":[2881,4160,1728,2944],"gbit":[56.10,54.66,56.88,56.13],"time":[14.26,14.63,14.06,14.25]},
-    "1.50": {"tsc":23, "real":1.507, "rto":0.76,"all":11764920,"to":[2176,2752,3200,2763],"gbit":[55.11,55.49,54.14,54.75],"time":[14.51,14.41,14.77,14.61]},
-    "2.00": {"tsc":31, "real":2.031, "rto":1.05,"all":11764920,"to":[2752,1344,3584,3008],"gbit":[54.85,57.44,56.30,56.26],"time":[14.58,13.92,14.20,14.21]},
-    "2.50": {"tsc":39, "real":2.555, "rto":1.30,"all":11764920,"to":[1984,3456,2880,2304],"gbit":[56.09,56.88,55.60,57.64],"time":[14.26,14.06,14.38,13.87]},
-    "3.00": {"tsc":46, "real":3.014, "rto":1.55,"all":11764920,"to":[2880,2528,1754,2816],"gbit":[56.44,55.41,56.05,57.49],"time":[14.17,14.43,14.27,13.91]},
-    "3.50": {"tsc":54, "real":3.538, "rto":1.80,"all":11764920,"to":[1143, 704,1024, 576],"gbit":[56.85,56.28,56.48,56.94],"time":[14.07,14.21,14.16,14.04]},
-    "4.00": {"tsc":62, "real":4.063, "rto":2.05,"all":11764920,"to":[   0, 384, 453,   0],"gbit":[56.11,54.75,56.88,54.92],"time":[14.25,14.61,14.06,14.56]},
-    "4.50": {"tsc":69, "real":4.521, "rto":2.30,"all":11764920,"to":[   0, 256, 384,  64],"gbit":[57.55,55.80,58.01,56.99],"time":[13.90,14.33,13.78,14.03]},
-    "5.00": {"tsc":77, "real":5.046, "rto":2.55,"all":11764920,"to":[ 384,  64,   0,   0],"gbit":[58.20,58.25,59.23,57.01],"time":[13.74,13.73,13.50,14.03]},
-    "5.50": {"tsc":84, "real":5.505, "rto":2.80,"all":11764920,"to":[   0, 128,   0, 128],"gbit":[57.82,56.00,56.39,55.88],"time":[13.83,14.28,14.18,14.31]},
-    "6.00": {"tsc":92, "real":6.029, "rto":3.05,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[56.42,57.97,57.33,56.29],"time":[14.17,13.79,13.95,14.21]},
-    "7.00": {"tsc":107,"real":7.012, "rto":3.55,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[58.22,56.78,56.29,55.45],"time":[13.73,14.08,14.20,14.42]},
-    "8.00": {"tsc":123,"real":8.060, "rto":4.05,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[58.82,57.15,57.40,57.35],"time":[14.07,13.99,13.93,13.94]},    
-    "9.00": {"tsc":138,"real":9.043, "rto":4.55,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[56.94,55.71,56.77,55.96],"time":[14.04,14.35,14.09,14.29]},
-    "10.0": {"tsc":153,"real":10.027,"rto":5.05,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[55.66,56.96,56.16,57.97],"time":[14.37,14.04,14.24,13.80]},
-    "12.5": {"tsc":191,"real":12.517,"rto":6.26,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[56.04,57.44,57.22,57.35],"time":[14.27,13.92,13.97,13.94]},
-    "15.0": {"tsc":229,"real":15.007,"rto":7.51,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[56.37,57.12,56.15,54.99],"time":[14.19,14.00,14.24,14.54]},
-  },
-  "batch-natural-nosa-nore-async": {
-    "0.25": {"tsc":4,  "real":0.262, "rto":0.14,"all":11764920,"to":[2304,2548,1915,3564],"gbit":[62.05,61.50,61.60,61.41],"time":[12.89,13.00,12.98,13.02]},
-    "0.50": {"tsc":8,  "real":0.524, "rto":0.27,"all":11764920,"to":[1984,2624,1984,2593],"gbit":[60.15,60.69,61.06,59.68],"time":[13.29,13.18,13.10,13.40]},
-    "1.00": {"tsc":16, "real":1.048, "rto":0.53,"all":11764920,"to":[1216,1920,2307,1536],"gbit":[60.37,60.36,61.27,60.90],"time":[13.24,13.25,13.05,13.13]},
-    "1.50": {"tsc":23, "real":1.507, "rto":0.76,"all":11764920,"to":[ 870,1920,1563,1920],"gbit":[60.56,60.75,60.00,60.77],"time":[13.20,13.16,13.33,13.16]},
-    "2.00": {"tsc":31, "real":2.031, "rto":1.05,"all":11764920,"to":[2240,1792, 704,1472],"gbit":[60.46,59.27,60.06,60.35],"time":[13.23,13.49,13.31,13.25]},
-    "2.50": {"tsc":39, "real":2.555, "rto":1.30,"all":11764920,"to":[   2,1600,1728,1920],"gbit":[60.60,59.79,60.67,61.05],"time":[13.20,13.38,13.18,13.10]},
-    "3.00": {"tsc":46, "real":3.014, "rto":1.55,"all":11764920,"to":[1024,1024, 975, 768],"gbit":[60.39,61.28,59.04,60.00],"time":[13.24,13.05,13.54,13.33]},
-    "3.50": {"tsc":54, "real":3.538, "rto":1.80,"all":11764920,"to":[1101, 476, 849, 521],"gbit":[61.29,61.03,61.91,60.57],"time":[13.05,13.10,12.92,13.20]},
-    "4.00": {"tsc":62, "real":4.063, "rto":2.05,"all":11764920,"to":[ 128,   0,   1, 640],"gbit":[60.84,61.13,60.40,59.39],"time":[13.14,13.08,13.24,13.46]},
-    "4.50": {"tsc":69, "real":4.521, "rto":2.30,"all":11764920,"to":[   0,   0, 320, 320],"gbit":[61.44,61.80,58.77,59.48],"time":[13.02,12.94,13.61,13.44]},
-    "5.00": {"tsc":77, "real":5.046, "rto":2.55,"all":11764920,"to":[   0, 320, 320,   0],"gbit":[60.85,61.11,61.57,60.29],"time":[13.14,13.01,12.99,13.26]},
-    "5.50": {"tsc":84, "real":5.505, "rto":2.80,"all":11764920,"to":[   0, 320,  64,  64],"gbit":[61.45,61.33,60.13,60.77],"time":[13.01,13.04,13.30,13.16]},
-    "6.00": {"tsc":92, "real":6.029, "rto":3.05,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[60.40,61.14,61.08,61.71],"time":[13.24,13.34,13.09,12.96]},
-    "7.00": {"tsc":107,"real":7.012, "rto":3.55,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[60.75,61.18,60.82,60.94],"time":[13.16,13.07,13.15,13.12]},
-    "8.00": {"tsc":123,"real":8.060, "rto":4.05,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[60.84,61.17,61.28,59.88],"time":[13.14,13.07,13.05,13.35]},
-    "9.00": {"tsc":138,"real":9.043, "rto":4.55,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[60.26,59.65,59.88,61.14],"time":[13.27,13.40,13.35,13.08]},
-    "10.0": {"tsc":153,"real":10.027,"rto":5.05,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[60.57,61.02,60.73,59.87],"time":[13.20,13.10,13.17,13.36]},
-    "12.5": {"tsc":191,"real":12.517,"rto":6.26,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[60.37,59.93,60.78,60.24],"time":[13.25,13.34,13.16,13.27]},
-    "15.0": {"tsc":229,"real":15.007,"rto":7.51,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[59.45,60.69,60.54,60.60],"time":[13.45,13.18,13.21,13.20]}
-  },
-  ######################
-  ######################
-  ######################
-  ######################
-  ######################
-  "batch-natural-sa-1.00-async": {
-    "3.50": {"tsc":54, "real":3.538, "rto":1.00,"all":11764920,"to":[ 704,   0,   0,1792],"gbit":[61.45,59.83,60.21,52.63],"time":[13.01,13.36,13.28,15.20]},
-    "4.00": {"tsc":69, "real":4.521, "rto":1.00,"all":11764920,"to":[   0, 760, 320,   0],"gbit":[60.21,54.67,60.51,60.01],"time":[13.28,14.63,13.21,13.32]},
-    "4.50": {"tsc":62, "real":4.063, "rto":1.00,"all":11764920,"to":[ 384,   0,   0, 256],"gbit":[57.34,60.83,60.10,58.11],"time":[13.95,13.15,13.31,13.76]},
-    "5.00": {"tsc":84, "real":5.505, "rto":1.00,"all":11764920,"to":[   0,   0, 512,   0],"gbit":[60.70,60.36,56.40,61.05],"time":[13.17,13.25,14.18,13.10]},
-    "5.50": {"tsc":84, "real":5.505, "rto":1.00,"all":11764920,"to":[   0,   0, 256,   0],"gbit":[60.67,61.80,57.80,61.46],"time":[13.18,12.94,13.83,13.01]},
-    "6.00": {"tsc":92, "real":6.029, "rto":1.00,"all":11764920,"to":[ 384,   0, 291,   0],"gbit":[59.60,60.27,56.99,61.48],"time":[13.42,13.27,14.03,13.01]},
-    "7.00": {"tsc":107,"real":7.012, "rto":1.00,"all":11764920,"to":[   0,   0,   0,   0],"gbit":[61.06,61.09,61.48,61.28],"time":[13.10,13.09,13.01,13.05]},
-  },
-  "batch-natural-sa-0.15-async": {
-    "0.25": {"tsc":4,  "real":0.262, "rto":0.15,"gbit":[59.17,58.65,57.95,58.09],"time":[13.51,13.63,13.80,13.77]},
-    "0.50": {"tsc":8,  "real":0.524, "rto":0.15,"gbit":[58.51,57.93,57.51,57.08],"time":[13.76,13.80,13.90,14.01]},
-    "0.75": {"tsc":12, "real":0.786, "rto":0.15,"gbit":[58.53,53.81,57.77,56.29],"time":[13.66,14.86,13.84,14.21]},
-    "1.00": {"tsc":16, "real":1.048, "rto":0.15,"gbit":[57.76,57.63,57.83,57.62],"time":[13.61,13.56,13.83,13.88]},
-    "1.50": {"tsc":23, "real":1.048, "rto":0.15,"gbit":[58.54,57.51,57.26,57.31],"time":[13.66,13.90,13.96,13.95]},
-    "2.00": {"tsc":31, "real":2.031, "rto":0.15,"gbit":[57.43,59.90,],"time":[13.92,13.35]},
-    "2.50": {"tsc":39, "real":2.555, "rto":0.15,"gbit":[58.43,59.15,],"time":[13.68,13.52]},
-    "3.00": {"tsc":46, "real":3.014, "rto":0.15,"gbit":[57.16,59.76,],"time":[14.04,13.38]},
-    "3.50": {"tsc":54, "real":3.538, "rto":0.15,"gbit":[59.51,59.22,58.28,53.83],"time":[13.44,13.48,13.72,14.92]},
-    "4.00": {"tsc":62, "real":4.063, "rto":0.15,"gbit":[59.49,59.44],"time":[13.44,13.45]},
-    "4.50": {"tsc":69, "real":4.521, "rto":0.15,"gbit":[59.44,58.41],"time":[13.45,13.98]},
-    "5.00": {"tsc":77, "real":5.046, "rto":0.15,"gbit":[59.68,59.30],"time":[13.40,13.48]},
-    "6.00": {"tsc":92, "real":6.029, "rto":0.15,"gbit":[58.45,59.34],"time":[13.68,13.47]},
-    "7.00": {"tsc":107,"real":7.012, "rto":0.15,"gbit":[59.65,59.29],"time":[13.41,13.49]},
-    "8.00": {"tsc":123,"real":8.060, "rto":0.15,"gbit":[58.91,59.62],"time":[13.57,13.32]},
-    "9.00": {"tsc":138,"real":9.043, "rto":0.15,"gbit":[59.46,58.84],"time":[13.45,13.51]},
-    "10.0": {"tsc":153,"real":10.027,"rto":0.15,"gbit":[59.75,59.77],"time":[13.38,13.38]},
-    "12.5": {"tsc":191,"real":12.517,"rto":0.15,"gbit":[59.92,59.33],"time":[13.35,13.48]},
-    "15.0": {"tsc":229,"real":15.007,"rto":0.15,"gbit":[59.55,59.46],"time":[13.43,13.45]}
-  },
-  "batch-natural-sa-2nd-async": {
-    "0.25": {"tsc":4,  "real":0.262,"rto":0.14,"gbit":[60.04,60.07],"time":[13.32,13.31]},
-    "0.50": {"tsc":8,  "real":0.524,"rto":0.27,"gbit":[56.97,60.57],"time":[14.04,13.09]},
-    "1.00": {"tsc":16, "real":1.048,"rto":0.55,"gbit":[58.83,56.72],"time":[13.79,14.10]},
-    "1.50": {"tsc":23, "real":1.507,"rto":0.76,"gbit":[57.50,58.29],"time":[13.91,13.72]},
-    "2.00": {"tsc":31, "real":2.031,"rto":1.05,"gbit":[60.98,60.27],"time":[13.11,13.27]},
-    "3.00": {"tsc":46, "real":3.014,"rto":1.55,"gbit":[60.93,60.55],"time":[13.12,13.19]},
-    "5.00": {"tsc":77, "real":5.046,"rto":2.55,"gbit":[],"time":[]},
-  },
-  ######################
-  ######################
-  ######################
-  ######################
-  ######################
-  "batch-force1-sa-1.00-async": {
-    "1.00": {"tsc":16, "real":1.048, "rto":1.00,"gbit":[55.34],"time":[14.45]},
-    "1.50": {"tsc":23, "real":1.048, "rto":1.00,"gbit":[55.22,55.31],"time":[14.48,14.46]},
-    "3.50": {"tsc":54, "real":3.538, "rto":1.00,"gbit":[49.23],"time":[16.24]},
-    "6.00": {"tsc":92, "real":6.029, "rto":1.00,"gbit":[40.00,39.68,39.75,39.84],"time":[19.99,20.16,20.12,20.07]},
-    "7.00": {"tsc":107,"real":7.012, "rto":1.00,"gbit":[39.14,39.71,39.67,39.45],"time":[20.43,20.14,20.16,20.27]},
-  },
-  "batch-force1-sa-0.15-async": {
-    "0.25": {"tsc":4,  "real":0.262, "rto":0.15,"gbit":[58.65,58.36,58.72,58.54],"time":[13.63,13.70,13.62,13.66]},
-    "0.50": {"tsc":8,  "real":0.524, "rto":0.15,"gbit":[57.79,57.41,57.20,57.62],"time":[13.84,13.93,13.97,13.88]},
-    "1.00": {"tsc":16, "real":1.048, "rto":0.15,"gbit":[56.38,55.50,55.16,55.20],"time":[14.18,14.41,14.50,14.49]},
-    "1.50": {"tsc":23, "real":1.507, "rto":0.15,"gbit":[56.01,53.48,53.43,53.29],"time":[14.28,14.95,14.97,15.01]},
-    "2.00": {"tsc":31, "real":2.031, "rto":0.15,"gbit":[52.20,52.22,52.78,52.28],"time":[15.32,15.31,15.15,15.30]},
-    "2.50": {"tsc":39, "real":2.555, "rto":0.15,"gbit":[50.62,50.31,50.43,50.37],"time":[15.80,15.89,15.86,15.88]},
-    "3.00": {"tsc":46, "real":3.014, "rto":0.15,"gbit":[48.89,48.58,48.75,48.96],"time":[16.36,16.46,16.40,16.33]},
-    "3.50": {"tsc":54, "real":3.538, "rto":0.15,"gbit":[47.96,47.78,47.47,47.65],"time":[16.67,16.74,16.85,16.78]},
-    "4.00": {"tsc":62, "real":4.063, "rto":0.15,"gbit":[46.23,46.34,46.14,46.49],"time":[17.30,17.26,17.33,17.20]},
-    "4.50": {"tsc":69, "real":4.521, "rto":0.15,"gbit":[45.28,44.92,44.72,44.79],"time":[17.66,17.80,17.88,17.86]},
-    "5.00": {"tsc":77, "real":5.046, "rto":0.15,"gbit":[43.50,43.74,44.17,43.75],"time":[18.38,18.28,18.11,18.28]},
-    "5.50": {"tsc":84, "real":5.505, "rto":0.15,"gbit":[42.51,42.39,42.62,42.58],"time":[18.81,18.86,18.76,18.78]},
-    "6.00": {"tsc":92, "real":6.029, "rto":0.15,"gbit":[41.11,41.09,41.04,41.02],"time":[19.45,19.46,19.49,19.49]},
-    "7.00": {"tsc":107,"real":7.012, "rto":0.15,"gbit":[39.67,39.49,39.24,39.73],"time":[20.16,20.25,20.38,20.13]},
-    "8.00": {"tsc":123,"real":8.060, "rto":0.15,"gbit":[37.80,37.66],"time":[21.16,21.24]},
-    "9.00": {"tsc":138,"real":9.043, "rto":0.15,"gbit":[36.09,36.04],"time":[22.16,22.19]},
-    "10.0": {"tsc":153,"real":10.027,"rto":0.15,"gbit":[34.55,34.49],"time":[23.15,23.19]},
-    "12.5": {"tsc":191,"real":12.517,"rto":0.15,"gbit":[31.50,31.29],"time":[25.39,25.56]},
-    "15.0": {"tsc":229,"real":15.007,"rto":0.15,"gbit":[28.46,28.32],"time":[28.10,28.24]}
-  },
-  "batch-force1-sa-2nd-async": {
-    "0.25": {"tsc":4,  "real":0.262,"rto":0.14,"gbit":[60.15,59.86],"time":[13.29,13.36]},
-    "0.50": {"tsc":8,  "real":0.524,"rto":0.27,"gbit":[58.96,58.44],"time":[13.59,13.68]},
-    "1.00": {"tsc":16, "real":1.048,"rto":0.55,"gbit":[57.89,58.66],"time":[13.81,13.63]},
-    "1.50": {"tsc":23, "real":1.507,"rto":0.76,"gbit":[54.65,54.71],"time":[14.63,14.62]},
-    "2.00": {"tsc":31, "real":2.031,"rto":1.05,"gbit":[55.10,54.82],"time":[14.51,14.59]},
-    "3.00": {"tsc":46, "real":3.014,"rto":1.55,"gbit":[52.21,51.99],"time":[15.19,15.05]},
-    "5.00": {"tsc":77, "real":5.046,"rto":2.55,"gbit":[],"time":[]},
-  },
-}
-
-
 import matplotlib.pyplot as plt
 
-def mean(x): return sum(x) / len(x)
+import tuning_data as data
 
-def series_success(exp):
-    pts = []
-    for k, v in exp.items():
-        if "all" in v and v.get("to"):
-            pts.append((float(k), (v["all"] - mean(v["to"])) / v["all"]))
-    # pts.sort()
-    return [x for x,_ in pts], [y for _,y in pts]
-def zoom(ax, ys, pad=0.15):
-    lo, hi = min(ys), max(ys)
-    m = (hi - lo) * pad if hi != lo else 1e-6
-    ax.set_ylim(lo - m, hi + m)
-
-def get_timeouts(exp):
+def get_timeout_ratio(exp, all=None):
   pts = []
   for k,v in exp.items():
       if "to" in v and v.get("to"):
-          pts.append( (float(k), sum(v["to"]) / len(v["to"]) / v['all'] ))
+          pts.append( (float(k), sum(v["to"]) / len(v["to"]) / ( all if all is not None else v['all'])))
   return [x for x,_ in pts], [y for _,y in pts]
 
+def get_timeout_count(exp, op='avg', all=None):
+  pts = []
+  if op not in ['avg','min','max']: raise "invalid op"
+  for k,v in exp.items():
+      if "to" in v and v.get("to"):
+          v = (sum(v["to"]) / len(v["to"])) if op == 'avg' else min(v["to"]) if op == 'min' else max(v["to"])
+          pts.append( (float(k), v) )
+  return [x for x,_ in pts], [y for _,y in pts]
 
 def get_series(data, key):
   pts = []
@@ -161,43 +25,129 @@ def get_series(data, key):
           pts.append( ( float(k), sum(v[key]) / len(v[key]) ))
   return [x for x,_ in pts], [y for _,y in pts]
 
-natural_sync = data["batch-natural-nosa-nore-sync"]
-natural_async = data["batch-natural-nosa-nore-async"]
 
-fig, axl = plt.subplots()
-xt = [0.25 * i for i in range(1, 61)]   # 0.25 .. 15.0
-axl.set_ylim(0,0.001)
-axl.set_xlim(0.25, 15.0)
-axl.set_xticks(xt)
-axl.set_xticklabels([f"{v:g}" if i % 4 == 0 else "" for i, v in enumerate(xt, 1)])
-axr = axl.twinx()
-axr.set_ylim(0, 65)
+def get_peak(data, key, x0=0, x1=1):
+  maximum = 0
+  for k,v in data.items():
+      if key in v and v.get(key):
+          maximum = max([maximum, max(v[key])])
+  return [x0,x1],[maximum,maximum]
 
-# success packets sync
-# x,y = get_series(data["batch-natural-nosa-nore-sync"], "to")
-# axl.plot(x, y, marker="o", label="natural-nosa-nore-sync (left)")
-x,y = get_timeouts(data["batch-natural-nosa-nore-async"])
-axl.plot(x, y, marker="^", linestyle="--", color="gray", label="natural-nosa-nore-async (left)")
+# natural_sync = data.packets["natural-nosa-nore-sync"]
+# natural_async = data["natural-nosa-nore-async"]
 
-x,y = get_series(data["batch-natural-sa-0.15-async"], "gbit")
-axr.plot(x, y, marker="*", color="green", label="batch-natural-sa-0.15-async (right)")
-# x,y = get_series(data["batch-force1-sa-1.00-async"], "gbit")
-# axr.plot(x, y, marker="+", label="batch-force1-sa-1.00-async (right)")
-x,y = get_series(data["batch-force1-sa-0.15-async"], "gbit")
-axr.plot(x, y, marker="*", color="purple", label="batch-force1-sa-0.15-async (right)")
-# x,y = get_series(data["batch-force1-sa-half-async"], "gbit")
-# axr.plot(x, y, marker="*", color="green", label="batch-force1-sa-half-async (right)")
+# fig, axl = plt.subplots()
+# rows, cols = 2, 3
+# fig, axs = plt.subplots(rows, cols, figsize=(5.5 * cols, 4.2 * rows), constrained_layout=True)
 
-x,y = get_series(data["batch-natural-sa-2nd-async"], "gbit")
-axr.plot(x, y, marker="x", color="green", label="batch-natural-sa-2nd-async (right)")
-x,y = get_series(data["batch-force1-sa-2nd-async"], "gbit")
-axr.plot(x, y, marker="x", color="purple", label="batch-force1-sa-2nd-async (right)")
+#=================
+# Plot 1
+#=================
+# axl, axr = axs[0,0], axs[0,0].twinx()
+# axl.set_xlim(0.25, 15.0)
+# xticks=[0.25 * i for i in range(1,60)]
+# axl.set_xticks(xticks)
+# axl.set_xticklabels([f"{v:g}" if i % 4 == 0 else "" for i, v in enumerate(xticks, 1)])
+# axl.set_ylim(0,70)
+# axl.set_yticks(list(range(0, 66, 5)))
+# axl.set_yticklabels([str(t) if t % 10 == 0 else "" for t in list(range(0, 66, 5))])
+# axl.set_xlabel("Straggler threshold (ms)", fontweight='bold')
+# axl.set_ylabel("Throughput (Gb/s)", fontweight='bold')
+# axr.set_ylim(0,0.01) # 1%
+# axr.set_ylabel("Straggler timeouts (to_pkts / all_pkts)", fontweight='bold')
 
-plt.legend()
+# # right axis, timeouts
+# axr.plot(*get_timeout_ratio(data["natural-nosa-nore-sync"]), marker="o", color='lightgray', label="natural-nore-sync (right)")
+# axr.plot(*get_timeout_ratio(data["natural-nosa-nore-async"]), marker="o", color="gray", label="natural-nore-async (right)")
+# axr.plot(*get_timeout_ratio(data["natural-nosa-nore-async-warm-4"]), marker="x", color="black", label="natural-nore-async-warm (right)")
+# # peak throughput
+# axl.plot(*get_peak(data["natural-nosa-nore-async"],"gbit", 0.25, 15), 
+#          linestyle="--", marker="", linewidth=3, markersize=16, color="red", label="peak (no retransmissions)")
+# # timeout strategies, natural + 1 induced straggler
+# axl.plot(*get_series(data["natural-sa-0.15-async"], "gbit"), marker="*", color="green", label="natural-sa-0.15-async")
+# axl.plot(*get_series(data["natural-sa-2nd-async"], "gbit"), marker="x", color="green", label="natural-sa-2nd-async")
+# axl.plot(*get_series(data["strag.1-sa-0.15-async"], "gbit"), marker="*", color="purple", label="strag.1-sa-0.15-async")
+# axl.plot(*get_series(data["strag.1-sa-2nd-async"], "gbit"), marker="x", color="purple", label="strag.1-sa-2nd-async")
+
+# axl.add_artist(axl.legend(loc="lower left", bbox_to_anchor=(-0.002, 0.05)))
+# axr.legend(loc="lower right", bbox_to_anchor=(1.0, 0.05))
+
+
+
+# plt.legend()
 # plt.tight_layout()
+
+rows, cols = 2, 3
+fig, axs = plt.subplots(rows, cols, figsize=(5.5 * cols, 4.2 * rows), constrained_layout=True)
+
+#=================
+# Plot 1
+#=================
+
+def find_zeroes(data):
+  any0,maj0,all0 = None, None, None
+  xs = sorted(float(k) for k in data.keys())
+  for x in xs:
+      arr = data[f"{x:.2f}"]["to"]
+      zeros = sum(v == 0 for v in arr)
+      if any0 is None and zeros >= 1: any0 = x
+      if maj0 is None and zeros >= len(arr) / 2: maj0 = x
+      if all0 is None and zeros == len(arr): all0 = x
+  return any0, maj0, all0
+
+def vline(ax, x, label, color, linestyle):
+    ax.axvline(x, color=color, linestyle=linestyle)
+    ax.text(x + 0.03, ax.get_ylim()[1] * 0.95, label, fontsize=13, rotation=90, color=color, va="top", ha="left")
+
+ax = axs[0,0]
+ax.set_title("Finding straggler timeout (switch-side)", fontweight="bold")
+ax.set_xticks(range(0,11), minor=True)
+ax.set_xlim(-0.05, 7)
+ax.set_ylim(0,3500)
+ax.set_ylabel("Straggler timeouts (pkts)", fontweight='bold')
+ax.set_xlabel("Straggler threshold (ms)", fontweight='bold')
+
+ax.plot(*get_timeout_count(data.packets["natural-su-nowarm-batch20"], 'min'), marker="^", markersize=10, markerfacecolor='none', color="red", label="su-min")
+ax.plot(*get_timeout_count(data.packets["natural-su-nowarm-batch20"], 'max'), marker="v", markersize=10, markerfacecolor='none', color="blue", label="su-max")
+ax.plot(*get_timeout_count(data.packets["natural-su-nowarm-batch20"], 'avg'), marker="o", markersize=10, markerfacecolor='none', color="green", label="su-avg")
+
+any0, maj0, all0 = find_zeroes(data.packets["natural-su-nowarm-batch20"])
+
+vline(ax, any0, color="red",   linestyle=":", label="first")
+vline(ax, maj0, color="black", linestyle=":", label="majority")
+vline(ax, all0, color="black", linestyle="-", label="all")
+
+ax.legend(loc="upper right", bbox_to_anchor=(0.85, 0.55))
+
+total_pkts = list(data.packets["natural-su-nowarm-batch20"].values())[0]["all"]
+ax2 = ax.twinx()
+ax2.set_ylim(ax.get_ylim())
+ax2.set_yticks(ax.get_yticks())
+ax2.set_yticklabels([f"{(y/total_pkts)*100:.3f}" for y in ax.get_yticks()])
+ax2.set_ylabel("Percentage", fontweight='bold', fontsize='12')
+
+# 3. FIX THE LEGEND: Get handles from ax, draw on ax2 (the top layer)
+handles, labels = ax.get_legend_handles_labels()
+
+
+
+# y1_min, y1_max = ax.get_ylim()
+# ax2.set_ylim((y1_min / total_pkts) * 100, (y1_max / total_pkts) * 100)
+
+
+
+
+
+
+
+# ax.plot(*get_timeout_count(data["natural-nosa-nore-sync"]), marker="None", color='lightgray', label="natural-nore-sync")
+# ax.plot(*get_timeout_count(data["natural-nosa-nore-async"]), linestyle='None', marker="o", markerfacecolor='none', markersize=10, color="gray", label="natural-nore-async-nowarm")
+# ax.plot(*get_timeout_count(data["natural-nosa-nore-async-warm-4"]), linestyle='None', marker="x", color="blue", label="natural-nore-async-warm-4")
+# ax.plot(*get_timeout_count(data["natural-nosa-nore-async-warm-10"]), linestyle='None', marker="s", markerfacecolor='none', markersize=10, color="green", label="natural-nore-async-warm-10")
+# ax.plot(*get_timeout_count(data["natural-nosa-nore-async-warm-20"]), linestyle='None', marker="^", markerfacecolor='none', markersize=10, color="red", label="natural-nore-async-warm-20")
+
+
 plt.show()
-
-
 # import matplotlib.pyplot as plt
 
 # def mean(x): return sum(x)/len(x)
@@ -216,7 +166,7 @@ plt.show()
 # fig, axL = plt.subplots()
 # axR = axL.twinx()
 
-# for m in ("batch-1", "batch-20"):
+# for m in ("1", "20"):
 #     xT, T = series(s0, m, to_avg)
 #     if T:
 #         axL.plot(xT, [t/max(T) for t in T], marker="o", label=f"s0 {m} timeouts/max")

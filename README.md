@@ -27,3 +27,10 @@
 ./hpdc-launch.sh --keep openwebtext -f hosts.txt -S nfs-rsync.sh /nfs0/datasets/openwebtext /home/gks/datasets
 ./hpdc-launch.sh --keep openwebtext -f hosts.txt -- tar -xvf /home/gks/datasets/openwebtext/openwebtext.tar.xz -C /home/gks/datasets/openwebtext 
 ```
+
+#### Setup info
+
+**Cluster ips**
+```bash
+./scripts/hpdc-launch2.sh hpdc-gnode 6 -S scripts/ip.sh --
+```
