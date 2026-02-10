@@ -54,7 +54,7 @@ def init(args):
         backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf) if dpdk else dpa.DPASocketBackendOptions.from_config(args.dpa_conf)
         if args.dpa_timeout is not None:
             print(f"WARNING: Overriding config.json timeout_us {backend.timeout_us} -> {args.dpa_timeout * 1000}")
-            backend.timeout_us = args.dpa_timeout * 1000
+            backend.timeout_us = int(args.dpa_timeout * 1000)
 
         pg_options = dpa.ProcessGroupDPADpdkOptions(device, backend) if dpdk else dpa.ProcessGroupDPASocketOptions(device, backend)
         pg_options.hint_pinned_tensor_size = args.size * 4
