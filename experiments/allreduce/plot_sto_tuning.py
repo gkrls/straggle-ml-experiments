@@ -76,15 +76,11 @@ def get_peak(data, key, x0=0, x1=1):
 
 def save_subplot(fig, ax, filename="plot.pdf"):
     fig.canvas.draw()
-    
     relevant_axes = [a for a in ax.figure.axes if a.get_subplotspec() == ax.get_subplotspec()]
-
     renderer = ax.figure.canvas.get_renderer()
     bboxes = [a.get_tightbbox(renderer) for a in relevant_axes]
-    
     full_bbox = Bbox.union(bboxes)
     extent = full_bbox.transformed(ax.figure.dpi_scale_trans.inverted())
-    
     ax.figure.savefig(filename, bbox_inches=extent)
 
 # # 2. CALL THIS BEFORE plt.show()
