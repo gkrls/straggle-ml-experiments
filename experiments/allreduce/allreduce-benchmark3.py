@@ -53,7 +53,7 @@ def init(args):
         device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf) if dpdk else dpa.DPASocketBackendOptions.from_config(args.dpa_conf)
         backend.profile_skip = args.dpa_profile_skip
-        if args.dpa_timeout is not None:
+        if args.dpa_timeout_us is not None:
             print(f"WARNING: Overriding config.json timeout_us {backend.timeout_us} -> {args.dpa_timeout * 1000}")
             backend.timeout_us = args.dpa_timeout_us
         if args.dpa_timeout_init_scaling is not None:
