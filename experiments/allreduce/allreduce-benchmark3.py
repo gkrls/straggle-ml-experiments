@@ -55,7 +55,7 @@ def init(args):
         backend.profile_skip = args.dpa_profile_skip
         if args.dpa_timeout is not None:
             print(f"WARNING: Overriding config.json timeout_us {backend.timeout_us} -> {args.dpa_timeout * 1000}")
-            backend.timeout_us = int(args.dpa_timeout * 1000)
+            backend.timeout_us = args.dpa_timeout_us
         if args.dpa_timeout_init_scaling is not None:
             print(f"WARNING: Overriding config.json dpa_timeout_init_scaling {backend.timeout_init_scaling} -> {args.dpa_timeout_init_scaling}")
             backend.timeout_init_scaling = args.dpa_timeout_init_scaling
@@ -379,7 +379,7 @@ if __name__ == "__main__":
     
     # DPA specific arguments
     parser.add_argument("--dpa_conf", help="DPA config file")
-    parser.add_argument("--dpa_timeout", type=float, default=None, help="RTX timeout (ms), overrides dpa_conf")
+    parser.add_argument("--dpa_timeout_us", type=int, default=None, help="RTX timeout (us), overrides dpa_conf")
     parser.add_argument("--dpa_timeout_init_scaling", type=float, default=None, help="Scale the RTX timeout during initial burst")
     parser.add_argument("--dpa_profile_skip",type=int, default=0, help="Start profiling after N operations")
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
