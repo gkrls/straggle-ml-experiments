@@ -153,7 +153,7 @@ def results(args, data):
 
     with open(args.dpa_conf) as f:
         out['dpa'] = json.load(f)['dpdk']
-        if args.dpa_timeout is not None: out['dpa']['timeout_us'] = args.dpa_timeout
+        if args.dpa_timeout_us is not None: out['dpa']['timeout_us'] = args.dpa_timeout_us
         if args.dpa_timeout_init_scaling is not None: out['dpa']['timeout_init_scaling'] = args.dpa_timeout_init_scaling
 
     s = dumps_inline_lists(out, indent=2, default=make_serializable)
