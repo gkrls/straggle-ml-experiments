@@ -63,6 +63,7 @@ def init(args):
             print(f"WARNING: Overriding config.json window {backend.window} -> {args.dpa_window}")
             backend.window = args.dpa_window
         if args.dpa_threads is not None:
+            print(f"WARNING: Overriding config.json window {backend.threads} -> {args.dpa_threads}")
             backend.threads = args.dpa_threads
 
         pg_options = dpa.ProcessGroupDPADpdkOptions(device, backend) if dpdk else dpa.ProcessGroupDPASocketOptions(device, backend)
@@ -163,7 +164,7 @@ def results(args, data):
         if args.dpa_timeout_init_scaling is not None: out['dpa']['timeout_init_scaling'] = args.dpa_timeout_init_scaling
         if args.dpa_window is not None: out['dpa']['window'] = args.dpa_window
         if args.dpa_threads is not None: out['dpa']['threads'] = args.dpa_threads
-        
+
     s = dumps_inline_lists(out, indent=2, default=make_serializable)
 
     # with open(args.json, 'w') as f:
