@@ -59,6 +59,12 @@ def init(args):
         if args.dpa_timeout_init_scaling is not None:
             print(f"WARNING: Overriding config.json timeout_init_scaling {backend.timeout_init_scaling} -> {args.dpa_timeout_init_scaling}")
             backend.timeout_init_scaling = args.dpa_timeout_init_scaling
+        if args.dpa_window is not None:
+            print(f"WARNING: Overriding config.json window {backend.window} -> {args.dpa_window}")
+            backend.window = args.dpa_window
+        if args.dpa_threads is not None:
+            backend.threads = args.dpa_threads
+
         pg_options = dpa.ProcessGroupDPADpdkOptions(device, backend) if dpdk else dpa.ProcessGroupDPASocketOptions(device, backend)
         pg_options.hint_pinned_tensor_size = args.size * 4
         pg_options.hint_pinned_tensor_pool_size = args.warmup + args.iters
@@ -155,7 +161,9 @@ def results(args, data):
         out['dpa'] = json.load(f)['dpdk']
         if args.dpa_timeout_us is not None: out['dpa']['timeout_us'] = args.dpa_timeout_us
         if args.dpa_timeout_init_scaling is not None: out['dpa']['timeout_init_scaling'] = args.dpa_timeout_init_scaling
-
+        if args.dpa_window is not None: out['dpa']['window'] = args.dpa_window
+        if args.dpa_threads is not None: out['dpa']['threads'] = args.dpa_threads
+        
     s = dumps_inline_lists(out, indent=2, default=make_serializable)
 
     # with open(args.json, 'w') as f:
@@ -379,6 +387,8 @@ if __name__ == "__main__":
     
     # DPA specific arguments
     parser.add_argument("--dpa_conf", help="DPA config file")
+    parser.add_argument("--dpa_threads", type=int, default=None, help="Number of DPA threads")
+    parser.add_argument("--dpa_window", type=int, default=None, help="Window size per thread")
     parser.add_argument("--dpa_timeout_us", type=int, default=None, help="RTX timeout (us), overrides dpa_conf")
     parser.add_argument("--dpa_timeout_init_scaling", type=float, default=None, help="Scale the RTX timeout during initial burst")
     parser.add_argument("--dpa_profile_skip",type=int, default=0, help="Start profiling after N operations")
