@@ -1,4 +1,5 @@
 results/
+__pycache__/
 .nsys*
 .sqlite
 env/
