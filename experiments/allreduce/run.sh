@@ -79,7 +79,7 @@ CONF=configs/edgecore.json
 CONF_NS=configs/edgecore-ns.json
 VALGRIND=valgrind #--leak-check=full --show-leak-kinds=all --track-origins=yes"
 NSYS="nsys profile -w true -t cuda,nvtx,osrt,cudnn,cublas --cuda-memory-usage=true --sampling-period=200000 -d 30 -o $HOME/nsys_profile -f true"
-PERF="perf stat -d --" # perf stat -e cache-misses,cache-references
+PERF="perf stat -d --" # perf s44tat -e cache-misses,cache-references
 GDB="gdb --args"
 
 # export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.8
