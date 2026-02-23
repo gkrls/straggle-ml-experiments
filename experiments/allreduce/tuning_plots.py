@@ -41,7 +41,7 @@ PACKET_SIZE_128_S = 610  # 128 values/pipe, 64 reducers/pipe, 16 reducer stages,
 PACKET_SIZE_86    = 442  #  86 values/pipe, 43 reducers/pipe, 11 reducer stages, tofino 2 only (frame-limit)
 PACKET_SIZE_64    = 354  #  64 values/pipe, 32 reducers/pipe,  8 reducer stages, tofino 1+2
 
-fig = plt.figure(figsize=(24, 10),constrained_layout=True)
+fig = plt.figure(figsize=(24, 12),constrained_layout=True)
 
 gs = fig.add_gridspec(2, 1)
 rows = [gs[0, 0].subgridspec(1, 4), # width_ratios=[2, 0.5, 2] 
@@ -230,33 +230,44 @@ def get(data,metric,op="avg", skip=None, smooth=None):
             x.append(float(k))
   return x, y
 
-def smooth(x,y):
-    new_x = np.linspace(min(x), max(x), 300)
+def smooth(x,y,points=300):
+    new_x = np.linspace(min(x), max(x), points)
     return new_x, PchipInterpolator(x, y)(new_x)
 
 ax = axs[1][0]
 ax.grid(True, linestyle='--', which='major', color='grey', alpha=0.3)
-ax.set_title("Profiling RTX timeout (win=384)", fontweight="bold", fontsize=10)
+ax.set_title("Profiling RTX timeout (natural stragglers)", fontweight="bold", fontsize=10)
 ax.set_ylabel('Throughput (Gbit/s)',fontweight='bold')
 ax.set_xlabel('RTX Threshold (μs)',fontweight='bold')
 ax.set_ylim(0,65)
 ax.set_xlim(-10,1500)
 
 
+peak_data_384 = data.window["4-pipe"]["384"][6]["gbit"]
+ax.plot([-10,1500], [sum(peak_data_384) / len(peak_data_384)] * 2, color="green", label="384-peak", linewidth="2")
 
 x,y = get(data.gbit["384"]["natural-su"], "gbit", skip=0)
-ax.plot(*smooth(x,y), color="lightgreen", label="384-nat-su")
+ax.plot(*smooth(x,y), color="lightgreen", label="384-su")
 
 x,y = get(data.gbit["384"]["natural-1500"], "gbit", skip=0)
-ax.plot(x,y,color="green",marker=".",label="384-nat-1500")
+ax.plot(*smooth(x,y,50),color="green",marker=".",label="384-sa-1500")
 
-peak_data_384 = data.window["4-pipe"]["384"][6]["gbit"]
+peak_data_446 = data.window["4-pipe"]["446"][6]["gbit"]
+ax.plot([-10,1500], [sum(peak_data_446) / len(peak_data_446)] * 2, color="blue", label="446-peak", linewidth="2")
 
-ax.plot([-10,1500], [sum(peak_data_384) / len(peak_data_384)] * 2, color="green", label="384-peak", linewidth="2")
+x,y=get(data.gbit["446"]["natural-su"], "gbit", skip=[0])
+ax.plot(*smooth(x,y), color="lightblue", label="444-su")
+
+x,y=get(data.gbit["446"]["natural-1500"], "gbit", skip=[0])
+ax.plot(*smooth(x,y,50),color="blue",marker=".",label="446-sa-1500")
+
+x,y=get(data.gbit["446"]["natural-3000"], "gbit", skip=[0])
+ax.plot(*smooth(x,y,50),color="blue",marker="o",label="446-sa-3000")
+
 ax.legend()
 
 #=========================================
-# Plot 1,0
+# Plot 1,1
 #=========================================
 ax = axs[1][1]
 ax.grid(True, linestyle='--', which='major', color='grey', alpha=0.3)
@@ -266,11 +277,6 @@ ax.set_xlabel('RTX Threshold (μs)',fontweight='bold')
 ax.set_ylim(0,65)
 ax.set_xlim(-10,1500)
 
-peak_data_446 = data.window["4-pipe"]["446"][6]["gbit"]
-ax.plot([-10,1500], [sum(peak_data_446) / len(peak_data_446)] * 2, color="blue", label="446-peak", linewidth="2")
-
-x,y=get(data.gbit["446"]["natural-su"], "gbit", skip=[0])
-ax.plot(*smooth(x,y), color="lightblue", label="444-natural-su")
 
 ax.legend()
 

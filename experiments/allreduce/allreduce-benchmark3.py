@@ -193,6 +193,7 @@ def benchmark(args):
     # DPA context options
     dpa_ctx = {"quantization": 'float' in args.type, "averaging": args.avg, "prescaled": args.dpa_pre,
                "pipes": args.dpa_pipes, "straggle": args.dpa_world_k}
+    dpa_ctx_wu = {"quantization": 'float' in args.type, "averaging": args.avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, "straggle": 0}
 
     op = dist.ReduceOp.AVG if args.avg else dist.ReduceOp.SUM # if (args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre)) else dist.ReduceOp.SUM
 
@@ -200,16 +201,17 @@ def benchmark(args):
 
     dist.barrier()
 
-    with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
-        jobs = []
-        times = []
-        counts = []
-
-        # Warmup
+    # Warmup
+    with dpa.DataplaneContext(**dpa_ctx_wu) if args.backend.startswith("dpa") else nullcontext():
         for i in range(args.warmup): jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
         for j in jobs: j.wait()
         torch.cuda.synchronize()
         jobs.clear()
+
+    with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
+        jobs = []
+        times = []
+        counts = []
 
         batch_i = -1
 
