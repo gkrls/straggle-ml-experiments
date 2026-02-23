@@ -213,7 +213,7 @@ ax2.set_yticklabels([f"{(y/total_pkts)*100:.3f}" for y in ax.get_yticks()])
 ax2.set_ylabel("Percentage", fontweight='bold')
 
 #=========================================
-# Plot 1,0 
+# Plot 1,0
 #=========================================
 def get(data,metric,op="avg", skip=None, smooth=None):
   if op not in ['avg','min','max','all']: raise "invalid op"
@@ -236,30 +236,41 @@ def smooth(x,y):
 
 ax = axs[1][0]
 ax.grid(True, linestyle='--', which='major', color='grey', alpha=0.3)
-ax.set_title("Profiling RTX timeout", fontweight="bold", fontsize=10)
+ax.set_title("Profiling RTX timeout (win=384)", fontweight="bold", fontsize=10)
 ax.set_ylabel('Throughput (Gbit/s)',fontweight='bold')
 ax.set_xlabel('RTX Threshold (μs)',fontweight='bold')
 ax.set_ylim(0,65)
-ax.set_xlim(-10,1000)
+ax.set_xlim(-10,1500)
 
 
 
 x,y = get(data.gbit["384"]["natural-su"], "gbit", skip=0)
-ax.plot(*smooth(x,y), color="lightgreen", label="384-natural-su")
+ax.plot(*smooth(x,y), color="lightgreen", label="384-nat-su")
 
+x,y = get(data.gbit["384"]["natural-1500"], "gbit", skip=0)
+ax.plot(x,y,color="green",marker=".",label="384-nat-1500")
 
-# ax.scatter(x, y, s=15)
-# ax.plot(*get_perf(data.perf["384"]["natural-cold"]), linestyle=":", color="teal", label="natural-cold")
+peak_data_384 = data.window["4-pipe"]["384"][6]["gbit"]
+
+ax.plot([-10,1500], [sum(peak_data_384) / len(peak_data_384)] * 2, color="green", label="384-peak", linewidth="2")
+ax.legend()
+
+#=========================================
+# Plot 1,0
+#=========================================
+ax = axs[1][1]
+ax.grid(True, linestyle='--', which='major', color='grey', alpha=0.3)
+ax.set_title("Profiling RTX timeout (win=446)", fontweight="bold", fontsize=10)
+ax.set_ylabel('Throughput (Gbit/s)',fontweight='bold')
+ax.set_xlabel('RTX Threshold (μs)',fontweight='bold')
+ax.set_ylim(0,65)
+ax.set_xlim(-10,1500)
+
+peak_data_446 = data.window["4-pipe"]["446"][6]["gbit"]
+ax.plot([-10,1500], [sum(peak_data_446) / len(peak_data_446)] * 2, color="blue", label="446-peak", linewidth="2")
 
 x,y=get(data.gbit["446"]["natural-su"], "gbit", skip=[0])
 ax.plot(*smooth(x,y), color="lightblue", label="444-natural-su")
-# ax.scatter(x, y, s=15)
-
-
-peak_data_384 = data.window["4-pipe"]["384"][6]["gbit"]
-peak_data_446 = data.window["4-pipe"]["446"][6]["gbit"]
-ax.plot([-10,1000], [sum(peak_data_384) / len(peak_data_384)] * 2, color="green", label="384-peak", linewidth="2")
-ax.plot([-10,1000], [sum(peak_data_446) / len(peak_data_446)] * 2, color="blue", label="446-peak", linewidth="2")
 
 ax.legend()
 

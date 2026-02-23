@@ -249,6 +249,8 @@ def benchmark(args):
 
     # print("done")
 
+    dist.barrier()
+
     tensor_bytes = args.size * 4
 
     times_np = np.array(times, dtype=np.float64)
