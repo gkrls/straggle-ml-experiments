@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from matplotlib.transforms import Bbox
 from matplotlib.patches import Patch
+from scipy.interpolate import PchipInterpolator
+import numpy as np
 
 import tuning_data as data
 
@@ -39,11 +41,11 @@ PACKET_SIZE_128_S = 610  # 128 values/pipe, 64 reducers/pipe, 16 reducer stages,
 PACKET_SIZE_86    = 442  #  86 values/pipe, 43 reducers/pipe, 11 reducer stages, tofino 2 only (frame-limit)
 PACKET_SIZE_64    = 354  #  64 values/pipe, 32 reducers/pipe,  8 reducer stages, tofino 1+2
 
-fig = plt.figure(figsize=(14, 8),constrained_layout=True)
+fig = plt.figure(figsize=(24, 10),constrained_layout=True)
 
 gs = fig.add_gridspec(2, 1)
-rows = [gs[0, 0].subgridspec(1, 3), # width_ratios=[2, 0.5, 2] 
-        gs[1, 0].subgridspec(1, 3)]
+rows = [gs[0, 0].subgridspec(1, 4), # width_ratios=[2, 0.5, 2] 
+        gs[1, 0].subgridspec(1, 4)]
 axs = [[fig.add_subplot(rows[r][0, c]) for c in range(rows[r].ncols)] for r in range(len(rows))]
 
 #=========================================
@@ -119,7 +121,7 @@ ax2.legend(handles=handles,loc='upper left',bbox_to_anchor=(0,1),ncol=len(handle
 
 
 #=========================================
-# Plot 0,1 - switch-side straggler timeout
+# Plot 0,1 switch-side straggler timeout
 #=========================================
 def get_timeouts(exp, op='avg', all=None):
   pts = []
@@ -148,20 +150,20 @@ def vline(ax, x, label, color, linestyle):
 ax = axs[0][1]#fig.add_subplot(row0[0,0])
 ax.set_title("Profiling straggler timeout (win=384/6)", fontweight="bold", fontsize=10)
 ax.set_xticks(range(0,11), minor=True)
-ax.set_xlim(-0.05, 7)
-ax.set_ylim(0,3500)
+ax.set_xlim(-0.05, 11)
+ax.set_ylim(0,6000)
 ax.set_ylabel("Straggler timeouts (pkts)", fontweight='bold')
 ax.set_xlabel("Straggler threshold (ms)", fontweight='bold')
 
-ax.plot(*get_timeouts(data.packets["384"]["natural-su-nore"], 'min'), marker="^", markersize=10, markerfacecolor='none', color="red", label="su-min")
-ax.plot(*get_timeouts(data.packets["384"]["natural-su-nore"], 'max'), marker="v", markersize=10, markerfacecolor='none', color="blue", label="su-max")
-ax.plot(*get_timeouts(data.packets["384"]["natural-su-nore"], 'avg'), marker="o", markersize=10, markerfacecolor='none', color="green", label="su-avg")
+ax.plot(*get_timeouts(data.packets["384"]["natural-su-nore"], 'min'), marker="^", markersize=10, markerfacecolor='none', color="red", label="min")
+ax.plot(*get_timeouts(data.packets["384"]["natural-su-nore"], 'max'), marker="v", markersize=10, markerfacecolor='none', color="blue", label="max")
+ax.plot(*get_timeouts(data.packets["384"]["natural-su-nore"], 'avg'), marker="o", markersize=10, markerfacecolor='none', color="green", label="avg")
 
 any0, maj0, all0 = find_zeroes(data.packets["384"]["natural-su-nore"])
 
 vline(ax, any0, color="red",   linestyle=":", label="first")
 vline(ax, maj0, color="black", linestyle=":", label="majority")
-vline(ax, all0, color="black", linestyle="-", label="all")
+vline(ax, all0, color="black", linestyle=":", label="all")
 
 ax.legend(loc="upper right", bbox_to_anchor=(0.85, 0.55))
 
@@ -182,20 +184,24 @@ ax2.set_ylabel("Percentage", fontweight='bold')
 
 
 #=========================================
-# Plot 0,2 - peak throughput
+# Plot 0,2 switch-side straggler timeout
 #=========================================
 ax = axs[0][2] #fig.add_subplot(row0[0,1])
-
+ax.set_title("Profiling straggler timeout (win=384/6)", fontweight="bold", fontsize=10)
+ax.set_xticks(range(0,12), minor=True)
+ax.set_xlim(-0.05, 11)
+ax.set_ylim(0,6000)
+ax.set_ylabel("Straggler timeouts (pkts)", fontweight='bold')
+ax.set_xlabel("Straggler threshold (ms)", fontweight='bold')
 ax.set_title("Profiling straggler timeout (win=446/6)", fontweight="bold", fontsize=10)
-
-ax.plot(*get_timeouts(data.packets["446"]["natural-su-nore"], 'min'), marker="^", markersize=10, markerfacecolor='none', color="red", label="su-min")
-ax.plot(*get_timeouts(data.packets["446"]["natural-su-nore"], 'max'), marker="v", markersize=10, markerfacecolor='none', color="blue", label="su-max")
-ax.plot(*get_timeouts(data.packets["446"]["natural-su-nore"], 'avg'), marker="o", markersize=10, markerfacecolor='none', color="green", label="su-avg")
+ax.plot(*get_timeouts(data.packets["446"]["natural-su-nore"], 'min'), marker="^", markersize=10, markerfacecolor='none', color="red", label="min")
+ax.plot(*get_timeouts(data.packets["446"]["natural-su-nore"], 'max'), marker="v", markersize=10, markerfacecolor='none', color="blue", label="max")
+ax.plot(*get_timeouts(data.packets["446"]["natural-su-nore"], 'avg'), marker="o", markersize=10, markerfacecolor='none', color="green", label="avg")
 
 any0, maj0, all0 = find_zeroes(data.packets["446"]["natural-su-nore"])
 vline(ax, any0, color="red",   linestyle=":", label="first")
 vline(ax, maj0, color="black", linestyle=":", label="majority")
-vline(ax, all0, color="black", linestyle="-", label="all")
+vline(ax, all0, color="black", linestyle=":", label="all")
 
 ax.legend(loc="upper right", bbox_to_anchor=(0.85, 0.55))
 
@@ -207,6 +213,57 @@ ax2.set_yticklabels([f"{(y/total_pkts)*100:.3f}" for y in ax.get_yticks()])
 ax2.set_ylabel("Percentage", fontweight='bold')
 
 #=========================================
+# Plot 1,0 
+#=========================================
+def get(data,metric,op="avg", skip=None, smooth=None):
+  if op not in ['avg','min','max','all']: raise "invalid op"
+  if skip is None: skip = []
+  if not isinstance(skip, list): skip = skip=[skip]
+  x, y = [], []
+  for k,v in data.items():
+        if k in skip or float(k) in skip: continue
+        if op == 'all':
+            x.extend([v[metric]] * len(v[metric]))
+            y.extend(v[metric])
+        else:
+            y.append( (sum(v[metric]) / max(len(v[metric]), 1)) if op == 'avg' else min(v[metric]) if op == 'min' else max(v[metric]))
+            x.append(float(k))
+  return x, y
+
+def smooth(x,y):
+    new_x = np.linspace(min(x), max(x), 300)
+    return new_x, PchipInterpolator(x, y)(new_x)
+
+ax = axs[1][0]
+ax.grid(True, linestyle='--', which='major', color='grey', alpha=0.3)
+ax.set_title("Profiling RTX timeout", fontweight="bold", fontsize=10)
+ax.set_ylabel('Throughput (Gbit/s)',fontweight='bold')
+ax.set_xlabel('RTX Threshold (μs)',fontweight='bold')
+ax.set_ylim(0,65)
+ax.set_xlim(-10,1000)
+
+
+
+x,y = get(data.gbit["384"]["natural-su"], "gbit", skip=0)
+ax.plot(*smooth(x,y), color="lightgreen", label="384-natural-su")
+
+
+# ax.scatter(x, y, s=15)
+# ax.plot(*get_perf(data.perf["384"]["natural-cold"]), linestyle=":", color="teal", label="natural-cold")
+
+x,y=get(data.gbit["446"]["natural-su"], "gbit", skip=[0])
+ax.plot(*smooth(x,y), color="lightblue", label="444-natural-su")
+# ax.scatter(x, y, s=15)
+
+
+peak_data_384 = data.window["4-pipe"]["384"][6]["gbit"]
+peak_data_446 = data.window["4-pipe"]["446"][6]["gbit"]
+ax.plot([-10,1000], [sum(peak_data_384) / len(peak_data_384)] * 2, color="green", label="384-peak", linewidth="2")
+ax.plot([-10,1000], [sum(peak_data_446) / len(peak_data_446)] * 2, color="blue", label="446-peak", linewidth="2")
+
+ax.legend()
+
+#=========================================
 #=========================================
 #=========================================
 #=========================================
@@ -214,6 +271,6 @@ ax2.set_ylabel("Percentage", fontweight='bold')
 #=========================================
 
 save_subplot(fig, axs[0][0], "window.pdf")
-save_subplot(fig, axs[0][1], "packets.pdf")
+save_subplot(fig, axs[0][1], "packets_384.pdf")
 
 plt.show()

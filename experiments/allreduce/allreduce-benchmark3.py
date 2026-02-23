@@ -212,6 +212,7 @@ def benchmark(args):
         jobs.clear()
 
         batch_i = -1
+        t_start_all = time.time_ns()
         for i in range(args.iters):
             if len(jobs) == 0:
                 batch_i += 1
@@ -241,7 +242,7 @@ def benchmark(args):
                 times.append(elapsed / len(jobs) * 1000.0)
                 counts.append(len(jobs))
                 jobs.clear()
-
+        t_all = (time.time_ns() - t_start_all) / 1000
 
     # print("done")
 
@@ -265,6 +266,7 @@ def benchmark(args):
         "bytes" : tensor_bytes,
         "times" : times_np.tolist(),
         "counts": counts_np.tolist(),
+        "time_all"  : t_all,
         "time_unit" : "ms",
         "time_mean" : time_mean, #np.average(times_np, weights=counts_np),
         "time_std"  : time_std,
