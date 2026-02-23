@@ -240,12 +240,12 @@ def benchmark(args):
             if len(jobs) >= args.batch or i == args.iters - 1:
                 for j in jobs: j.wait()
                 torch.cuda.synchronize()
-                elapsed = (time.time_ns() - t_start) / 1e9
-                times.append(elapsed / len(jobs) * 1000.0)
+                elapsed = (time.time_ns() - t_start) / 1e6
+                times.append(elapsed / len(jobs))  #* 1000.0
                 counts.append(len(jobs))
                 jobs.clear()
 
-        t_all = (time.time_ns() - t_start_all) / 1e9
+        t_all = (time.time_ns() - t_start_all) / 1e6
 
     # print("done")
 
