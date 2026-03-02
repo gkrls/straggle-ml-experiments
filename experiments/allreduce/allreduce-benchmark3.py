@@ -252,7 +252,7 @@ def benchmark(args):
 
         t_all = (time.time_ns() - t_start_all) / 1e6
 
-    # print("done")
+    print("done")
 
     dist.barrier()
 
