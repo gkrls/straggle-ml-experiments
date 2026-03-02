@@ -508,7 +508,7 @@ def train(args):
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
-        model = dpa.DDPWrapper(model, straggle = args.straggle_k if args.straggle_k > 0 else args.world_size, prescale=args.prescale)
+        model = dpa.DDPWrapper(model, straggle = args.dpa_world_k if args.dpa_world_k else args.world_size, prescale=args.prescale)
 
     # Straggle sim
     # straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)
@@ -608,6 +608,8 @@ def train(args):
 
     best_ppl = float('inf')
     global_step = 0  # cumulative optimizer steps so far
+
+    dist.barrier()
 
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
@@ -734,7 +736,6 @@ def main():
     parser.add_argument('--master_addr', type=str, default='127.0.0.1')
     parser.add_argument('--master_port', type=int, default=29500)
     parser.add_argument('--backend', type=str, default='gloo', choices=['nccl', 'gloo', 'dpa_dpdk'])
-    parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'])
     parser.add_argument('--deterministic', action='store_true')
     parser.add_argument('--static_graph', action='store_true')
@@ -743,6 +744,11 @@ def main():
     parser.add_argument('--json', type=str, default="gpt2.json", help="Path to JSON run log")
     parser.add_argument('--log_every_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
                             'Automatically disabled if epoch has fewer than N steps.')
+
+    parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
+    parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
+    parser.add_argument("--dpa_prescale", action="store_true", help="Enable prescaling")
+
 
     # Data
     parser.add_argument('--data', type=str, required=True)
@@ -786,14 +792,14 @@ def main():
     parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=0)
     parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
     parser.add_argument("--straggle_verbose", action='store_true')
-    parser.add_argument("--straggle_k", type=int, default=0)
+    # parser.add_argument("--straggle_k", type=int, default=0)
 
 
 
     args = parser.parse_args()
     args.seed = args.seed + args.rank * 1000
 
-    if args.straggle_k:
+    if args.dpa_world_k:
         print(f"!! Straggler mitigation ENABLED with straggle_k={args.straggle_k} !!")
     else:
         print(f"!! Straggler mitigation ENABLED !!")

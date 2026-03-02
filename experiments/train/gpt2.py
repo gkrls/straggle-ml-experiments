@@ -774,6 +774,8 @@ def main():
         if not s: return []
         try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
         except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
+
+        
     parser.add_argument("--straggle_points", type=int, help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
     parser.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
     parser.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
@@ -781,6 +783,7 @@ def main():
     parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
     parser.add_argument("--straggle_verbose", action='store_true')
 
+    
 
 
     args = parser.parse_args()
