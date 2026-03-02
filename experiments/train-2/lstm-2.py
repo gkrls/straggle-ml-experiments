@@ -495,14 +495,14 @@ def train(args):
 
     # Model (only BIG)
     model = LSTMTextModel(vocab_size=len(vocab), num_classes=args.num_classes).to(device)
-    model = SimpleDDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False,
-                gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    model.require_forward_param_sync = False
+    # model = SimpleDDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False,
+    #             gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
+    # model.require_forward_param_sync = False
     print(f"Model 'lstm_big' initialized. (embed=300, hidden=512, layers=2, drop=0.6)", flush=True)
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
-        dpa.DDPWrapper(model, pipes=4, straggle = args.straggle_k if args.straggle_k > 0 else args.world_size, prescale=args.prescale)
+        dpa.DDPWrapper(model, pipes=4, straggle = args.dpa_world_k if args.dpa_world_k > 0 else args.world_size, prescale=args.prescale)
 
 
     # Straggle sim
@@ -696,7 +696,7 @@ def main():
     parser.add_argument("--straggle_amount", type=float, default=0)
     parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), default=[1.0, 1.0])
     parser.add_argument("--straggle_verbose", action='store_true')
-    parser.add_argument("--straggle_k", type=int, default=0)
+    # parser.add_argument("--straggle_k", type=int, default=0)
 
     parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
     parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
@@ -706,8 +706,8 @@ def main():
     args = parser.parse_args()
     args.seed = args.seed + args.rank * 1000
 
-    if args.straggle_k:
-        print(f"!! Straggler mitigation ENABLED with straggle_k={args.straggle_k} !!")
+    if args.dpa_world_k:
+        print(f"!! Straggler mitigation ENABLED with dpa_world_k={args.dpa_world_k} !!")
     else:
         print(f"!! Straggler mitigation ENABLED !!")
 

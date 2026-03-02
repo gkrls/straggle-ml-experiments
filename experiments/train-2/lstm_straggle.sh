@@ -88,7 +88,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-sudo -E $(which python) experiments/train-2/lstm-2.py \
+sudo -E DPA_LOG=Info DPA_SCHEDULER=OFF $(which python) experiments/train-2/lstm-2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -110,7 +110,8 @@ sudo -E $(which python) experiments/train-2/lstm-2.py \
   --straggle_prob 16 \
   --straggle_ranks 1 \
   --straggle_amount 0.05 \
-  --straggle_multiply 0.5 2
+  --straggle_multiply 0.5 2 \
+  --dpa_world_k 5
   # --straggle_verbose \
   # --straggle_k $WORLD_K \
   "$@"
