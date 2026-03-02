@@ -495,6 +495,8 @@ def train(args):
 
     # Model (only BIG)
     model = LSTMTextModel(vocab_size=len(vocab), num_classes=args.num_classes).to(device)
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
+                gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
     # model = SimpleDDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False,
     #             gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
     # model.require_forward_param_sync = False
