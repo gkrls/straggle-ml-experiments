@@ -790,6 +790,7 @@ def main():
         except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
     parser.add_argument("--straggle_points", type=int, help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
     parser.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
+    parser.add_argument("--straggle_last", type=int, default=0)
     parser.add_argument("--straggle_skip", type=int, default=0)
     parser.add_argument("--straggle_skip_every", type=int, default=0)
     parser.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
