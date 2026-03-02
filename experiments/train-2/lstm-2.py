@@ -654,7 +654,6 @@ def main():
     parser.add_argument('--master_addr', type=str, default="42.0.0.1")
     parser.add_argument("--master_port", type=int, default=29500)
     parser.add_argument("--backend", type=str, default="gloo", help="DDP backend (e.g., gloo, nccl)")
-    parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     parser.add_argument("--device", type=str, choices=['cuda', 'cpu'], default='cuda')
     parser.add_argument("--deterministic", action='store_true')
     parser.add_argument("--workers", type=int, default=8)
@@ -663,7 +662,11 @@ def main():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument("--json", type=str, default="lstm.json", help="Path to JSON run log")
 
+    parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")   
+    parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
+    parser.add_argument("--dpa_prescale", action="store_true", help="Enable prescaling")
 
+    
     # Training (only BIG model)
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--batch_size', type=int, default=32)

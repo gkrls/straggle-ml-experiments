@@ -205,7 +205,7 @@ def benchmark(args):
     dist.barrier()
 
     # Warmup
-    with dpa.DataplaneContext(**dpa_ctx_wu) if args.backend.startswith("dpa") else nullcontext():
+    with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
         jobs = []
         for i in range(args.warmup): jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
         for j in jobs: j.wait()
