@@ -517,6 +517,8 @@ def train(args):
                                   multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)        
     if straggle.attach(model): print(f"{straggle} created and active for rank {args.rank}")
     else: print(f"{straggle} created but inactive for rank {args.rank}")
+    if straggle.active:
+        straggle.print_pattern()
     # straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
     #                                 ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
     #                                 verbose=args.straggle_verbose)

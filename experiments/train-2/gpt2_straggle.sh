@@ -110,10 +110,10 @@ sudo -E $(which python) experiments/train-2/gpt2-2.py \
   --json experiments/train-2/gpt2_straggle_16.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
-  --straggle_points 3 \
-  --straggle_prob 16 \
+  --straggle_points 1 \
+  --straggle_prob 10 \
   --straggle_ranks 1 \
   --straggle_amount 1.68 \
-  --straggle_multiply 0.5 2 \
+  --straggle_multiply 0.5 0.6 \
   --dpa_world_k 5 \
   "$@"
