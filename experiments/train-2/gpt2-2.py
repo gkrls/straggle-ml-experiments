@@ -432,7 +432,7 @@ class SimpleDDP(DDP):
         # Skip all DDP's sync logic, just call the module
         return self.module(*inputs, **kwargs)
 
-def train(args):
+def train(args, straggle):
     device = torch.device(args.device)
 
     data_root = Path(args.data).resolve()
@@ -506,6 +506,11 @@ def train(args):
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=False)
     model.require_forward_param_sync = False
 
+    if straggle.attach(model):
+        print(f"{straggle} created and active for rank {args.rank}")
+    else:
+        print(f"{straggle} inactive for rank {args.rank}")
+
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
         model = dpa.DDPWrapper(model, straggle = args.dpa_world_k if args.dpa_world_k else args.world_size, prescale=args.prescale)
@@ -513,12 +518,7 @@ def train(args):
     # Straggle sim
     # straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)
 
-    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks, 
-                                  multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)        
-    if straggle.attach(model): print(f"{straggle} created and active for rank {args.rank}")
-    else: print(f"{straggle} created but inactive for rank {args.rank}")
-    if straggle.active:
-        straggle.print_pattern()
+
     # straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
     #                                 ranks=args.straggle_ranks, multiplier_range=args.straggle_multiply, seed=42,
     #                                 verbose=args.straggle_verbose)
@@ -790,6 +790,8 @@ def main():
         except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
     parser.add_argument("--straggle_points", type=int, help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
     parser.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
+    parser.add_argument("--straggle_skip", type=int, default=0)
+    parser.add_argument("--straggle_skip_every", type=int, default=0)
     parser.add_argument("--straggle_ranks", type=csv_ints, help="comma separated list of ints", default=[])
     parser.add_argument("--straggle_amount", type=float, help="base straggle amount in seconds (e.g. mean step time)", default=0)
     parser.add_argument("--straggle_multiply", type=float, nargs=2, metavar=("lo","hi"), help="straggle amount multipler lo and hi", default=[1.0, 1.0])
@@ -838,8 +840,14 @@ def main():
     setup_ddp(args)
     print(f"[{now()}] Configuration:\n{json.dumps(vars(args), indent=2)}")
 
+    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks,
+                                  skip=args.straggle_skip,skip_every=args.straggle_skip_every,last=args.straggle_last, 
+                                  multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)  
+    
+    if straggle.active: straggle.print_pattern()
+
     try:
-        train(args)
+        train(args,straggle)
     finally:
         if dist.is_available() and dist.is_initialized():
             dist.destroy_process_group()
