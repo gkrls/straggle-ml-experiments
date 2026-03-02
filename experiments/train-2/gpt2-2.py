@@ -800,7 +800,7 @@ def main():
     args.seed = args.seed + args.rank * 1000
 
     if args.dpa_world_k:
-        print(f"!! Straggler mitigation ENABLED with straggle_k={args.straggle_k} !!")
+        print(f"!! Straggler mitigation ENABLED with straggle_k={args.dpa_world_k} !!")
     else:
         print(f"!! Straggler mitigation ENABLED !!")
 
