@@ -28,7 +28,7 @@ PATTERN = {
 
 PATTERN_OUT = {
     1: lambda args: PATTERN[1](args) * (args.world_size if not args.avg else 1),
-    2: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1))),
+    2: lambda args: torch.ones(args.size, dtype=args.dtype, device=torch.device(args.device)) * sum(list(range(1, args.world_size + 1)) / (args.world_size if args.avg else 1)),
     3: lambda args: PATTERN[3](args) * (args.world_size if not args.avg else 1),
 }
 
@@ -207,7 +207,7 @@ def benchmark(args):
         for i in range(args.warmup): jobs.append(dist.all_reduce(tensors[i], op=op, async_op=True))
         for j in jobs: j.wait()
         torch.cuda.synchronize()
-
+    # Normal
     with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
         jobs = []
         times = []
