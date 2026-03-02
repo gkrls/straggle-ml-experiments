@@ -746,7 +746,7 @@ def main():
                             'Automatically disabled if epoch has fewer than N steps.')
 
     parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
-    parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
+    parser.add_argument("--dpd_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
     parser.add_argument("--dpa_prescale", action="store_true", help="Enable prescaling")
 
 
