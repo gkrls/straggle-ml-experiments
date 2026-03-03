@@ -710,14 +710,14 @@ def setup_ddp(args):
     os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
     os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
 
+    init_method = f"tcp://{args.master_addr}:{args.master_port}" # "env://"
+
     # Initialize process group
     if args.backend.startswith("dpa"):
         if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
         dpa_device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         dpa_backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf)
         pg_options = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
-        # pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4) # observed max around 150-is MB
-        # pg_options.hint_pinned_tensor_pool_size = 20                                              # observed count 13
         pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0) # observed max around 150-is MB
         pg_options.hint_pinned_tensor_pool_size = 20                                                                                       # observed count 13
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
@@ -846,12 +846,11 @@ def main():
                                   multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)  
     
     if straggle.active: straggle.print_pattern()
-
+    
     try:
         train(args,straggle)
     finally:
-        if dist.is_available() and dist.is_initialized():
-            dist.destroy_process_group()
+        dist.destroy_process_group()
 
 if __name__ == "__main__":
     main()

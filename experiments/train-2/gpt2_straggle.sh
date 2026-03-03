@@ -86,11 +86,11 @@ set -x
 
 GDB='gdb -ex run --args'
 
-LOGFILE="output_gpt2_straggle_$(date +%Y%m%d_%H%M%S).log"
+LOGFILE="output_gpt2_su_straggle_$(date +%Y%m%d_%H%M%S).log"
 
 # Standard settings for GPT2 on a 16GB GPU
 # Consumes around ~15.3GB of memory with AMP
-sudo -E $(which python) experiments/train-2/gpt2-2.py \
+sudo -E DPA_LOG=Info $(which python) experiments/train-2/gpt2-2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -117,6 +117,6 @@ sudo -E $(which python) experiments/train-2/gpt2-2.py \
   --straggle_ranks 1 \
   --straggle_amount 1.68 \
   --straggle_multiply 0.5 0.6 \
-  --dpa_world_k 5 \
+  --dpa_world_k 6 \
   "$@" \
   2>&1 | tee "$LOGFILE"
