@@ -34,6 +34,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
         -DDPA_FASTESTK_EXIT=OFF \
+        -DDPA_FASTESTK_BULK=OFF \
+        -DDPA_SYNCHRON_BULK=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
@@ -90,7 +92,7 @@ LOGFILE="output_gpt2_su_straggle_$(date +%Y%m%d_%H%M%S).log"
 
 # Standard settings for GPT2 on a 16GB GPU
 # Consumes around ~15.3GB of memory with AMP
-sudo -E DPA_LOG=Info $(which python) experiments/train-2/gpt2-2.py \
+sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -117,6 +119,4 @@ sudo -E DPA_LOG=Info $(which python) experiments/train-2/gpt2-2.py \
   --straggle_ranks 1 \
   --straggle_amount 1.68 \
   --straggle_multiply 0.5 0.6 \
-  --dpa_world_k 6 \
-  "$@" \
-  2>&1 | tee "$LOGFILE"
+  --dpa_world_k 5

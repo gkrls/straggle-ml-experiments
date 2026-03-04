@@ -254,7 +254,7 @@ dpa.torch.DDPWrapper: _DPAHookState Object:  {'pipes': 0, 'straggle': 6, 'averag
 [2026-03-03 14:03:43] New best validation perplexity: 29.80
 [2026-03-03 14:03:43][Epoch 005] ...
 [2026-03-03 14:11:29][Epoch 005][Step 0050/1200] global_step=6050 train_loss=3.3649 train_ppl=28.93 lr=0.000101 step_time=9.313s step_time_min=8.357 step_time_max=31.495 micro_time=1.854s tp=6591 tok/s
-^[[A[2026-03-03 14:18:51][Epoch 005][Step 0100/1200] global_step=6100 train_loss=3.3557 train_ppl=28.67 lr=0.000098 step_time=8.826s step_time_min=8.357 step_time_max=31.495 micro_time=1.757s tp=6958 tok/s
+[2026-03-03 14:18:51][Epoch 005][Step 0100/1200] global_step=6100 train_loss=3.3557 train_ppl=28.67 lr=0.000098 step_time=8.826s step_time_min=8.357 step_time_max=31.495 micro_time=1.757s tp=6958 tok/s
 [2026-03-03 14:26:13][Epoch 005][Step 0150/1200] global_step=6150 train_loss=3.3693 train_ppl=29.06 lr=0.000094 step_time=8.849s step_time_min=8.357 step_time_max=31.495 micro_time=1.761s tp=6940 tok/s
 [2026-03-03 14:33:37][Epoch 005][Step 0200/1200] global_step=6200 train_loss=3.4021 train_ppl=30.03 lr=0.000091 step_time=8.863s step_time_min=8.357 step_time_max=31.495 micro_time=1.764s tp=6929 tok/s
 [2026-03-03 14:41:02][Epoch 005][Step 0250/1200] global_step=6250 train_loss=3.3660 train_ppl=28.96 lr=0.000088 step_time=8.901s step_time_min=8.357 step_time_max=31.495 micro_time=1.771s tp=6900 tok/s
