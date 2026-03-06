@@ -119,4 +119,6 @@ sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-
   --straggle_ranks 1 \
   --straggle_amount 1.68 \
   --straggle_multiply 0.5 0.6 \
+  --straggle_skip 10 \
+  --straggle_skip_every 100
   --dpa_world_k 5

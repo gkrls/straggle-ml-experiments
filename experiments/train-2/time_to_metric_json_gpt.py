@@ -4,8 +4,8 @@ import numpy as np
 
 # File paths with clearer names
 FILE_NO_STRAGGLE = '../train/results/gpt2.json'               # no stragglers
-FILE_STRAGGLE_UNAWARE = '../train/results/gpt2_straggle_16.json'   # with stragglers, no mitigation
-FILE_STRAGGLE_AWARE = '../train-2/gpt2_straggle_16.json'         # with stragglers and mitigation
+FILE_STRAGGLE_UNAWARE = 'data/gpt2_su_straggle_20260302_225512.json'   # with stragglers, no mitigation
+FILE_STRAGGLE_AWARE = 'data/gpt2_sa_straggle.json'         # with stragglers and mitigation
 
 FILE_NO_STRAGGLE = os.path.join(os.path.dirname(__file__), FILE_NO_STRAGGLE)
 FILE_STRAGGLE_UNAWARE = os.path.join(os.path.dirname(__file__), FILE_STRAGGLE_UNAWARE)
