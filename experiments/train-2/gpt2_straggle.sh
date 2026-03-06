@@ -47,11 +47,11 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   source $HOME/straggle-ml-experiments/venv/bin/activate
 
   # Make sure env is ok
-  python -m pip install --upgrade pip 
-  python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
+  python -m pip install --upgrade -q pip 
+  python -m pip install --no-user -q -r "$HOME/straggle-ml-experiments/requirements.txt"
 
   # Compile the plugin
-  PYTHONWARNINGS="ignore::setuptools.errors.SetuptoolsDeprecationWarning,ignore::setuptools.errors.EasyInstallDeprecationWarning" \
+  # PYTHONWARNINGS="ignore::setuptools.errors.SetuptoolsDeprecationWarning,ignore::setuptools.errors.EasyInstallDeprecationWarning" \
   python $HOME/straggle-ml/build/install/lib/dpa_plugin_pytorch/setup.py -q develop
 else
   source $HOME/straggle-ml-experiments/venv/bin/activate
@@ -90,7 +90,6 @@ GDB='gdb -ex run --args'
 
 LOGFILE="output_gpt2_su_straggle_$(date +%Y%m%d_%H%M%S).log"
 
-# Standard settings for GPT2 on a 16GB GPU
 # Consumes around ~15.3GB of memory with AMP
 sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-2.py \
   --rank "$RANK" \
@@ -115,10 +114,11 @@ sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
   --straggle_points 1 \
-  --straggle_prob 10 \
+  --straggle_prob 5 \
   --straggle_ranks 1 \
   --straggle_amount 1.68 \
   --straggle_multiply 0.5 0.6 \
-  --straggle_skip 10 \
-  --straggle_skip_every 100
   --dpa_world_k 5
+  # --straggle_skip 10 \
+  # --straggle_skip_every 100 \
+  
