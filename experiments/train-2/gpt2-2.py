@@ -448,12 +448,9 @@ def train(args, straggle):
     tokenizer.pad_token = tokenizer.eos_token  # GPT-2 uses eos as pad
     vocab_size = len(tokenizer)
 
-    if args.rank == 0:
-        print(f"[{now()}] Loading Parquet dataset from {data_root} (cache: {cache_dir}) ...", flush=True)
+    print(f"[{now()}] Loading Parquet dataset from {data_root} (cache: {cache_dir}) ...", flush=True)
 
-    ds_train, ds_val = hf_load_train_val_parquet(
-        data_root, val_fraction=args.val_fraction, seed=42, cache_dir=str(cache_dir)
-    )
+    ds_train, ds_val = hf_load_train_val_parquet(data_root, val_fraction=args.val_fraction, seed=42, cache_dir=str(cache_dir))
 
     # datasets/loaders
     train_ds = GPT2Windows(ds_train, tokenizer, seq_len=args.seq_len, stride=args.seq_len,
@@ -506,10 +503,9 @@ def train(args, straggle):
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=False)
     model.require_forward_param_sync = False
 
-    if straggle.attach(model):
-        print(f"{straggle} created and active for rank {args.rank}")
-    else:
-        print(f"{straggle} inactive for rank {args.rank}")
+    if straggle is not None:
+        if straggle.attach(model):print(f"{straggle} created and active for rank {args.rank}")
+        else: print(f"{straggle} inactive for rank {args.rank}")
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
@@ -682,10 +678,9 @@ def train(args, straggle):
 
         if val_metrics['ppl'] < best_ppl:
             best_ppl = val_metrics['ppl']
-            print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
+            # print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
 
-    if args.rank == 0:
-        print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
+    print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
 
 
 # ------------------------- DDP setup/teardown -------------------------
@@ -841,11 +836,12 @@ def main():
     setup_ddp(args)
     print(f"[{now()}] Configuration:\n{json.dumps(vars(args), indent=2)}")
 
-    straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks,
-                                  skip=args.straggle_skip,skip_every=args.straggle_skip_every,last=args.straggle_last, 
-                                  multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)  
-    
-    if straggle.active: straggle.print_pattern()
+    straggle = None
+    if args.straggle_points:
+        straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, 
+                                      ranks=args.straggle_ranks, skip=args.straggle_skip,skip_every=args.straggle_skip_every,
+                                      last=args.straggle_last, multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)
+        straggle.print_pattern()
     
     try:
         train(args,straggle)

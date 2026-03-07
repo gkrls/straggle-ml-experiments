@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Try to set CPU governor to performance; ignore all failures
+if command -v cpupower &>/dev/null; then
+    sudo cpupower frequency-set -g performance 2>/dev/null && \
+        echo "[cpufreq] Set governor to performance" || \
+        echo "[cpufreq] Could not set governor (BIOS-locked or no sudo?), continuing"
+elif [ -d /sys/devices/system/cpu/cpu0/cpufreq ]; then
+    # fallback: write directly if cpupower isn't installed
+    for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+        echo performance | sudo tee "$gov" 2>/dev/null
+    done && \
+        echo "[cpufreq] Set governor to performance (tee fallback)" || \
+        echo "[cpufreq] Could not set governor via tee, continuing"
+else
+    echo "[cpufreq] No cpufreq support on this node, continuing"
+fi
+
 BRANCH="wip-simple"
 
 # export PKG_CONFIG_PATH=/opt/mellanox/dpdk/23.11/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
@@ -111,16 +127,16 @@ sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-
   --deterministic \
   --prefetch_factor 4 \
   --log_every_steps 50 \
-  --json experiments/train-2/gpt2_straggle_10_s25e75.json \
+  --json experiments/train-2/gpt2_sa_natural.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_world_k 5 \
-  --straggle_skip 25 \
-  --straggle_skip_every 75 \
-  --straggle_points 1 \
-  --straggle_prob 5 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.68 \
-  --straggle_multiply 0.05 0.10
+  --dpa_world_k 5
+  # --straggle_skip 25 \
+  # --straggle_skip_every 75 \
+  # --straggle_points 1 \
+  # --straggle_prob 5 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 1.68 \
+  # --straggle_multiply 0.05 0.10
 
   
