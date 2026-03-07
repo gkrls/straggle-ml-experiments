@@ -549,7 +549,8 @@ def train(args, straggle):
     adj_micro_steps_per_epoch = (orig_micro_steps_per_epoch // GA) * GA
     if adj_micro_steps_per_epoch <= 0:
         raise ValueError("micro_steps_per_epoch must be at least gradient_accumulation_steps.")
-    if args.rank == 0 and adj_micro_steps_per_epoch != orig_micro_steps_per_epoch:
+    # if args.rank == 0 and adj_micro_steps_per_epoch != orig_micro_steps_per_epoch:
+    if  adj_micro_steps_per_epoch != orig_micro_steps_per_epoch:
         print(
             f"[{now()}][Note] micro_steps_per_epoch adjusted from {orig_micro_steps_per_epoch} "
             f"to {adj_micro_steps_per_epoch} to be a multiple of GA={GA}.",
