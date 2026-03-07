@@ -100,7 +100,7 @@ sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-
   --master_port "$MASTER_PORT" \
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
-  --workers 4 \
+  --workers 1 \
   --epochs 6 \
   --steps_per_epoch 6000 \
   --mini_val_every_steps 300 \
@@ -111,16 +111,16 @@ sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-
   --deterministic \
   --prefetch_factor 4 \
   --log_every_steps 50 \
-  --json experiments/train-2/gpt2_straggle_16.json \
+  --json experiments/train-2/gpt2_straggle_10_s25e75.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_world_k 6 
-  # --straggle_skip 20 \
-  # --straggle_skip_every 80 \
-  # --straggle_points 1 \
-  # --straggle_prob 10 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 1.68 \
-  # --straggle_multiply 0.5 0.6 \
+  --dpa_world_k 6 \
+  --straggle_skip 25 \
+  --straggle_skip_every 75 \
+  --straggle_points 1 \
+  --straggle_prob 10 \
+  --straggle_ranks 1 \
+  --straggle_amount 1.68 \
+  --straggle_multiply 0.5 0.6 \
 
   
