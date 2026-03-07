@@ -56,8 +56,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
-        -DDPA_TORCH_PINNEDPOOL=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PINNEDPOOL=OFF \
+        -DDPA_TORCH_WORKSTEALING=OFF ..
   make -j4 install
 
   # Install the plugin
