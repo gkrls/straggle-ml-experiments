@@ -31,6 +31,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DCMAKE_BUILD_TYPE=Release \
         -DDPA_TRACE=OFF \
         -DDPA_DEVELOP=OFF \
+        -DDPA_PROFILE=ON \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
         -DDPA_FASTESTK_EXIT=OFF \
