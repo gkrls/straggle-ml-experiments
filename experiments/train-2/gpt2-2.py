@@ -268,6 +268,8 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         _sync()
         micro_dt = time.perf_counter() - t0
 
+        return
+
         # micro accounting
         tok = x.numel()
         tokens += tok
@@ -683,6 +685,8 @@ def train(args, straggle):
         if val_metrics['ppl'] < best_ppl:
             best_ppl = val_metrics['ppl']
             print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
+
+        break
 
     if args.rank == 0:
         print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
