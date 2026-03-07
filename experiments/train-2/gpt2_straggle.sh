@@ -114,13 +114,13 @@ sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-
   --json experiments/train-2/gpt2_straggle_10_s25e75.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_world_k 6 \
+  --dpa_world_k 5 \
   --straggle_skip 25 \
   --straggle_skip_every 75 \
   --straggle_points 1 \
-  --straggle_prob 10 \
+  --straggle_prob 5 \
   --straggle_ranks 1 \
   --straggle_amount 1.68 \
-  --straggle_multiply 0.5 0.6 \
+  --straggle_multiply 0.05 0.10
 
   
