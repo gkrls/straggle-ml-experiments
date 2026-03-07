@@ -614,7 +614,7 @@ def train(args, straggle):
         
         epoch_start = time.time()
 
-        straggle.reset_stats()
+        if straggle is not None: straggle.reset_stats()
         
         train_ds.set_epoch(epoch)
 
@@ -642,7 +642,7 @@ def train(args, straggle):
             f"epoch_train_time={train_metrics['epoch_time']:.3f}s ",
             f"epoch_time={epoch_time:.3f}s "
             f"tp={train_metrics['throughput']:.0f} tok/s "
-            f"straggle_events={straggle.get_stats()['num_straggle_events']}", flush=True
+            f"straggle_events={straggle.get_stats()['num_straggle_events'] if straggle else 0}", flush=True
         )
 
         # JSON epoch log
@@ -669,7 +669,7 @@ def train(args, straggle):
             "epoch_train_throughput": float(train_metrics['throughput']),
 
             # straggle-sim
-            "straggle" : straggle.get_stats() if straggle.active else {}
+            "straggle" : straggle.get_stats() if straggle and straggle.active else {}
         }
         with open(args.json, "r") as f:
             log = json.load(f)
