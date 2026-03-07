@@ -268,7 +268,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         _sync()
         micro_dt = time.perf_counter() - t0
 
-        return
+        break
 
         # micro accounting
         tok = x.numel()
