@@ -82,7 +82,7 @@ DPA_CONF=$HOME/straggle-ml-experiments/configs/edgecore.json
 IFACE="${IFACE:-ens4f1}"                 # network interface to read IP from
 WORLD_SIZE="${WORLD_SIZE:-6}"            # set by launcher or leave 1 for single-node
 BACKEND="${BACKEND:-dpa_dpdk}"
-MASTER_ADDR="${MASTER_ADDR:-"42.0.1.1"}"
+MASTER_ADDR="${MASTER_ADDR:-"42.0.1.2"}"
 MASTER_PORT="${MASTER_PORT:-"29500"}"
 
 # Derive IP on IFACE, rank = last octet - 1
@@ -92,9 +92,17 @@ if [[ -z "${IP}" ]]; then
   exit 1
 fi
 
-RANK=$(( ${IP##*.} - 1 ))
+# RANK=$(( ${IP##*.} - 1 ))
+IP_LAST=${IP##*.}
+if [ "$IP_LAST" -eq 1 ]; then
+    RANK=1
+elif [ "$IP_LAST" -eq 2 ]; then
+    RANK=0
+else
+    RANK=$(( IP_LAST - 1 ))
+fi
 
-MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
+# MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
 echo "[$SCRIPT] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
 
