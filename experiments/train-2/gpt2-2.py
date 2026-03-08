@@ -724,6 +724,8 @@ def setup_ddp(args):
 
     print(f"[{now()}][DDP] backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
+    os.sched_setaffinity(0, set(range(os.cpu_count() - dpa_backend.threads - 1)))
+    print(f"[{now()}][DDP] re-pinned to cores 0-{os.cpu_count() - dpa_backend.threads - 1}")
 
 # ------------------------- main -------------------------
 def main():
@@ -800,12 +802,12 @@ def main():
     args = parser.parse_args()
 
     # pin away from dpdk threads
-    with open(args.dpa_conf) as f:
-        conf = json.load(f)
-        dpdk_threads = conf.get("dpdk", {}).get("threads", 6) ## assume 6 thrads if no threads are present in the json
-        os.sched_setaffinity(0, set(range(os.cpu_count() - (dpdk_threads + 1))))
-
-
+    # with open(args.dpa_conf) as f:
+    #     conf = json.load(f)
+    #     dpdk_threads = conf.get("dpdk", {}).get("threads", 6) ## assume 6 thrads if no threads are present in the json
+    #     dpdk_start = os.cpu_count() - (dpdk_threads + 1)
+    #     print(f"[{now()}] Setting affinity to 0-{dpdk_start - 1}")
+    #     os.sched_setaffinity(0, set(range(dpdk_start)))
 
     args.seed = args.seed + args.rank * 1000
 
