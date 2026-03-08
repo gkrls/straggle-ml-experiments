@@ -233,13 +233,10 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
     it = iter(dataloader)
     while True:
         try:
-            t_data = time.perf_counter()
             batch = next(it)
-            print(time.perf_counter() - t_data)
         except StopIteration:
             break
-        if batch.size(1) != args.seq_len + 1:
-            continue
+        if batch.size(1) != args.seq_len + 1: continue
 
         # start a new optimizer step timing on first micro
         if micros_in_step == 0:
@@ -252,7 +249,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 
         # ----- micro-step -----
         x = batch[:, :-1].contiguous().to(device, non_blocking=True)
-        y = batch[:, 1:].contiguous().to(device, non_blocking=True)
+        y = batch[:, 1: ].contiguous().to(device, non_blocking=True)
         is_last_micro = (micros_in_step == GA - 1)
         ctx = nullcontext() if is_last_micro else model.no_sync()
 
@@ -285,7 +282,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         micro_time_min = min(micro_time_min, micro_dt)
         micro_time_max = max(micro_time_max, micro_dt)
 
-        # ----- finish GA group → optimizer step -----
+        # ----- finish GA -> optimizer -----
         if is_last_micro:
             _sync()
             if scaler is not None:
@@ -355,7 +352,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 w_tokens = 0
                 w_loss_sum = 0.0; w_token_count = 0
 
-            # ----- optional mini validation -----
+            # ----- mini validation -----
             if (val_loader is not None and getattr(args, "mini_val_every_steps", 0) > 0
                     and step_count % args.mini_val_every_steps == 0):
                 val_metrics = validate(model, val_loader, device, args, max_batches=getattr(args, "mini_val_max_batches", 64))
@@ -416,23 +413,22 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 
 
 
-# ------------------------- training driver -------------------------
-
-class SimpleDDP(DDP):
-    def __init__(self, module, **kwargs):
-        super().__init__(module, broadcast_buffers=False, **kwargs)
-        self.require_forward_param_sync = False
+# # ------------------------- training driver -------------------------
+# class SimpleDDP(DDP):
+#     def __init__(self, module, **kwargs):
+#         super().__init__(module, broadcast_buffers=False, **kwargs)
+#         self.require_forward_param_sync = False
     
-    def _sync_params(self):
-        pass  # Never sync parameters
+#     def _sync_params(self):
+#         pass  # Never sync parameters
     
-    def _distributed_broadcast_coalesced(self, *args, **kwargs):
-        pass  # Never broadcast anything
+#     def _distributed_broadcast_coalesced(self, *args, **kwargs):
+#         pass  # Never broadcast anything
     
-    # Optionally override forward to skip the check entirely
-    def forward(self, *inputs, **kwargs):
-        # Skip all DDP's sync logic, just call the module
-        return self.module(*inputs, **kwargs)
+#     # Optionally override forward to skip the check entirely
+#     def forward(self, *inputs, **kwargs):
+#         # Skip all DDP's sync logic, just call the module
+#         return self.module(*inputs, **kwargs)
 
 def train(args, straggle):
     device = torch.device(args.device)
