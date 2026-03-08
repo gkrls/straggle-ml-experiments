@@ -268,9 +268,10 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
             if scaler is not None: scaler.scale(loss).backward()
             else: loss.backward()
         _sync()
-        micro_dt = time.perf_counter() - t0
+        t2 = time.perf_counter() 
+        micro_dt = t2 - t0
 
-        print(f"[rank {args.rank}] fwd={1000*(t1-t0):.1f}ms bwd={1000*(micro_dt-t1):.1f}ms", flush=True)
+        print(f"[rank {args.rank}] fwd={1000*(t1-t0):.1f}ms bwd={1000*(t2-t1):.1f}ms", flush=True)
 
         # micro accounting
         tok = x.numel()
