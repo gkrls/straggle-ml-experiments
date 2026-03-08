@@ -126,15 +126,13 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-
   --backend $BACKEND \
   --workers 4 \
   --epochs 4 \
-  --steps_per_epoch 6000 \
-  --mini_val_every_steps 300 \
-  --gradient_accumulation_steps 5 \
   --batch_size 12 \
+  --steps_per_epoch 6000 \
+  --gradient_accumulation_steps 1 --learning_rate 0.00012 --min_lr 0.000012 --mini_val_every_opt_steps 1500 --log_every_opt_steps 250 \
   --seq_len 1024 \
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --log_every_steps 50 \
   --json experiments/train-2/gpt2_sa_natural.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
@@ -147,4 +145,8 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-
   # --straggle_amount 1.68 \
   # --straggle_multiply 0.05 0.10
 
-  
+# for GA=5 use:
+# --gradient_accumulation_steps 5 --learning_rate 0.0006 --min_lr 0.00006 --mini_val_every_opt_steps 300 --log_every_opt_steps 50
+
+# for GA=1 use:
+# --gradient_accumulation_steps 1 --learning_rate 0.00012 --min_lr 0.000012 --mini_val_every_opt_steps 1500 --log_every_opt_steps 250

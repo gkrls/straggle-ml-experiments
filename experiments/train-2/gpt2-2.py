@@ -200,7 +200,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 
     GA = max(1, args.gradient_accumulation_steps)
     steps_per_epoch = max(1, args.micro_steps_per_epoch // GA)
-    log_every = max(0, args.log_every_steps)
+    log_every = max(0, args.log_every_opt_steps)
 
     # ----- epoch counters -----
     epoch_t0 = time.perf_counter()
@@ -271,7 +271,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         t2 = time.perf_counter() 
         micro_dt = t2 - t0
 
-        print(f"[rank {args.rank}] fwd={1000*(t1-t0):.1f}ms bwd={1000*(t2-t1):.1f}ms", flush=True)
+        # print(f"[rank {args.rank}] fwd={1000*(t1-t0):.1f}ms bwd={1000*(t2-t1):.1f}ms", flush=True)
 
         # micro accounting
         tok = x.numel()
@@ -359,9 +359,8 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 w_loss_sum = 0.0; w_token_count = 0
 
             # ----- mini validation -----
-            if (val_loader is not None and getattr(args, "mini_val_every_steps", 0) > 0
-                    and step_count % args.mini_val_every_steps == 0):
-                val_metrics = validate(model, val_loader, device, args, max_batches=getattr(args, "mini_val_max_batches", 64))
+            if val_loader is not None and args.mini_val_every_opt_steps and step_count % args.mini_val_every_opt_steps == 0: #getattr(args, "mini_val_every_opt_steps", 0) > 0
+                val_metrics = validate(model, val_loader, device, args, max_batches=args.mini_val_max_batches) #getattr(args, "mini_val_max_batches", 64))
                 model.train()
                 # if args.rank == 0:
                 print(f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
@@ -377,7 +376,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                                 "global_step": int(global_step),
                                 "mini_val_loss": float(val_metrics['loss']),
                                 "mini_val_ppl":  float(val_metrics['ppl']),
-                                "max_batches":   int(getattr(args, "mini_val_max_batches", 64)),
+                                "max_batches":   int(args.mini_val_max_batches) #int(getattr(args, "mini_val_max_batches", 64)),
                             }
                         save_log(args.json, log)
                     except Exception as e:
@@ -576,12 +575,12 @@ def train(args, straggle):
     print(f"[{now()}] LR schedule: warmup {warmup_steps} steps, cosine decay to {lr_decay_iters} (min_lr={args.min_lr}).")
 
     # Window logging info
-    if args.log_every_steps > 0:
-        if steps_per_epoch >= args.log_every_steps:
-            n_logs_per_epoch = steps_per_epoch // args.log_every_steps
-            print(f"[{now()}] Periodic logging: every {args.log_every_steps} steps (~{n_logs_per_epoch} times per epoch)")
+    if args.log_every_opt_steps > 0:
+        if steps_per_epoch >= args.log_every_opt_steps:
+            n_logs_per_epoch = steps_per_epoch // args.log_every_opt_steps
+            print(f"[{now()}] Periodic logging: every {args.log_every_opt_steps} steps (~{n_logs_per_epoch} times per epoch)")
         else:
-            print(f"[{now()}] Periodic logging: disabled (epoch too short: {steps_per_epoch} < {args.log_every_steps})")
+            print(f"[{now()}] Periodic logging: disabled (epoch too short: {steps_per_epoch} < {args.log_every_opt_steps})")
     else:
         print(f"[{now()}] Periodic logging: disabled")
 
@@ -721,13 +720,13 @@ def setup_ddp(args):
         pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0) # observed max around 150-is MB
         pg_options.hint_pinned_tensor_pool_size = 20                                                                                       # observed count 13
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
+        os.sched_setaffinity(0, set(range(os.cpu_count() - dpa_backend.threads - 1)))
+        print(f"[{now()}] re-pinned to cores 0-{os.cpu_count() - dpa_backend.threads - 1}")
     else:
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
 
-    print(f"[{now()}][DDP] backend={args.backend} world_size={args.world_size} "
+    print(f"[{now()}] DDP setup with backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
-    os.sched_setaffinity(0, set(range(os.cpu_count() - dpa_backend.threads - 1)))
-    print(f"[{now()}][DDP] re-pinned to cores 0-{os.cpu_count() - dpa_backend.threads - 1}")
 
 # ------------------------- main -------------------------
 def main():
@@ -746,7 +745,7 @@ def main():
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--json', type=str, default="gpt2.json", help="Path to JSON run log")
-    parser.add_argument('--log_every_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
+    parser.add_argument('--log_every_opt_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
                             'Automatically disabled if epoch has fewer than N steps.')
 
     parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
@@ -766,8 +765,8 @@ def main():
                         help='Micro-batches per epoch (alias: --steps_per_epoch). Optimizer steps/epoch ~= this / GA.')
     parser.add_argument('--batch_size', type=int, default=12)
     parser.add_argument('--gradient_accumulation_steps', type=int, default=5)
-    parser.add_argument('--learning_rate', type=float, default=6e-4)
-    parser.add_argument('--min_lr', type=float, default=6e-5)
+    parser.add_argument('--learning_rate', type=float, default=0.0006)
+    parser.add_argument('--min_lr', type=float, default=0.00006)
     parser.add_argument('--warmup_steps', '--warmup_optimizer_steps', dest='warmup_steps', type=int, default=-1,
                         help='Warmup in OPTIMIZER steps (not micro-steps). -1 = auto (10% of total optimizer steps, capped at 1000).')
     parser.add_argument('--lr_decay_iters', type=int, default=-1, help='-1 = auto (total planned optimizer steps)')
@@ -776,7 +775,7 @@ def main():
     parser.add_argument('--amp', action='store_true')
     parser.add_argument('--prefetch_factor', type=int, default=2)
     parser.add_argument('--val_max_batches', type=int, default=200)
-    parser.add_argument('--mini_val_every_steps', type=int, default=0, help='Run a small validation every N optimizer steps. 0=off.')
+    parser.add_argument('--mini_val_every_opt_steps', type=int, default=0, help='Run a small validation every N optimizer steps. 0=off.')
     parser.add_argument('--mini_val_max_batches', type=int, default=64, help='Batches to use for mini validation.')
 
     parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
