@@ -125,7 +125,7 @@ sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-
   --dpa_conf $DPA_CONF \
   --backend $BACKEND \
   --workers 4 \
-  --epochs 6 \
+  --epochs 4 \
   --steps_per_epoch 6000 \
   --mini_val_every_steps 300 \
   --gradient_accumulation_steps 5 \
