@@ -253,7 +253,8 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         is_last_micro = (micros_in_step == GA - 1)
         ctx = nullcontext() if is_last_micro else model.no_sync()
 
-        _sync(); t0 = time.perf_counter()
+        _sync()
+        t0 = time.perf_counter()
         with ctx:
             with torch.amp.autocast(device_type="cuda", enabled=args.amp):
                 attn = torch.ones_like(x, dtype=torch.long)
@@ -262,10 +263,14 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 B, T, V = logits.shape
                 loss_full = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
                 loss = loss_full / GA
+            _sync()
+            t1 = time.perf_counter()
             if scaler is not None: scaler.scale(loss).backward()
             else: loss.backward()
         _sync()
         micro_dt = time.perf_counter() - t0
+
+        print(f"[rank {args.rank}] fwd={1000*(t1-t0):.1f}ms bwd={1000*(micro_dt-t1):.1f}ms", flush=True)
 
         # micro accounting
         tok = x.numel()
