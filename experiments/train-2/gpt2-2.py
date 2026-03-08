@@ -797,9 +797,16 @@ def main():
     parser.add_argument("--straggle_verbose", action='store_true')
     # parser.add_argument("--straggle_k", type=int, default=0)
 
-
-
     args = parser.parse_args()
+
+    # pin away from dpdk threads
+    with open(args.dpa_conf) as f:
+        conf = json.load(f)
+        dpdk_threads = conf.get("dpdk", {}).get("threads", 6) ## assume 6 thrads if no threads are present in the json
+        os.sched_setaffinity(0, set(range(os.cpu_count() - (dpdk_threads + 1))))
+
+
+
     args.seed = args.seed + args.rank * 1000
 
     if args.dpa_world_k:
