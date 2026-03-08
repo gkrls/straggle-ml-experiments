@@ -116,7 +116,7 @@ GDB='gdb -ex run --args'
 LOGFILE="output_gpt2_su_straggle_$(date +%Y%m%d_%H%M%S).log"
 
 # Consumes around ~15.3GB of memory with AMP
-sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-2.py \
+sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
