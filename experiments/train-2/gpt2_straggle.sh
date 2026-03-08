@@ -123,9 +123,10 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
   --dpa_conf $DPA_CONF \
+  --dpa_repin \
   --backend $BACKEND \
   --workers 4 \
-  --epochs 4 \
+  --epochs 3 \
   --batch_size 12 \
   --steps_per_epoch 6000 \
   --gradient_accumulation_steps 1 --learning_rate 0.00012 --min_lr 0.000012 --mini_val_every_opt_steps 1500 --log_every_opt_steps 250 \

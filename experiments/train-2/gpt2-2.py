@@ -720,8 +720,9 @@ def setup_ddp(args):
         pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0) # observed max around 150-is MB
         pg_options.hint_pinned_tensor_pool_size = 20                                                                                       # observed count 13
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
-        os.sched_setaffinity(0, set(range(os.cpu_count() - dpa_backend.threads - 1)))
-        print(f"[{now()}] re-pinned to cores 0-{os.cpu_count() - dpa_backend.threads - 1}")
+        if args.dpa_repin:
+            os.sched_setaffinity(0, set(range(os.cpu_count() - dpa_backend.threads - 1)))
+            print(f"[{now()}] re-pinned to cores 0-{os.cpu_count() - dpa_backend.threads - 1}")
     else:
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))
 
@@ -749,6 +750,7 @@ def main():
                             'Automatically disabled if epoch has fewer than N steps.')
 
     parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
+    parser.add_argument("--dpa_repin", action="store_true")
     parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
     parser.add_argument("--dpa_prescale", action="store_true", help="Enable prescaling")
 
