@@ -233,7 +233,9 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
     it = iter(dataloader)
     while True:
         try:
+            t_data = time.perf_counter()
             batch = next(it)
+            print(time.perf_counter() - t_data)
         except StopIteration:
             break
         if batch.size(1) != args.seq_len + 1:
