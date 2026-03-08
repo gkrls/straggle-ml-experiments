@@ -82,7 +82,7 @@ DPA_CONF=$HOME/straggle-ml-experiments/configs/edgecore.json
 IFACE="${IFACE:-ens4f1}"                 # network interface to read IP from
 WORLD_SIZE="${WORLD_SIZE:-6}"            # set by launcher or leave 1 for single-node
 BACKEND="${BACKEND:-dpa_dpdk}"
-MASTER_ADDR="${MASTER_ADDR:-"42.0.1.2"}"
+MASTER_ADDR="${MASTER_ADDR:-"42.0.1.1"}"
 MASTER_PORT="${MASTER_PORT:-"29500"}"
 
 # Derive IP on IFACE, rank = last octet - 1
@@ -92,15 +92,15 @@ if [[ -z "${IP}" ]]; then
   exit 1
 fi
 
-# RANK=$(( ${IP##*.} - 1 ))
-IP_LAST=${IP##*.}
-if [ "$IP_LAST" -eq 1 ]; then
-    RANK=1
-elif [ "$IP_LAST" -eq 2 ]; then
-    RANK=0
-else
-    RANK=$(( IP_LAST - 1 ))
-fi
+RANK=$(( ${IP##*.} - 1 ))
+# IP_LAST=${IP##*.}
+# if [ "$IP_LAST" -eq 1 ]; then
+#     RANK=1
+# elif [ "$IP_LAST" -eq 2 ]; then
+#     RANK=0
+# else
+#     RANK=$(( IP_LAST - 1 ))
+# fi
 
 # MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
@@ -116,7 +116,7 @@ GDB='gdb -ex run --args'
 LOGFILE="output_gpt2_su_straggle_$(date +%Y%m%d_%H%M%S).log"
 
 # Consumes around ~15.3GB of memory with AMP
-sudo -E DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-2.py \
+sudo -E DPA_LOG=Info DPA_SCHEDULER=OFF DPA_LOG=Warn $(which python) experiments/train-2/gpt2-2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
