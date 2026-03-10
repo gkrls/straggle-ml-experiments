@@ -527,7 +527,7 @@ def train(args, straggle, best_model_group):
     # DDP
     # model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
     #             bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False, bucket_cap_mb=args.bucket_cap_mb, 
+    model = DDP(model, device_ids=0 if device.type == "cuda" else None, broadcast_buffers=False, bucket_cap_mb=args.bucket_cap_mb, 
                 gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=False)
     model.require_forward_param_sync = False
 
@@ -733,7 +733,7 @@ def setup_ddp(args):
     args.master_addr = env_str("MASTER_ADDR", args.master_addr)
     args.master_port = env_int("MASTER_PORT", args.master_port)
     args.iface = env_str("IFACE", args.iface)
-    args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
+    # args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
 
     if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
 
@@ -746,16 +746,18 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
 
     init_method = f"tcp://{args.master_addr}:{args.master_port}" # "env://"
+    init_method="env://"
 
     # Initialize process group
     if args.backend.startswith("dpa"):
         if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
-        dpa_device = dpa.DPADeviceOptions.from_config(args.dpa_conf)
+        dpa_device  = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         dpa_backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf)
-        pg_options = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
+        pg_options  = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
         pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0) # observed max around 150-is MB
         pg_options.hint_pinned_tensor_pool_size = 20                                                                                       # observed count 13
-        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
+        dist.init_process_group(backend=args.backend, init_method=init_method, rank=args.rank, world_size=args.world_size,
+                                timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
         if args.dpa_repin:
             os.sched_setaffinity(0, set(range(os.cpu_count() - dpa_backend.threads - 1)))
             print(f"[{now()}] re-pinned to cores 0-{os.cpu_count() - dpa_backend.threads - 1}")
@@ -770,7 +772,7 @@ def setup_ddp(args):
     if args.best_model:
         args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
         best_model_group = dist.new_group(ranks=args.best_model_active_ranks, backend="gloo")
-        print(f"[{now()}] Will compute best model in the end excluding rank(s): {'none' if not args.best_model_ignore else args.best_model_ignore} ")
+        print(f"[{now()}] DDP best model selection ENABLED. Ranks considered: {args.best_model_active_ranks}")
         return best_model_group
 
 
@@ -792,12 +794,11 @@ def main():
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--json', type=str, default="gpt2.json", help="Path to JSON run log")
-    parser.add_argument('--log_every_opt_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled. '
-                            'Automatically disabled if epoch has fewer than N steps.')
+    parser.add_argument('--log_every_opt_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled.')
 
     parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     parser.add_argument("--dpa_repin", action="store_true")
-    parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
+    parser.add_argument("--dpa_world_k", type=int, default=0, help="Configure fastest-k amount. Disabled if 0 or world_size")
     parser.add_argument("--dpa_prescale", action="store_true", help="Enable prescaling")
 
     # Data
@@ -808,8 +809,7 @@ def main():
 
     # Training
     parser.add_argument('--epochs', type=int, default=12)
-    parser.add_argument('--micro_steps_per_epoch', '--steps_per_epoch', dest='micro_steps_per_epoch', type=int, default=6000,
-                        help='Micro-batches per epoch (alias: --steps_per_epoch). Optimizer steps/epoch ~= this / GA.')
+    parser.add_argument('--micro_steps_per_epoch', dest='micro_steps_per_epoch', type=int, default=6000, help='Micro-batches per epoch. Optimizer steps/epoch ~= this / GA.')
     parser.add_argument('--batch_size', type=int, default=12)
     parser.add_argument('--gradient_accumulation_steps', type=int, default=5)
     parser.add_argument('--learning_rate', type=float, default=0.0006)
@@ -833,8 +833,7 @@ def main():
 
     # Straggle
     def csv_ints(s: str) -> list[int]:
-        if not s: return []
-        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x]
+        try: return [int(x) for x in re.split(r"\s*,\s*", s) if x] if s else []
         except ValueError: raise argparse.ArgumentTypeError("Expected a comma-separated list of integers (e.g. 1,2,3)")
     parser.add_argument("--straggle_points", type=int, help="Number of straggle points (1-3). Use 0 for no straggle sim", default=0)
     parser.add_argument("--straggle_prob", type=float, help="Probability to straggle at each point", default=0)
@@ -847,11 +846,14 @@ def main():
     parser.add_argument("--straggle_verbose", action='store_true')
     # parser.add_argument("--straggle_k", type=int, default=0)
 
-    parser.add_argument('--best_model', action='store_true')
-    parser.add_argument('--best_model_ignore', type=csv_ints, default=[],
-                        help='Ranks to exclude from --best_model comparison.')
+    parser.add_argument('--best_model', action='store_true', help='Select model with best val loss among participating ranks')
+    parser.add_argument('--best_model_ignore', type=csv_ints, default=[], help='Ranks to exclude from --best_model comparison.')
     
     args = parser.parse_args()
+    args.dpa_dpdk = {}
+    if args.dpa_conf:
+        with open(args.dpa_conf) as f:
+            args.dpa_dpdk = json.load(f).get("dpdk", {})
 
     # pin away from dpdk threads
     # with open(args.dpa_conf) as f:
@@ -863,10 +865,11 @@ def main():
 
     args.seed = args.seed + args.rank * 1000
 
-    if args.dpa_world_k:
-        print(f"!! Straggler mitigation ENABLED with straggle_k={args.dpa_world_k} !!")
+
+    if args.dpa_world_k and args.dpa_world_k < args.world_size:
+        print(f"[{now()}] Straggler mitigation ENABLED with straggle_k={args.dpa_world_k} !!")
     else:
-        print(f"!! Straggler mitigation ENABLED !!")
+        print(f"[{now()}] Straggler mitigation DISABLED !!")
 
     # Determinism & CUDA opts
     if args.deterministic:
@@ -877,8 +880,7 @@ def main():
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(args.seed)
+        if torch.cuda.is_available(): torch.cuda.manual_seed_all(args.seed)
     else:
         torch.backends.cudnn.benchmark = True
 
