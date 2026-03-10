@@ -770,7 +770,7 @@ def setup_ddp(args):
     args.best_model_active_ranks = None
     if args.best_model:
         args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
-        args.best_model_group = dist.new_group(ranks=args.best_model_active_ranks)
+        args.best_model_group = dist.new_group(ranks=args.best_model_active_ranks, backend="gloo")
         print(f"[{now()}] Will compute best model in the end excluding rank(s): {'none' if not args.best_model_ignore else args.best_model_ignore} ")
 
 
