@@ -126,10 +126,10 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-
   --dpa_repin \
   --backend $BACKEND \
   --workers 4 \
-  --epochs 3 \
+  --epochs 1 \
   --batch_size 12 \
   --steps_per_epoch 6000 \
-  --gradient_accumulation_steps 1 --learning_rate 0.00012 --min_lr 0.000012 --mini_val_every_opt_steps 1500 --log_every_opt_steps 250 \
+  --gradient_accumulation_steps 5 --learning_rate 0.0006 --min_lr 0.00006 --mini_val_every_opt_steps 300 --log_every_opt_steps 50 \
   --seq_len 1024 \
   --amp \
   --deterministic \
@@ -137,17 +137,19 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-
   --json experiments/train-2/gpt2_sa_natural.json \
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_world_k 5
-  # --straggle_skip 25 \
-  # --straggle_skip_every 75 \
+  --micro_steps_per_epoch \
+  --best_model \
+  --dpa_world_k 5 #\
   # --straggle_points 1 \
-  # --straggle_prob 5 \
+  # --straggle_prob 15 \
   # --straggle_ranks 1 \
-  # --straggle_amount 1.68 \
-  # --straggle_multiply 0.05 0.10
+  # --straggle_amount 1.66 \
+  # --straggle_multiply 0.30 0.40
+  # --straggle_skip 33 \
+  # --straggle_skip_every 66 \
 
 # for GA=5 use:
 # --gradient_accumulation_steps 5 --learning_rate 0.0006 --min_lr 0.00006 --mini_val_every_opt_steps 300 --log_every_opt_steps 50
 
-# for GA=1 use:
-# --gradient_accumulation_steps 1 --learning_rate 0.00012 --min_lr 0.000012 --mini_val_every_opt_steps 1500 --log_every_opt_steps 250
+# for GA=1 use: (maybe the same LR as with GA=5 is also fine)
+# --gradient_accumulation_steps 1 --learning_rate 0.0003 --min_lr 0.00003 --mini_val_every_opt_steps 1500 --log_every_opt_steps 250

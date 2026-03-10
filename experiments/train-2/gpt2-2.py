@@ -189,10 +189,10 @@ def validate(model, loader, device, args, max_batches=200):
     return {'loss': val_loss, 'ppl': val_ppl, 'time': time.perf_counter() - step_start}
 
 
-# ------------------------- train (enhanced with periodic logging) -------------------------
+# ------------------------- train  -------------------------
 def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                     epoch, global_step_start, warmup_steps, lr_decay_iters,
-                    val_loader=None):
+                    val_loader=None, log=None):
     model.train()
     use_cuda = (device.type == "cuda")
     def _sync():
@@ -331,32 +331,48 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                       f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
                       f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
                       f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s",flush=True)
-                if args.json:
-                    try:
-                        with open(args.json, "r") as f:
-                            log = json.load(f)
-                        updates = log.setdefault("updates", {})
-                        ep = updates.setdefault(str(epoch), {})
-                        ep[f"{step_count:04d}"] = {
-                            "global_step": int(global_step),
-                            "train_loss": float(train_loss),
-                            "train_ppl":  float(train_ppl),
-                            "lr": float(lr),
-                            "step_time":       float(step_time_win),
-                            "micro_step_time": float(micro_time_win),
-                            "throughput":      float(tok_per_s),
-                            "tokens":          int(w_tokens),
-                        }
-                        save_log(args.json, log)
-                    except Exception as e:
-                        print(f"[{now()}][Warning] Failed to update JSON log: {e}", flush=True)
+                
+                if log is not None:
+                    ep = log.setdefault("updates", {}).setdefault(str(epoch), {})
+                    ep[f"{step_count:04d}"] = {
+                        "global_step": int(global_step),
+                        "train_loss": float(train_loss),
+                        "train_ppl":  float(train_ppl),
+                        "lr": float(lr),
+                        "step_time":       float(step_time_win),
+                        "micro_step_time": float(micro_time_win),
+                        "throughput":      float(tok_per_s),
+                        "tokens":          int(w_tokens),
+                    }
+
+                # if args.json:
+                #     try:
+                #         with open(args.json, "r") as f:
+                #             log = json.load(f)
+                #         updates = log.setdefault("updates", {})
+                #         ep = updates.setdefault(str(epoch), {})
+                #         ep[f"{step_count:04d}"] = {
+                #             "global_step": int(global_step),
+                #             "train_loss": float(train_loss),
+                #             "train_ppl":  float(train_ppl),
+                #             "lr": float(lr),
+                #             "step_time":       float(step_time_win),
+                #             "micro_step_time": float(micro_time_win),
+                #             "throughput":      float(tok_per_s),
+                #             "tokens":          int(w_tokens),
+                #         }
+                #         save_log(args.json, log)
+                #     except Exception as e:
+                #         print(f"[{now()}][Warning] Failed to update JSON log: {e}", flush=True)
 
                 # reset window
                 w_start = time.perf_counter()
-                w_step_time = 0.0; w_step_count = 0
+                w_step_time = 0.0
+                w_step_count = 0
                 w_micro_time = 0.0
                 w_tokens = 0
-                w_loss_sum = 0.0; w_token_count = 0
+                w_loss_sum = 0.0
+                w_token_count = 0
 
             # ----- mini validation -----
             if val_loader is not None and args.mini_val_every_opt_steps and step_count % args.mini_val_every_opt_steps == 0: #getattr(args, "mini_val_every_opt_steps", 0) > 0
@@ -366,21 +382,30 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 print(f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
                       f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
                       flush=True)
-                if args.json:
-                    try:
-                        with open(args.json, "r") as f:
-                            log = json.load(f)
-                            updates_minival = log.setdefault("minival", {})
-                            epm = updates_minival.setdefault(str(epoch), {})
-                            epm[f"{step_count:04d}"] = {
-                                "global_step": int(global_step),
-                                "mini_val_loss": float(val_metrics['loss']),
-                                "mini_val_ppl":  float(val_metrics['ppl']),
-                                "max_batches":   int(args.mini_val_max_batches) #int(getattr(args, "mini_val_max_batches", 64)),
-                            }
-                        save_log(args.json, log)
-                    except Exception as e:
-                        print(f"[{now()}][Warning] Failed to update JSON log (mini-val): {e}", flush=True)
+                if log is not None:
+                    epm = log.setdefault("minival", {}).setdefault(str(epoch), {})
+                    epm[f"{step_count:04d}"] = {
+                        "global_step": int(global_step),
+                        "mini_val_loss": float(val_metrics['loss']),
+                        "mini_val_ppl":  float(val_metrics['ppl']),
+                        "max_batches":   int(args.mini_val_max_batches),
+                    }
+
+                # if args.json:
+                #     try:
+                #         with open(args.json, "r") as f:
+                #             log = json.load(f)
+                #             updates_minival = log.setdefault("minival", {})
+                #             epm = updates_minival.setdefault(str(epoch), {})
+                #             epm[f"{step_count:04d}"] = {
+                #                 "global_step": int(global_step),
+                #                 "mini_val_loss": float(val_metrics['loss']),
+                #                 "mini_val_ppl":  float(val_metrics['ppl']),
+                #                 "max_batches":   int(args.mini_val_max_batches) #int(getattr(args, "mini_val_max_batches", 64)),
+                #             }
+                #         save_log(args.json, log)
+                #     except Exception as e:
+                #         print(f"[{now()}][Warning] Failed to update JSON log (mini-val): {e}", flush=True)
 
         # optional epoch cap by micro-steps
         if args.micro_steps_per_epoch and micro_count >= args.micro_steps_per_epoch:
@@ -623,7 +648,7 @@ def train(args, straggle):
         train_ds.set_epoch(epoch)
 
         # train
-        train_metrics = train_one_epoch(model, train_loader, optimizer, device, scaler, args, epoch, global_step, warmup_steps, lr_decay_iters, val_loader)
+        train_metrics = train_one_epoch(model, train_loader, optimizer, device, scaler, args, epoch, global_step, warmup_steps, lr_decay_iters, val_loader, log=log)
         global_step += train_metrics['steps']  # accumulate optimizer steps
 
         # validate full (only at end of epoch)
@@ -631,8 +656,7 @@ def train(args, straggle):
         current_lr = optimizer.param_groups[0]['lr']
 
         epoch_time = time.time() - epoch_start
-        # stdout per-epoch
-        # if args.rank == 0:
+
         print(
             f"[{now()}][Epoch {epoch:03d}] "
             f"global_step={global_step} ",
@@ -675,8 +699,8 @@ def train(args, straggle):
             # straggle-sim
             "straggle" : straggle.get_stats() if straggle and straggle.active else {}
         }
-        with open(args.json, "r") as f:
-            log = json.load(f)
+        # with open(args.json, "r") as f:
+        #     log = json.load(f)
         log["epochs"][str(epoch)] = epoch_metrics
         save_log(args.json, log)
 
@@ -685,6 +709,19 @@ def train(args, straggle):
             # print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
 
     print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
+
+    if args.best_model and args.best_model_group is not None:
+        if args.rank not in args.best_model_ignore:
+            best_val_loss = min(e["val_loss"] for e in log["epochs"].values())
+            t = torch.tensor([best_val_loss], dtype=torch.float32)
+            all_losses = [torch.zeros(1, dtype=torch.float32) for _ in range(len(args.best_model_active_ranks))]
+            dist.all_gather(all_losses, t, group=args.best_model_group)
+            best_idx = int(torch.stack(all_losses).argmin().item())
+            best_rank = args.best_model_active_ranks[best_idx]
+            print(f"[{now()}] Best model: val loss {float(all_losses[best_idx]):.4f} at rank {best_rank}", flush=True)
+
+
+    
 
 
 # ------------------------- DDP setup/teardown -------------------------
@@ -710,6 +747,12 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
 
     init_method = f"tcp://{args.master_addr}:{args.master_port}" # "env://"
+
+    args.best_model_group = None
+    args.best_model_active_ranks = None
+    if args.best_model:
+        args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
+        args.best_model_group = dist.new_group(ranks=args.best_model_active_ranks)
 
     # Initialize process group
     if args.backend.startswith("dpa"):
@@ -753,7 +796,6 @@ def main():
     parser.add_argument("--dpa_repin", action="store_true")
     parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
     parser.add_argument("--dpa_prescale", action="store_true", help="Enable prescaling")
-
 
     # Data
     parser.add_argument('--data', type=str, required=True)
@@ -802,6 +844,10 @@ def main():
     parser.add_argument("--straggle_verbose", action='store_true')
     # parser.add_argument("--straggle_k", type=int, default=0)
 
+    parser.add_argument('--best_model', action='store_true')
+    parser.add_argument('--best_model_ignore', type=csv_ints, default=[],
+                        help='Ranks to exclude from --best_model comparison.')
+    
     args = parser.parse_args()
 
     # pin away from dpdk threads

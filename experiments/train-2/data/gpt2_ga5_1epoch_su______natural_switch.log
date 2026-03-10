@@ -1,0 +1,66 @@
+---------------------------------------
+PKT_COUNT: ingress.dpa.receiver.counter
+---------------------------------------
+ [pipe0]
+   inp_old  | 0
+   inp_exp  | 3401752469
+   inp_new  | 589297392
+   inp_hi   | 0
+   syn_old  | 0
+   syn_exp  | 0
+   syn_new  | 0
+   syn_hi   | 0
+   bad      | 0
+   none     | 0
+   other    | 1179308890
+
+   old_per_port: [0] 0             [1] 0             [2] 0             [3] 0             [4] 0             [5] 0             
+   syn_per_port: [0] 0             [1] 0             [2] 0             [3] 0             [4] 0             [5] 0             
+
+ [pipeN]:
+   syn      | 0
+   bad      | 0
+   none     | 0
+   other    | 14921421808
+------------------------------------
+PKT_COUNT: ingress.dpa.state.counter
+------------------------------------
+      ok | 3520818668 | 3520818668 | 3520818668 | 3520818668
+   ok_to | 14965684   | 14965684   | 14965684   | 14965684  
+      re | 7728       | 7728       | 7728       | 7728      
+   re_to | 455257781  | 455257781  | 455257781  | 455257781 
+      sy | 0          | 0          | 0          | 0         
+      ol | 0          | 0          | 0          | 0         
+      hi | 0          | 0          | 0          | 0         
+      rc | 1179308890 | 1179308890 | 1179308890 | 589654445 
+    miss | 0          | 0          | 0          | 0         
+
+---------------------------------
+PKT_COUNT: ingress.dpa.next (pre)
+---------------------------------
+  syn_incomplete       | 0
+  syn_complete         | 0
+  old_incomplete       | 0
+  old_complete         | 0
+  new                  | 589297392
+  exp                  | 3401752469
+  bad_input_old_seen   | 0
+  bad_input_hi_seen    | 0
+  bad_input_hi_unseen  | 0
+  bad_syn_hi           | 0
+  bad_syn_complete_now | 0
+  bad_other            | 0
+  other                | 16100730698
+
+----------------------------
+PKT_COUNT: egress.dpa.sender
+----------------------------
+    syn  : 0
+    old  : 0
+syn_old  : 0
+    bad  : 0
+    rtx  : 357053
+    res_n: 3535784352
+    res_k: 0
+    miss : 0
+
