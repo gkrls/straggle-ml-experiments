@@ -527,8 +527,8 @@ def train(args, straggle, best_model_group):
     # DDP
     # model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
     #             bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=args.static_graph)
-    model = DDP(model, device_ids=0 if device.type == "cuda" else None, broadcast_buffers=False, bucket_cap_mb=args.bucket_cap_mb, 
-                gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=False)
+    model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None, broadcast_buffers=False,
+                bucket_cap_mb=args.bucket_cap_mb, gradient_as_bucket_view=True, find_unused_parameters=False, static_graph=False)
     model.require_forward_param_sync = False
 
     if straggle is not None:
@@ -733,7 +733,7 @@ def setup_ddp(args):
     args.master_addr = env_str("MASTER_ADDR", args.master_addr)
     args.master_port = env_int("MASTER_PORT", args.master_port)
     args.iface = env_str("IFACE", args.iface)
-    # args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
+    args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
 
     if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
 
