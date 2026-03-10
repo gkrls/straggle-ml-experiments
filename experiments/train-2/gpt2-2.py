@@ -748,12 +748,6 @@ def setup_ddp(args):
 
     init_method = f"tcp://{args.master_addr}:{args.master_port}" # "env://"
 
-    args.best_model_group = None
-    args.best_model_active_ranks = None
-    if args.best_model:
-        args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
-        args.best_model_group = dist.new_group(ranks=args.best_model_active_ranks)
-
     # Initialize process group
     if args.backend.startswith("dpa"):
         if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
@@ -771,6 +765,15 @@ def setup_ddp(args):
 
     print(f"[{now()}] DDP setup with backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
+    
+    args.best_model_group = None
+    args.best_model_active_ranks = None
+    if args.best_model:
+        args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
+        args.best_model_group = dist.new_group(ranks=args.best_model_active_ranks)
+        print(f"[{now()}] Will compute best model in the end excluding rank(s): {'none' if not args.best_model_ignore else args.best_model_ignore} ")
+
+
 
 # ------------------------- main -------------------------
 def main():
