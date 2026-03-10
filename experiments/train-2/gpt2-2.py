@@ -460,7 +460,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
 #         # Skip all DDP's sync logic, just call the module
 #         return self.module(*inputs, **kwargs)
 
-def train(args, straggle):
+def train(args, straggle, best_model_group):
     device = torch.device(args.device)
 
     data_root = Path(args.data).resolve()
@@ -710,15 +710,14 @@ def train(args, straggle):
 
     print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
 
-    if args.best_model and args.best_model_group is not None:
-        if args.rank not in args.best_model_ignore:
-            best_val_loss = min(e["val_loss"] for e in log["epochs"].values())
-            t = torch.tensor([best_val_loss], dtype=torch.float32)
-            all_losses = [torch.zeros(1, dtype=torch.float32) for _ in range(len(args.best_model_active_ranks))]
-            dist.all_gather(all_losses, t, group=args.best_model_group)
-            best_idx = int(torch.stack(all_losses).argmin().item())
-            best_rank = args.best_model_active_ranks[best_idx]
-            print(f"[{now()}] Best model: val loss {float(all_losses[best_idx]):.4f} at rank {best_rank}", flush=True)
+    if args.best_model and best_model_group is not None and args.rank not in args.best_model_ignore:
+        best_val_loss = min(e["val_loss"] for e in log["epochs"].values())
+        t = torch.tensor([best_val_loss], dtype=torch.float32)
+        all_losses = [torch.zeros(1, dtype=torch.float32) for _ in range(len(args.best_model_active_ranks))]
+        dist.all_gather(all_losses, t, group=best_model_group)
+        best_idx = int(torch.stack(all_losses).argmin().item())
+        best_rank = args.best_model_active_ranks[best_idx]
+        print(f"[{now()}] Best model: val loss {float(all_losses[best_idx]):.4f} at rank {best_rank}", flush=True)
 
 
     
@@ -770,8 +769,9 @@ def setup_ddp(args):
     args.best_model_active_ranks = None
     if args.best_model:
         args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
-        args.best_model_group = dist.new_group(ranks=args.best_model_active_ranks, backend="gloo")
+        best_model_group = dist.new_group(ranks=args.best_model_active_ranks, backend="gloo")
         print(f"[{now()}] Will compute best model in the end excluding rank(s): {'none' if not args.best_model_ignore else args.best_model_ignore} ")
+        return best_model_group
 
 
 
@@ -897,7 +897,7 @@ def main():
 
     sys.stdout.reconfigure(line_buffering=True)
 
-    setup_ddp(args)
+    best_model_group = setup_ddp(args)
     print(f"[{now()}] Configuration:\n{json.dumps(vars(args), indent=2)}")
 
     straggle = None
@@ -908,7 +908,7 @@ def main():
         straggle.print_pattern()
     
     try:
-        train(args,straggle)
+        train(args,straggle,best_model_group)
     finally:
         dist.destroy_process_group()
 
