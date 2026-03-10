@@ -809,7 +809,8 @@ def main():
 
     # Training
     parser.add_argument('--epochs', type=int, default=12)
-    parser.add_argument('--micro_steps_per_epoch', dest='micro_steps_per_epoch', type=int, default=6000, help='Micro-batches per epoch. Optimizer steps/epoch ~= this / GA.')
+    parser.add_argument('--micro_steps_per_epoch', '--steps_per_epoch', dest='micro_steps_per_epoch', type=int, default=6000,
+                        help='Micro-batches per epoch. Optimizer steps/epoch ~= this / GA.')
     parser.add_argument('--batch_size', type=int, default=12)
     parser.add_argument('--gradient_accumulation_steps', type=int, default=5)
     parser.add_argument('--learning_rate', type=float, default=0.0006)
