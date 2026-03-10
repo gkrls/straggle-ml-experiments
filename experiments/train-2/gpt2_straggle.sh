@@ -128,7 +128,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-
   --workers 4 \
   --epochs 1 \
   --batch_size 12 \
-  --steps_per_epoch 10 \
+  --micro_steps_per_epoch 10 \
   --gradient_accumulation_steps 5 --learning_rate 0.0006 --min_lr 0.00006 --mini_val_every_opt_steps 300 --log_every_opt_steps 50 \
   --seq_len 1024 \
   --amp \
@@ -138,13 +138,12 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
   --best_model \
-  --best_model_ignore 5 \
-  --dpa_world_k 5 #\
-  # --straggle_points 1 \
-  # --straggle_prob 15 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 1.66 \
-  # --straggle_multiply 0.30 0.40
+  --dpa_world_k 5 \
+  --straggle_points 1 \
+  --straggle_prob 15 \
+  --straggle_ranks 1 \
+  --straggle_amount 1.66 \
+  --straggle_multiply 0.5 2
   # --straggle_skip 33 \
   # --straggle_skip_every 66 \
 

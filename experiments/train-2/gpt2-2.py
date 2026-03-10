@@ -464,8 +464,7 @@ def train(args, straggle, best_model_group):
     device = torch.device(args.device)
 
     data_root = Path(args.data).resolve()
-    if not data_root.exists():
-        raise FileNotFoundError(f"--data path not found: {data_root}")
+    if not data_root.exists(): raise FileNotFoundError(f"--data path not found: {data_root}")
 
     cache_dir = Path(args.cache_dir) if args.cache_dir else (data_root / "cache")
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -488,7 +487,8 @@ def train(args, straggle, best_model_group):
 
     def _seed_worker(worker_id):
         worker_seed = (args.seed + args.rank * max(1, args.workers) + worker_id) % 2**32
-        np.random.seed(worker_seed); random.seed(worker_seed)
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
 
     train_loader = DataLoader(
         train_ds,
@@ -577,13 +577,8 @@ def train(args, straggle, best_model_group):
     adj_micro_steps_per_epoch = (orig_micro_steps_per_epoch // GA) * GA
     if adj_micro_steps_per_epoch <= 0:
         raise ValueError("micro_steps_per_epoch must be at least gradient_accumulation_steps.")
-    # if args.rank == 0 and adj_micro_steps_per_epoch != orig_micro_steps_per_epoch:
-    if  adj_micro_steps_per_epoch != orig_micro_steps_per_epoch:
-        print(
-            f"[{now()}][Note] micro_steps_per_epoch adjusted from {orig_micro_steps_per_epoch} "
-            f"to {adj_micro_steps_per_epoch} to be a multiple of GA={GA}.",
-            flush=True
-        )
+    if adj_micro_steps_per_epoch != orig_micro_steps_per_epoch:
+        print(f"[{now()}][Note] micro_steps_per_epoch adjusted from {orig_micro_steps_per_epoch} to {adj_micro_steps_per_epoch} to be a multiple of GA={GA}.", flush=True)
     args.micro_steps_per_epoch = adj_micro_steps_per_epoch  # keep arg as micro-steps/epoch
 
     # Optimizer steps per epoch & total planned optimizer steps
@@ -708,7 +703,7 @@ def train(args, straggle, best_model_group):
             best_ppl = val_metrics['ppl']
             # print(f"[{now()}] New best validation perplexity: {best_ppl:.2f}", flush=True)
 
-    print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
+    print(f"\n[{now()}] Training complete. Best (local) validation perplexity: {best_ppl:.2f}")
 
     if args.best_model and best_model_group is not None and args.rank not in args.best_model_ignore:
         best_val_ppl = min(e["val_ppl"] for e in log["epochs"].values())
@@ -898,7 +893,6 @@ def main():
 
     args.workers = max(args.workers, 0)
 
-
     sys.stdout.reconfigure(line_buffering=True)
 
     best_model_group = setup_ddp(args)
@@ -911,10 +905,10 @@ def main():
                                       last=args.straggle_last, multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)
         straggle.print_pattern()
     
-    try:
-        train(args,straggle,best_model_group)
-    finally:
-        dist.destroy_process_group()
+    # try:
+    train(args,straggle,best_model_group)
+    # finally:
+    #     dist.destroy_process_group()
 
 if __name__ == "__main__":
     main()
