@@ -711,13 +711,13 @@ def train(args, straggle, best_model_group):
     print(f"\n[{now()}] Training complete. Best val ppl: {best_ppl:.2f}")
 
     if args.best_model and best_model_group is not None and args.rank not in args.best_model_ignore:
-        best_val_loss = min(e["val_loss"] for e in log["epochs"].values())
-        t = torch.tensor([best_val_loss], dtype=torch.float32)
-        all_losses = [torch.zeros(1, dtype=torch.float32) for _ in range(len(args.best_model_active_ranks))]
-        dist.all_gather(all_losses, t, group=best_model_group)
-        best_idx = int(torch.stack(all_losses).argmin().item())
+        best_val_ppl = min(e["val_ppl"] for e in log["epochs"].values())
+        t = torch.tensor([best_val_ppl], dtype=torch.float32)
+        all_ppls= [torch.zeros(1, dtype=torch.float32) for _ in range(len(args.best_model_active_ranks))]
+        dist.all_gather(all_ppls, t, group=best_model_group)
+        best_idx  = int(torch.stack(all_ppls).argmin().item())
         best_rank = args.best_model_active_ranks[best_idx]
-        print(f"[{now()}] Best model: val loss {float(all_losses[best_idx]):.4f} at rank {best_rank}", flush=True)
+        print(f"[{now()}] Best model: val_ppl {float(all_ppls[best_idx]):.4f} at rank {best_rank}", flush=True)
 
 
     
@@ -851,6 +851,7 @@ def main():
     parser.add_argument('--best_model_ignore', type=csv_ints, default=[], help='Ranks to exclude from --best_model comparison.')
     
     args = parser.parse_args()
+    args.local_rank = 0
     args.dpa_dpdk = {}
     if args.dpa_conf:
         with open(args.dpa_conf) as f:

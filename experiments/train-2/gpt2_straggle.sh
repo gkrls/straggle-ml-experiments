@@ -138,6 +138,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-
   --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
   --best_model \
+  --best_model_ignore 5 \
   --dpa_world_k 5 #\
   # --straggle_points 1 \
   # --straggle_prob 15 \
