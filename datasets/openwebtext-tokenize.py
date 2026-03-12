@@ -52,12 +52,21 @@ def main():
 
     tokenizer = GPT2Tokenizer.from_pretrained(args.tokenizer)
 
-    # Reuse the existing layout resolver from the training script
-    sys.path.insert(0, str(Path(__file__).parent))
-    from gpt2 import hf_load_train_val_parquet
+    # # Reuse the existing layout resolver from the training script
+    # sys.path.insert(0, str(Path(__file__).parent))
+    # from gpt2 import hf_load_train_val_parquet
+    # print(f"Loading parquet from {data_root} ...")
+    # ds_train, ds_val = hf_load_train_val_parquet(data_root, val_fraction=args.val_fraction, seed=42)
+
+    data_root = Path(args.data).resolve()
+    train_glob = str(data_root / "train" / "*.parquet")
+    val_glob = str(data_root / "val" / "*.parquet")
 
     print(f"Loading parquet from {data_root} ...")
-    ds_train, ds_val = hf_load_train_val_parquet(data_root, val_fraction=args.val_fraction, seed=42)
+    ds = load_dataset("parquet", data_files={"train": train_glob, "val": val_glob})
+    ds_train = ds["train"]
+    ds_val = ds["val"]
+
 
     print(f"\nTokenizing train split ({len(ds_train)} docs):")
     tokenize_split(ds_train, tokenizer, out_dir / "train.bin")
