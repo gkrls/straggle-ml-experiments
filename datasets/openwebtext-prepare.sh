@@ -5,23 +5,32 @@ git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
 
 source ~/straggle-ml-experiments/venv/bin/activate
 
-# Clean previous outputs
+ARCHIVE_DIR="$HOME/datasets/openwebtext/openwebtext"
+PARQUET_DIR="$HOME/datasets/openwebtext/parquet"
+TOKENIZ_DIR="$HOME/datasets/openwebtext/tokenized"
 
-# echo "[openwebtext-to-parquet] ..."
-# rm -rf ~/datasets/openwebtext/parquet/train ~/datasets/openwebtext/parquet/val
-# python ~/straggle-ml-experiments/datasets/openwebtext-to-parquet.py \
-#   --arc_dir  ~/datasets/openwebtext/openwebtext \
-#   --out_dir  ~/datasets/openwebtext/parquet \
-#   --docs_per_shard 300000 \
-#   --val_frac 0.01
+if [ "${1:-}" = "--force" ] || [ "${1:-}" = "--clean" ]; then
+  echo "[prepare] Cleaning all generated data"
+  rm -rf $PARQUET_DIR/train $PARQUET_DIR/val $TOKENIZ_DIR
+fi
 
-echo "[openwebtext-tokenize] ..."
-rm -rf ~/datasets/openwebtext/tokenized
-python ~/straggle-ml-experiments/datasets/openwebtext-tokenize.py \
-  --data ~/datasets/openwebtext/parquet \
-  --out  ~/datasets/openwebtext/tokenized \
-  --num_proc 24
+if [ -d $PARQUET_DIR/train ] && [ -d $PARQUET_DIR/val ]; then
+  echo "[openwebtext-to-parquet] SKIPPED: parquet/train and parquet/val already exist"
+else
+  echo "[openwebtext-to-parquet] ..."
+  rm -rf $PARQUET_DIR/train $PARQUET_DIR/val
+  python ~/straggle-ml-experiments/datasets/openwebtext-to-parquet.py \
+    --arc_dir $ARCHIVE_DIR --out_dir $PARQUET_DIR --docs_per_shard 300000 --val_frac 0.01
+fi
 
+if [ -f $TOKENIZ_DIR/train.bin ] && [ -f $TOKENIZ_DIR/val.bin ]; then
+  echo "[openwebtext-tokenize] SKIPPED: tokenized/train.bin and tokenized/val.bin already exist"
+else
+  echo "[openwebtext-tokenize] ..."
+  rm -rf $TOKENIZ_DIR
+  python ~/straggle-ml-experiments/datasets/openwebtext-tokenize.py \
+    --data $PARQUET_DIR --out $TOKENIZ_DIR --num_proc 24
+fi
 
 
   # DIR="${1:-$HOME/datasets/imagenet}"

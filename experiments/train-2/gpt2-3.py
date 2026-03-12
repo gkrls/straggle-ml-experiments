@@ -676,6 +676,7 @@ def main():
 
     # Training
     parser.add_argument('--data', type=str, required=True)
+    parser.add_argument('--tokenizer', type=str, default='gpt2')
     parser.add_argument('--epochs', type=int, default=12)
     parser.add_argument('--micro_steps_per_epoch', '--steps_per_epoch', dest='micro_steps_per_epoch', type=int, default=6000,
                         help='Micro-batches per epoch. Optimizer steps/epoch ~= this / GA.')
@@ -721,7 +722,7 @@ def main():
     # args = parser.parse_args()
     args, unknown = parser.parse_known_args()
     if unknown: print(f"[{now()}][Warning] Ignoring unknown args: {unknown}", flush=True)
-    
+
     args.local_rank = 0
     args.dpa_dpdk = {}
     if args.dpa_conf:
