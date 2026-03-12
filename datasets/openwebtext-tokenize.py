@@ -1,90 +1,86 @@
 #!/usr/bin/env python3
 """
 Pre-tokenize OpenWebText parquet into flat memmap token files.
-Run once:  python tokenize_owt.py --data /path/to/owt --out /path/to/owt/tokenized
 """
 
-import argparse, os, sys
+import argparse, json
 from pathlib import Path
 import numpy as np
 from transformers import GPT2Tokenizer
 from datasets import load_dataset
 
-def tokenize_split(hf_split, tokenizer, out_path: Path):
-    """Tokenize all docs, concatenate with EOS, write as uint16 memmap."""
-    eos = tokenizer.eos_token_id
-    # First pass: count total tokens so we can allocate the memmap
-    print(f"  Counting tokens for {out_path.name} ...")
-    total = 0
-    for i, ex in enumerate(hf_split):
-        ids = tokenizer.encode(ex["text"], add_special_tokens=False)
-        total += len(ids) + 1  # +1 for EOS separator
-        if (i + 1) % 50000 == 0:
-            print(f"    {i+1} docs, {total:,} tokens so far", flush=True)
-    print(f"  Total: {len(hf_split)} docs, {total:,} tokens")
 
-    # Second pass: write tokens
-    mm = np.memmap(str(out_path), dtype=np.uint16, mode='w+', shape=(total,))
-    offset = 0
-    for i, ex in enumerate(hf_split):
-        ids = tokenizer.encode(ex["text"], add_special_tokens=False)
+def tokenize_split(hf_split, tokenizer, out_path: Path, num_proc=1):
+    eos = tokenizer.eos_token_id
+
+    def tok_fn(example):
+        ids = tokenizer.encode(example["text"], add_special_tokens=False)
         ids.append(eos)
+        return {"ids": ids, "len": len(ids)}
+
+    print(f"  Tokenizing {len(hf_split)} docs with {num_proc} processes ...", flush=True)
+    mapped = hf_split.map(
+        tok_fn,
+        num_proc=num_proc,
+        remove_columns=hf_split.column_names,
+        desc=f"Tokenizing {out_path.stem}",
+    )
+
+    total = sum(mapped["len"])
+    print(f"  {total:,} tokens total. Writing {out_path} ...", flush=True)
+
+    mm = np.memmap(str(out_path), dtype=np.uint16, mode="w+", shape=(total,))
+    offset = 0
+    for i, ids in enumerate(mapped["ids"]):
         arr = np.array(ids, dtype=np.uint16)
-        mm[offset:offset + len(arr)] = arr
+        mm[offset : offset + len(arr)] = arr
         offset += len(arr)
-        if (i + 1) % 50000 == 0:
-            print(f"    Written {i+1} docs ({offset:,} tokens)", flush=True)
+        if (i + 1) % 100_000 == 0:
+            print(f"    {i+1} docs written ({offset:,} tokens)", flush=True)
     mm.flush()
-    print(f"  Wrote {out_path} ({offset:,} tokens, {out_path.stat().st_size / 1e9:.2f} GB)")
+    print(f"  Done: {out_path} ({total:,} tokens, {out_path.stat().st_size / 1e9:.2f} GB)")
+    return total
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data', type=str, required=True, help='Root of parquet dataset')
-    parser.add_argument('--out', type=str, default=None, help='Output directory (default: <data>/tokenized)')
-    parser.add_argument('--tokenizer', type=str, default='gpt2')
-    parser.add_argument('--val_fraction', type=float, default=0.0005)
+    parser = argparse.ArgumentParser(description="Tokenize OpenWebText parquet into flat uint16 memmap files")
+    parser.add_argument("--data", type=str, required=True, help="Root dir containing train/ and val/ parquet subdirs")
+    parser.add_argument("--out", type=str, default=None, help="Output dir (default: <data>/../tokenized)")
+    parser.add_argument("--tokenizer", type=str, default="gpt2")
+    parser.add_argument("--num_proc", type=int, default=2, help="Number of parallel workers for tokenization")
     args = parser.parse_args()
 
     data_root = Path(args.data).resolve()
-    out_dir = Path(args.out) if args.out else data_root / "tokenized"
+    out_dir = Path(args.out).resolve() if args.out else data_root.parent / "tokenized"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     tokenizer = GPT2Tokenizer.from_pretrained(args.tokenizer)
+    tokenizer.model_max_length = 2**30  # suppress length warning
 
-    # # Reuse the existing layout resolver from the training script
-    # sys.path.insert(0, str(Path(__file__).parent))
-    # from gpt2 import hf_load_train_val_parquet
-    # print(f"Loading parquet from {data_root} ...")
-    # ds_train, ds_val = hf_load_train_val_parquet(data_root, val_fraction=args.val_fraction, seed=42)
-
-    data_root = Path(args.data).resolve()
     train_glob = str(data_root / "train" / "*.parquet")
     val_glob = str(data_root / "val" / "*.parquet")
 
-    print(f"Loading parquet from {data_root} ...")
+    print(f"Loading parquet from {data_root} ...", flush=True)
     ds = load_dataset("parquet", data_files={"train": train_glob, "val": val_glob})
-    ds_train = ds["train"]
-    ds_val = ds["val"]
 
+    print(f"\n--- Train ({len(ds['train'])} docs) ---")
+    train_tokens = tokenize_split(ds["train"], tokenizer, out_dir / "train.bin", num_proc=args.num_proc)
 
-    print(f"\nTokenizing train split ({len(ds_train)} docs):")
-    tokenize_split(ds_train, tokenizer, out_dir / "train.bin")
+    print(f"\n--- Val ({len(ds['val'])} docs) ---")
+    val_tokens = tokenize_split(ds["val"], tokenizer, out_dir / "val.bin", num_proc=args.num_proc)
 
-    print(f"\nTokenizing val split ({len(ds_val)} docs):")
-    tokenize_split(ds_val, tokenizer, out_dir / "val.bin")
-
-    # Write a small metadata file
     meta = {
         "tokenizer": args.tokenizer,
         "vocab_size": len(tokenizer),
-        "train_tokens": int(np.memmap(str(out_dir / "train.bin"), dtype=np.uint16, mode='r').shape[0]),
-        "val_tokens": int(np.memmap(str(out_dir / "val.bin"), dtype=np.uint16, mode='r').shape[0]),
+        "train_tokens": train_tokens,
+        "val_tokens": val_tokens,
     }
-    import json
     with open(out_dir / "meta.json", "w") as f:
         json.dump(meta, f, indent=2)
-    print(f"\nDone. Metadata: {meta}")
+
+    print(f"\nAll done. Output in {out_dir}")
+    print(f"  train.bin: {train_tokens:,} tokens")
+    print(f"  val.bin:   {val_tokens:,} tokens")
 
 
 if __name__ == "__main__":

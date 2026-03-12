@@ -6,10 +6,9 @@ git -C "$HOME/straggle-ml-experiments" pull --ff-only || true
 source ~/straggle-ml-experiments/venv/bin/activate
 
 # Clean previous outputs
-# rm -rf ~/datasets/openwebtext/parquet/train ~/datasets/openwebtext/parquet/val
-# rm -rf ~/datasets/openwebtext/tokenized
 
 # echo "[openwebtext-to-parquet] ..."
+# rm -rf ~/datasets/openwebtext/parquet/train ~/datasets/openwebtext/parquet/val
 # python ~/straggle-ml-experiments/datasets/openwebtext-to-parquet.py \
 #   --arc_dir  ~/datasets/openwebtext/openwebtext \
 #   --out_dir  ~/datasets/openwebtext/parquet \
@@ -17,9 +16,11 @@ source ~/straggle-ml-experiments/venv/bin/activate
 #   --val_frac 0.01
 
 echo "[openwebtext-tokenize] ..."
+rm -rf ~/datasets/openwebtext/tokenized
 python ~/straggle-ml-experiments/datasets/openwebtext-tokenize.py \
   --data ~/datasets/openwebtext/parquet \
-  --out  ~/datasets/openwebtext/tokenized
+  --out  ~/datasets/openwebtext/tokenized \
+  --num_proc 24
 
 
 
