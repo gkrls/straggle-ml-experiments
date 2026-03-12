@@ -706,6 +706,7 @@ def train(args, straggle, best_model_group):
     print(f"\n[{now()}] Training complete. Best (local) validation perplexity: {best_ppl:.2f}")
 
     if args.best_model and best_model_group is not None and args.rank not in args.best_model_ignore:
+        # if args.rank in args.best_mo
         best_val_ppl = min(e["val_ppl"] for e in log["epochs"].values())
         t = torch.tensor([best_val_ppl], dtype=torch.float32)
         all_ppls= [torch.zeros(1, dtype=torch.float32) for _ in range(len(args.best_model_active_ranks))]
