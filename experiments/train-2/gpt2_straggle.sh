@@ -134,8 +134,8 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2-
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --json experiments/train-2/gpt2_sa_straggle_aggressive.json \
-  --data ~/datasets/openwebtext \
+  --json experiments/train-2/gpt2_new_test.json \
+  --data ~/datasets/openwebtext/tokenized \
   --cache_dir ~/datasets/openwebtext/cache \
   --dpa_world_k 5 \
   --straggle_points 3 \
