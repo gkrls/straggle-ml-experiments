@@ -116,7 +116,7 @@ GDB='gdb -ex run --args'
 PY="gpt2-2.py"
 
 # Consumes around ~15.3GB of memory with AMP
-sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/"$PY" \
+sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/"$PY" \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -134,16 +134,16 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/"$PY"
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --json experiments/train-2/gpt2_sa_straggle_aggresive.json \
-  --data ~/datasets/openwebtext/tokenized \
-  --dpa_world_k 6
-  
-  # --straggle_points 3 \
-  # --straggle_prob 15 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 1.66 \
-  # --straggle_skip 5 \
-  # --straggle_multiply 0.5 2
+  --json experiments/train-2/gpt2_sa_straggle_aggressive.json \
+  --data ~/datasets/openwebtext \
+  --cache_dir ~/datasets/openwebtext/cache \
+  --dpa_world_k 5 \
+  --straggle_points 3 \
+  --straggle_prob 15 \
+  --straggle_ranks 1 \
+  --straggle_amount 1.66 \
+  --straggle_skip 5 \
+  --straggle_multiply 0.5 2
   # --best_model \
   # --best_model_ignore 1 \
 
