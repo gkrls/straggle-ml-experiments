@@ -664,7 +664,7 @@ def train(args, straggle, best_model_group):
             f"steps={train_metrics['steps']} "
             f"step_time={train_metrics['step_time']:.3f}s "
             f"train_time={train_metrics['epoch_time']:.3f}s ",
-            f"val_time={val_metrics['time']}",
+            f"val_time={val_metrics['time']:.3f}s ",
             f"epoch_time={epoch_time:.3f}s "
             f"tp={train_metrics['throughput']:.0f} tok/s "
             f"straggle_events={straggle.get_stats()['num_straggle_events'] if straggle else 0}", flush=True
