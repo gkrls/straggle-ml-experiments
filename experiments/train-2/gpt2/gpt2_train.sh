@@ -50,8 +50,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_PROFILE=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
-        -DDPA_FASTESTK=OFF \
-        -DDPA_FASTESTK_EXIT=ON \
+        -DDPA_FASTESTK=ON \
+        -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_FASTESTK_BULK=OFF \
         -DDPA_SYNCHRON_BULK=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
@@ -136,15 +136,15 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --deterministic \
   --prefetch_factor 4 \
   --json experiments/train-2/gpt2_sa_natural.json \
-  --data ~/datasets/openwebtext/tokenized \
+  --data ~/datasets/openwebtext \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_world_k 5 \
-  --straggle_points 3 \
-  --straggle_prob 15 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.66 \
-  --straggle_skip 5 \
-  --straggle_multiply 0.5 2
+  --dpa_world_k 5 
+  # --straggle_points 3 \
+  # --straggle_prob 15 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 1.66 \
+  # --straggle_skip 5 \
+  # --straggle_multiply 0.5 2
   # --best_model \
   # --best_model_ignore 1 \
 
