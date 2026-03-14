@@ -94,7 +94,7 @@ RANK=$(( ${IP##*.} - 1 ))
 
 echo "[$SCRIPT] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
 
-PY="gpt2-2.py"
+PY="gpt2-3.py"
 
 sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/"$PY" \
   --rank "$RANK" \
@@ -109,13 +109,13 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --batch_size 12 \
   --epochs 1 \
   --micro_steps_per_epoch 50 \
-  --gradient_accumulation_steps 5 --learning_rate 0.0006 --min_lr 0.00006 --mini_val_every_opt_steps 0   --log_every_opt_steps 5 \
+  --gradient_accumulation_steps 5 --learning_rate 0.0006 --min_lr 0.00006 --mini_val_every_opt_steps 0 --log_every_opt_steps 5 \
   --val_max_batches 10 \
   --seq_len 1024 \
   --amp \
   --deterministic \
   --prefetch_factor 4 \
   --json experiments/train-2/gpt2-tiny-test.json \
-  --data ~/datasets/openwebtext \
+  --data ~/datasets/openwebtext/tokenized \
   --cache_dir ~/datasets/openwebtext/cache \
   --dpa_world_k 6

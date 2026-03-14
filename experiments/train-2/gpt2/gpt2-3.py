@@ -377,16 +377,16 @@ def train(args, straggle, best_model_group):
     if not data_root.exists(): raise FileNotFoundError(f"--data path not found: {data_root}")
 
     train_ds = GPT2MemmapDataset(data_root / "train.bin", seq_len=args.seq_len, world_size=args.world_size, rank=args.rank, seed=args.seed)
-    val_ds   = GPT2MemmapDataset(data_root / "val.bin", seq_len=args.seq_len, world_size=args.world_size, rank=args.rank, seed=args.seed+1)
+    val_ds   = GPT2MemmapDataset(data_root / "val.bin", seq_len=args.seq_len, world_size=args.world_size, rank=args.rank, seed=args.seed)
 
-    def _seed_worker(worker_id):
-        worker_seed = (args.seed + args.rank * max(1, args.workers) + worker_id) % 2**32
-        np.random.seed(worker_seed)
-        random.seed(worker_seed)
+    # def _seed_worker(worker_id):
+    #     worker_seed = (args.seed + args.rank * max(1, args.workers) + worker_id) % 2**32
+    #     np.random.seed(worker_seed)
+    #     random.seed(worker_seed)
 
-    train_loader = DataLoader(train_ds,batch_size=args.batch_size,num_workers=args.workers,pin_memory=True,worker_init_fn=_seed_worker,
+    train_loader = DataLoader(train_ds,batch_size=args.batch_size,num_workers=args.workers,pin_memory=True,
                               prefetch_factor=args.prefetch_factor if args.workers > 0 else None,persistent_workers=(args.workers > 0))
-    val_loader = DataLoader(val_ds,batch_size=args.batch_size,num_workers=args.workers,pin_memory=True,worker_init_fn=_seed_worker)
+    val_loader = DataLoader(val_ds,batch_size=args.batch_size,num_workers=args.workers,pin_memory=True)
 
     # tokenizer
     tokenizer = GPT2Tokenizer.from_pretrained(args.tokenizer, use_fast=True)
@@ -737,7 +737,7 @@ def main():
     #     print(f"[{now()}] Setting affinity to 0-{dpdk_start - 1}")
     #     os.sched_setaffinity(0, set(range(dpdk_start)))
 
-    args.seed = args.seed + args.rank * 1000
+    # args.seed = args.seed + args.rank * 1000
 
 
     if args.dpa_world_k and args.dpa_world_k < args.world_size:
