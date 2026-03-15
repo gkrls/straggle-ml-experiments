@@ -64,10 +64,10 @@ def main():
     ds = load_dataset("parquet", data_files={"train": train_glob, "val": val_glob})
 
     print(f"\n--- Train ({len(ds['train'])} docs) ---")
-    train_tokens = tokenize_split(ds["train"], tokenizer, out_dir / "train.bin", num_proc=args.num_proc)
+    train_tokens = tokenize_split(ds["train"].shuffle(seed=42), tokenizer, out_dir / "train.bin", num_proc=args.num_proc)
 
     print(f"\n--- Val ({len(ds['val'])} docs) ---")
-    val_tokens = tokenize_split(ds["val"], tokenizer, out_dir / "val.bin", num_proc=args.num_proc)
+    val_tokens = tokenize_split(ds["val"].shuffle(seed=42), tokenizer, out_dir / "val.bin", num_proc=args.num_proc)
 
     meta = {
         "tokenizer": args.tokenizer,
