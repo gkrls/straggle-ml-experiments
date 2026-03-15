@@ -126,7 +126,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --backend $BACKEND \
   --dpa_conf $DPA_CONF \
   --dpa_repin \
-  --workers 4 \
+  --workers 0 \
   --epochs 1 \
   --batch_size 12 \
   --micro_steps_per_epoch 6000 \
