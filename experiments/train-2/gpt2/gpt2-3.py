@@ -680,7 +680,7 @@ def main():
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'])
     parser.add_argument('--deterministic', action='store_true')
     parser.add_argument('--static_graph', action='store_true')
-    parser.add_argument('--workers', type=int, default=4)
+    parser.add_argument('--workers', type=int, default=0)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--json', type=str, default="gpt2.json", help="Path to JSON run log")
     parser.add_argument('--log_every_opt_steps', type=int, default=0, help='Log every N optimizer updates during training. 0 = disabled.')
