@@ -1,0 +1,109 @@
+Using config file: /home/gks/straggle-ml/configs/config-edgecore.json                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+P4 device: Tofino 2 asic                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+P4 program: 'dpa'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+P4 program config:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+{                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+  "dpa_comm": 1,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+  "dpa_implicit_syn": 0,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+  "dpa_udp_port": 4242,                                                                                                                 
+  "dpa_pipes": 4,                                                                                                                       
+  "dpa_exponents": 1,                                                                                                                   
+  "dpa_reducers": 32,                                                                                                                   
+  "dpa_reducer_mode": 2,                                                                                                                
+  "dpa_slots": 16384,                                                                                                                   
+  "dpa_sessions": 1,                                                                                                                    
+  "dpa_counters": 1,                                                                                                                    
+  "dpa_backward_port": 56,                                                                                                              
+  "net_arp_table_size": 512,                                                                                                            
+  "net_icmp_table_size": 512,                                                                                                           
+  "net_forwarding_table_size": 512                                                                                                      
+}                                                                                                                                       
+DPA session config:                                                                                                                     
+{                                                                                                                                       
+  "id": 1,                                                                                                                              
+  "ports": [                                                                                                                            
+    "1/0",                                                                                                                              
+    "2/0",                                                                                                                              
+    "3/0",                                                                                                                              
+    "4/0",                                                                                                                              
+    "5/0",                                                                                                                              
+    "6/0"                                                                                                                               
+  ],                                                                                                                                    
+  "pool_base": 0,                                                                                                                       
+  "pool_size": 16384,                                                                                                                   
+  "straggle_timeout_ms": 100.0,                                                                                                         
+  "mgid": 2,                                                                                                                            
+  "dropsim": {                                                                                                                          
+    "ingress": 0.0,                                                                                                                     
+    "egress": 0.0                                                                                                                       
+  }                                                                                                                                     
+}                                                                                                                                       
+
+  *************************************                                                                                                 
+  *   DPA_SA switch packet counters   *                                                                                                 
+  *************************************                                                                                                 
+---------------------------------------                                                                                                 
+PKT_COUNT: ingress.dpa.receiver.counter                                                                                                 
+---------------------------------------                                                                                                 
+ [pipe0]                                                                                                                                
+   inp_old  | 157504                                                                                                                    
+   inp_exp  | 3416795845                                                                                                                
+   inp_new  | 589297392                                                                                                                 
+   inp_hi   | 0                                                                                                                         
+   syn_old  | 81165                                                                                                                     
+   syn_exp  | 0                                                                                                                         
+   syn_new  | 0                                                                                                                         
+   syn_hi   | 0                                                                                                                         
+   bad      | 0                                                                                                                         
+   none     | 0                                                                                                                         
+   other    | 1179658206                                                                                                                
+
+   old_per_port: [0] 99981         [1] 48387         [2] 1040          [3] 2121          [4] 2563          [5] 3412          
+   syn_per_port: [0] 56392         [1] 24773         [2] 0             [3] 0             [4] 0             [5] 0             
+
+ [pipeN]:                                                                                                                               
+   syn      | 0                                                                                                                         
+   bad      | 0                                                                                                                         
+   none     | 0                                                                                                                         
+   other    | 14967425224                                                                                                               
+------------------------------------                                                                                                    
+PKT_COUNT: ingress.dpa.state.counter                                                                                                    
+------------------------------------                                                                                                    
+      ok | 3534273602 | 3534273601 | 3534273601 | 3534273598                                                                            
+   ok_to | 26475      | 26475      | 26475      | 26475                                                                                 
+      re | 470019902  | 470019902  | 470019902  | 470019902                                                                             
+   re_to | 1773258    | 1773258    | 1773258    | 1773258                                                                               
+      sy | 81165      | 0          | 0          | 0                                                                                     
+      ol | 157504     | 1          | 0          | 3                                                                                     
+      hi | 0          | 0          | 0          | 0                                                                                     
+      rc | 1179658206 | 1179658206 | 1179658206 | 589829103                                                                             
+    miss | 0          | 0          | 0          | 0                                                                                     
+
+---------------------------------                                                                                                       
+PKT_COUNT: ingress.dpa.next (pre)                                                                                                       
+---------------------------------                                                                                                       
+  syn_incomplete       | 28968                                                                                                          
+  syn_complete         | 52197                                                                                                          
+  old_incomplete       | 31911                                                                                                          
+  old_complete         | 125593                                                                                                         
+  new                  | 589297392                                                                                                      
+  exp                  | 3416795845                                                                                                     
+  bad_input_old_seen   | 0                                                                                                              
+  bad_input_hi_seen    | 0                                                                                                              
+  bad_input_hi_unseen  | 0                                                                                                              
+  bad_syn_hi           | 0                                                                                                              
+  bad_syn_complete_now | 0                                                                                                              
+  bad_other            | 0                                                                                                              
+  other                | 16147083430                                                                                                    
+
+----------------------------                                                                                                            
+PKT_COUNT: egress.dpa.sender                                                                                                            
+----------------------------                                                                                                            
+    syn  : 52197                                                                                                                        
+    old  : 31911                                                                                                                        
+syn_old  : 125593                                                                                                                       
+    bad  : 0                                                                                                                            
+    rtx  : 531711                                                                                                                       
+    res_n: 3525564132                                                                                                                   
+    res_k: 10220220                                                                                                                     
+    miss : 0    

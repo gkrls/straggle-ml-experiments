@@ -114,7 +114,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-PY="gpt2-2.py"
+PY="gpt2-3.py"
 
 # Consumes around ~15.3GB of memory with AMP
 sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/"$PY" \
@@ -123,9 +123,9 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
+  --backend $BACKEND \
   --dpa_conf $DPA_CONF \
   --dpa_repin \
-  --backend $BACKEND \
   --workers 4 \
   --epochs 1 \
   --batch_size 12 \
@@ -136,7 +136,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --deterministic \
   --prefetch_factor 4 \
   --json experiments/train-2/gpt2_sa_natural.json \
-  --data ~/datasets/openwebtext \
+  --data ~/datasets/openwebtext/tokenized \
   --cache_dir ~/datasets/openwebtext/cache \
   --dpa_world_k 5 
   # --straggle_points 3 \

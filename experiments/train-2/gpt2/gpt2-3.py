@@ -31,8 +31,8 @@ def save_log(path, log):
     tmp = f"{path}.tmp"
     with open(tmp, "w") as f:
         json.dump(log, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
+        # f.flush()
+        # os.fsync(f.fileno())
     os.replace(tmp, path)
 
 class AverageMeter:
@@ -182,8 +182,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
             batch = next(it)
         except StopIteration:
             break
-        if batch.size(1) != args.seq_len + 1: continue
-
+        # if batch.size(1) != args.seq_len + 1: continue
         # start a new optimizer step timing on first micro
         if micros_in_step == 0:
             _sync()
@@ -411,7 +410,7 @@ def train(args, straggle, best_model_group):
     model.require_forward_param_sync = False
 
     if straggle is not None:
-        if straggle.attach(model):print(f"{straggle} created and active for rank {args.rank}")
+        if straggle.attach(model): print(f"{straggle} created and active for rank {args.rank}")
         else: print(f"{straggle} inactive for rank {args.rank}")
 
     # Wrap the model if DPA backend is requested
@@ -508,7 +507,7 @@ def train(args, straggle, best_model_group):
     best_ppl = float('inf')
     global_step = 0  # cumulative optimizer steps so far
 
-    dist.barrier()
+    dist.barrier() # make sure all ranks start together
 
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)

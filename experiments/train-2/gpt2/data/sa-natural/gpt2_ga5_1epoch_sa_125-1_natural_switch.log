@@ -1,0 +1,109 @@
+Using config file: /home/gks/straggle-ml/configs/config-edgecore.json
+P4 device: Tofino 2 asic
+P4 program: 'dpa'
+P4 program config:
+{
+  "dpa_comm": 1,
+  "dpa_implicit_syn": 0,
+  "dpa_udp_port": 4242,
+  "dpa_pipes": 4,
+  "dpa_exponents": 1,
+  "dpa_reducers": 32,
+  "dpa_reducer_mode": 2,
+  "dpa_slots": 16384,
+  "dpa_sessions": 1,
+  "dpa_counters": 1,
+  "dpa_backward_port": 56,
+  "net_arp_table_size": 512,
+  "net_icmp_table_size": 512,
+  "net_forwarding_table_size": 512
+}
+DPA session config:
+{
+  "id": 1,
+  "ports": [
+    "1/0",
+    "2/0",
+    "3/0",
+    "4/0",
+    "5/0",
+    "6/0"
+  ],
+  "pool_base": 0,
+  "pool_size": 16384,
+  "straggle_timeout_ms": 125.0,
+  "mgid": 2,
+  "dropsim": {
+    "ingress": 0.0,
+    "egress": 0.0
+  }
+}
+
+  *************************************
+  *   DPA_SA switch packet counters   *
+  *************************************
+---------------------------------------
+PKT_COUNT: ingress.dpa.receiver.counter
+---------------------------------------
+ [pipe0]
+   inp_old  | 2135
+   inp_exp  | 3414350037
+   inp_new  | 589297392
+   inp_hi   | 0
+   syn_old  | 425
+   syn_exp  | 0
+   syn_new  | 0
+   syn_hi   | 0
+   bad      | 0
+   none     | 0
+   other    | 1179204352
+
+   old_per_port: [0] 1090          [1] 1045          [2] 0             [3] 0             [4] 0             [5] 0             
+   syn_per_port: [0] 190           [1] 235           [2] 0             [3] 0             [4] 0             [5] 0             
+
+ [pipeN]:
+   syn      | 0
+   bad      | 0
+   none     | 0
+   other    | 14958953167
+------------------------------------
+PKT_COUNT: ingress.dpa.state.counter
+------------------------------------
+      ok | 3535750915 | 3535750915 | 3535750915 | 3535750915
+   ok_to | 4610       | 4610       | 4610       | 4610      
+      re | 466192513  | 466192513  | 466192513  | 466192513 
+   re_to | 1699391    | 1699391    | 1699391    | 1699391   
+      sy | 425        | 0          | 0          | 0         
+      ol | 2135       | 0          | 0          | 0         
+      hi | 0          | 0          | 0          | 0         
+      rc | 1179204352 | 1179204352 | 1179204352 | 589602176 
+    miss | 0          | 0          | 0          | 0         
+
+---------------------------------
+PKT_COUNT: ingress.dpa.next (pre)
+---------------------------------
+  syn_incomplete       | 11
+  syn_complete         | 414
+  old_incomplete       | 540
+  old_complete         | 1595
+  new                  | 589297392
+  exp                  | 3414350037
+  bad_input_old_seen   | 0
+  bad_input_hi_seen    | 0
+  bad_input_hi_unseen  | 0
+  bad_syn_hi           | 0
+  bad_syn_complete_now | 0
+  bad_other            | 0
+  other                | 16138157519
+
+----------------------------
+PKT_COUNT: egress.dpa.sender
+----------------------------
+    syn  : 414
+    old  : 540
+syn_old  : 1595
+    bad  : 0
+    rtx  : 304784
+    res_n: 3535611390
+    res_k: 172962
+    miss : 0
