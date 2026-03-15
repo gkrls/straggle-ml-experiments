@@ -63,21 +63,38 @@ class GPT2MemmapDataset(IterableDataset):
     Reads pre-tokenized uint16 memmap. Each rank gets a contiguous chunk,
     guaranteeing identical token counts across all ranks per epoch.
     """
-    def __init__(self, bin_path, seq_len=1024, world_size=1, rank=0, seed=42):
+    def __init__(self, bin_path, seq_len=1024, shards=1, shard_id=0, seed=42):
         super().__init__()
         self.data = np.memmap(bin_path, dtype=np.uint16, mode='r')
         self.seq_len = seq_len
         self.window = seq_len + 1
-        self.world_size = world_size
-        self.rank = rank
         self.seed = seed
         self.epoch = 0
 
-        # Each rank gets a contiguous chunk, trimmed to whole windows
-        chunk = len(self.data) // world_size
-        self.start = rank * chunk
-        self.end = self.start + chunk
+        if shards > 1:
+            chunk = len(self.data) // shards
+            self.start = shard_id * chunk
+            self.end = self.start + chunk
+        else:
+            self.start = 0
+            self.end = len(self.data)
+
         self.n_windows = (self.end - self.start) // self.window
+    # def __init__(self, bin_path, seq_len=1024, world_size=1, rank=0, seed=42):
+    #     super().__init__()
+    #     self.data = np.memmap(bin_path, dtype=np.uint16, mode='r')
+    #     self.seq_len = seq_len
+    #     self.window = seq_len + 1
+    #     self.world_size = world_size
+    #     self.rank = rank
+    #     self.seed = seed
+    #     self.epoch = 0
+
+    #     # Each rank gets a contiguous chunk, trimmed to whole windows
+    #     chunk = len(self.data) // world_size
+    #     self.start = rank * chunk
+    #     self.end = self.start + chunk
+    #     self.n_windows = (self.end - self.start) // self.window
 
     def set_epoch(self, epoch: int):
         self.epoch = epoch
@@ -375,8 +392,8 @@ def train(args, straggle, best_model_group):
     data_root = Path(args.data).resolve()
     if not data_root.exists(): raise FileNotFoundError(f"--data path not found: {data_root}")
 
-    train_ds = GPT2MemmapDataset(data_root / "train.bin", seq_len=args.seq_len, world_size=args.world_size, rank=args.rank, seed=args.seed)
-    val_ds   = GPT2MemmapDataset(data_root / "val.bin", seq_len=args.seq_len, world_size=args.world_size, rank=args.rank, seed=args.seed)
+    train_ds = GPT2MemmapDataset(data_root / "train.bin", seq_len=args.seq_len, shards=args.world_size, shard_id=args.rank, seed=args.seed)
+    val_ds   = GPT2MemmapDataset(data_root / "val.bin", seq_len=args.seq_len, shards=1, shard_id=0, seed=args.seed + args.rank)
 
     # def _seed_worker(worker_id):
     #     worker_seed = (args.seed + args.rank * max(1, args.workers) + worker_id) % 2**32

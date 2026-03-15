@@ -9,16 +9,25 @@ data = {
   "time" : {},
   "packets" : {
     "sa" : {
+      "natural-new": {
+        150:{"res_n":0,         "res_k":0,         "ok":0,         "ok_to":0,       "re":0,        "re_to":0,        "re_out":0,       "old_in":0,       "old_out":0,                "syn_in":0,      "syn_out":0},
+      },
+
       "natural" : {
-        25: {"res_n":29620679,"res_k":3256481426,"ok":2737060586,"ok_to":10807891,"re":6437,"re_to":287248245,"re_out":3237954,"old_in":38641711,"old_out":29894074+6589020,"syn_in":5410083,"syn_out":4634305},
+        25: {"res_n":29620679,  "res_k":3256481426,"ok":2737060586,"ok_to":10807891,"re":6437,     "re_to":287248245,"re_out":3237954, "old_in":38641711,"old_out":29894074+6589020, "syn_in":5410083,"syn_out":4634305},
+        50: {"res_n":3411674491,"res_k":117442345, "ok":2972481017,"ok_to":6146444, "re":180937656,"re_to":206530700,"re_out":13679163,"old_in":95499656,"old_out":73620084+15010294,"syn_in":9103010,"syn_out":7511836},
+        75: {"res_n":3288394853,"res_k":247365709, "ok":3498292457,"ok_to":417500,  "re":421136021,"re_to":10056750, "re_out":4517330, "old_in":5389566, "old_out":1102249 +4262801, "syn_in":1039386,"syn_out":692470 },
+        100:{"res_n":3525564132,"res_k":10220220,  "ok":3534273602,"ok_to":26475,   "re":470019902,"re_to":1773258,  "re_out":531711,  "old_in":157504,  "old_out":31911   +125593,  "syn_in":81165,  "syn_out":52197},
+        125:{"res_n":3535611390,"res_k":172962,    "ok":3535750915,"ok_to":4610,    "re":466192513,"re_to":1699391,  "re_out":304784,  "old_in":2135,    "old_out":540     +1595,    "syn_in":425,    "syn_out":414},
+        150:{"res_n":3535527216,"res_k":257136,    "ok":3535752703,"ok_to":4804,    "re":469941086,"re_to":1569455,  "re_out":304153,  "old_in":2168,    "old_out":518     +1650,    "syn_in":1532,   "syn_out":953},
       },
       "straggle": {
-         5: {"res_n":0,      "res_k":3535756854,"ok":2929216156,"ok_to":17272103,"re":5325,     "re_to":430582943,"re_out":2147772, "old_in":4866518,"old_out":4581392+257143,"syn_in":15486,"syn_out":14362},
-        25: {"res_n":0,      "res_k":3535784352,"ok":2940183144,"ok_to":6304425,"re":5273,      "re_to":517810229,"re_out":6658521, "old_in":5985792,"old_out":5772662+213130,"syn_in":1920,"syn_out":1641},
-        50: {"res_n":0,      "res_k":3535783756,"ok":2940566423,"ok_to":5928440,"re":201256633, "re_to":206530747,"re_out":1746410, "old_in":6010247,"old_out":5767938+241594,"syn_in":2761,"syn_out":2241},
-        75: {"res_n":60,     "res_k":3535770868,"ok":2946064098,"ok_to":425746, "re":655953794, "re_to":30944135, "re_out":9711786, "old_in":6104957,"old_out":5830463+261189,"syn_in":10745,"syn_out":9607},
-        100:{"res_n":2918862,"res_k":3532865490,"ok":2946668233,"ok_to":305762, "re":1109214743,"re_to":22413261, "re_out":9195524, "old_in":5985412,"old_out":5681476+303936,"syn_in":1404,"syn_out":1404},
-        125:{"res_n":2918862,"res_k":3532865490,"ok":2946968060,"ok_to":5935,   "re":1532690720,"re_to":23764888, "re_out":15993296,"old_in":5985408,"old_out":392623+5592785,"syn_in":1472,"syn_out":1472}
+         5: {"res_n":0,         "res_k":3535756854,"ok":2929216156,"ok_to":17272103,"re":5325,     "re_to":430582943,"re_out":2147772, "old_in":4866518,"old_out":4581392+257143,    "syn_in":15486,  "syn_out":14362},
+        25: {"res_n":0,         "res_k":3535784352,"ok":2940183144,"ok_to":6304425,"re":5273,      "re_to":517810229,"re_out":6658521, "old_in":5985792,"old_out":5772662+213130,    "syn_in":1920,   "syn_out":1641},
+        50: {"res_n":0,         "res_k":3535783756,"ok":2940566423,"ok_to":5928440,"re":201256633, "re_to":206530747,"re_out":1746410, "old_in":6010247,"old_out":5767938+241594,    "syn_in":2761,   "syn_out":2241},
+        75: {"res_n":60,        "res_k":3535770868,"ok":2946064098,"ok_to":425746, "re":655953794, "re_to":30944135, "re_out":9711786, "old_in":6104957,"old_out":5830463+261189,    "syn_in":10745,  "syn_out":9607},
+        100:{"res_n":2918862,   "res_k":3532865490,"ok":2946668233,"ok_to":305762, "re":1109214743,"re_to":22413261, "re_out":9195524, "old_in":5985412,"old_out":5681476+303936,    "syn_in":1404,   "syn_out":1404},
+        125:{"res_n":2918862,   "res_k":3532865490,"ok":2946968060,"ok_to":5935,   "re":1532690720,"re_to":23764888, "re_out":15993296,"old_in":5985408,"old_out":392623+5592785,    "syn_in":1472,   "syn_out":1472}
       }
     },
     "su" : {
@@ -27,36 +36,41 @@ data = {
     },
   }
 }
-stos = [5,25,50,75,100,125]
+stos = [25,50,75,100,125] #5
 
 for sto in stos:
-  with open(script_dir / f"gpt2_ga5_1epoch_sa_{sto}-1_straggl_3.15.50-200.json") as f:
+  with open(script_dir / "sa" / f"gpt2_ga5_1epoch_sa_{sto}-1_straggl_3.15.50-200.json") as f:
     data["time"].setdefault("sa", {}).setdefault("straggle", {})[sto] = json.load(f)
-with open(script_dir / "gpt2_ga5_1epoch_sa_25-1_natural.json") as f:
-  data["time"].setdefault("sa", {}).setdefault("natural", {})[25] = json.load(f)
-with open(script_dir / ".." / "su" / "gpt2_ga5_1epoch_su_natural.json") as f:
+  with open(script_dir / "sa-natural" / "gpt2_ga5_1epoch_sa_25-1_natural.json") as f:
+    data["time"].setdefault("sa", {}).setdefault("natural", {})[sto] = json.load(f)
+
+with open(script_dir / "su" / "gpt2_ga5_1epoch_su_natural.json") as f:
   data["time"].setdefault("su", {})["natural"] = json.load(f)
-with open(script_dir / ".." / "su" / "gpt2_ga5_1epoch_su_straggl_3.15.50-200.json") as f:
+with open(script_dir / "su" / "gpt2_ga5_1epoch_su_straggl_3.15.50-200.json") as f:
   data["time"].setdefault("su", {})["straggle"] = json.load(f)
 
 
 fig, axs = plt.subplots(2, 3, figsize=(18,10))
 
 # epoch time
-sa_times = [data["time"]["sa"]["straggle"][sto]["epochs"]["0"]["epoch_time"] for sto in stos]
-su_natural_time  = data["time"]["su"]["natural"]["epochs"]["0"]["epoch_time"]
-su_straggle_time = data["time"]["su"]["straggle"]["epochs"]["0"]["epoch_time"]
-axs[0,0].plot(stos, sa_times, marker='o', label="SA (straggle)")
-axs[0,0].axhline(su_natural_time, linestyle='--', color='green', label="SU (natural)")
-axs[0,0].axhline(su_straggle_time, linestyle='--', color='red', label="SU (straggle)")
+sa_straggl_epoch = [data["time"]["sa"]["straggle"][sto]["epochs"]["0"]["epoch_time"] for sto in stos]
+sa_natural_epoch = [data["time"]["sa"]["natural"][sto]["epochs"]["0"]["epoch_time"] for sto in stos]
+su_natural_epoch = data["time"]["su"]["natural"]["epochs"]["0"]["epoch_time"]
+su_straggl_epoch = data["time"]["su"]["straggle"]["epochs"]["0"]["epoch_time"]
+axs[0,0].plot(stos, sa_straggl_epoch, marker='o', label="SA (straggle)")
+axs[0,0].plot(stos, sa_natural_epoch, marker='x', label="SA (natural)")
+axs[0,0].axhline(su_natural_epoch, linestyle='--', color='green', label="SU (natural)")
+axs[0,0].axhline(su_straggl_epoch, linestyle='--', color='red', label="SU (straggle)")
 axs[0,0].set_xlabel("STO")
 axs[0,0].set_ylabel("Epoch Time (s)")
 axs[0,0].set_title("Epoch Time vs STO")
 # micro_step_time
-sa_micro = [data["time"]["sa"]["straggle"][sto]["epochs"]["0"]["micro_step_time"] for sto in stos]
+sa_straggl_micro  = [data["time"]["sa"]["straggle"][sto]["epochs"]["0"]["micro_step_time"] for sto in stos]
+sa_natural_micro  = [data["time"]["sa"]["natural"][sto]["epochs"]["0"]["micro_step_time"] for sto in stos]
 su_natural_micro  = data["time"]["su"]["natural"]["epochs"]["0"]["micro_step_time"]
 su_straggle_micro = data["time"]["su"]["straggle"]["epochs"]["0"]["micro_step_time"]
-axs[0,1].plot(stos, sa_micro, marker='o', label="SA (straggle)")
+axs[0,1].plot(stos, sa_straggl_micro, marker='o', label="SA (straggle)")
+axs[0,1].plot(stos, sa_natural_micro, marker='x', label="SA (natural)")
 axs[0,1].axhline(su_natural_micro, linestyle='--', color='green', label="SU (natural)")
 axs[0,1].axhline(su_straggle_micro, linestyle='--', color='red', label="SU (straggle)")
 axs[0,1].set_xlabel("STO")
@@ -73,8 +87,8 @@ axs[0,2].set_xlabel("STO")
 axs[0,2].set_ylabel("Step Time (s)")
 axs[0,2].set_title("Step Time vs STO")
 
-axs[0,0].axhline(data["time"]["sa"]["natural"][25]["epochs"]["0"]["epoch_time"], linestyle="--", color='orange', label="SA (natural)")
-axs[0,1].axhline(data["time"]["sa"]["natural"][25]["epochs"]["0"]["micro_step_time"], linestyle="--", color='orange', label="SA (natural)")
+# axs[0,0].axhline(data["time"]["sa"]["natural"][25]["epochs"]["0"]["epoch_time"], linestyle="--", color='orange', label="SA (natural)")
+# axs[0,1].axhline(data["time"]["sa"]["natural"][25]["epochs"]["0"]["micro_step_time"], linestyle="--", color='orange', label="SA (natural)")
 axs[0,2].axhline(data["time"]["sa"]["natural"][25]["epochs"]["0"]["step_time"], linestyle="--", color='orange', label="SA (natural)")
 
 axs[0,0].legend()
@@ -93,11 +107,12 @@ for key in ["natural", "straggle"]:
     res_n_vals.append(data["packets"]["su"][key]["res_n"])
     res_k_vals.append(data["packets"]["su"][key]["res_k"])
 
-labels.append("SA nat 25")
-res_n_vals.append(data["packets"]["sa"]["natural"][25]["res_n"])
-res_k_vals.append(data["packets"]["sa"]["natural"][25]["res_k"])
+for sto in stos:
+  labels.append(f"SA nat {sto}")
+  res_n_vals.append(data["packets"]["sa"]["natural"][sto]["res_n"])
+  res_k_vals.append(data["packets"]["sa"]["natural"][sto]["res_k"])
 
-for sto in [5, 25, 50, 75, 100, 125]:
+for sto in stos:
     labels.append(f"SA str {sto}")
     res_n_vals.append(data["packets"]["sa"]["straggle"][sto]["res_n"])
     res_k_vals.append(data["packets"]["sa"]["straggle"][sto]["res_k"])
