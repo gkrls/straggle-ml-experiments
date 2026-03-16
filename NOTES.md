@@ -59,4 +59,5 @@ dpa: new-task allreduce.1132 [39385344 x f32] 0x7fca72000000 > 0x7fca72000000 4-
 | 12.5                | 0.125               |124-125| 34                |
 
 
- 
+
+Freq 3768 vs 3852 is 2.2% diff. On an 8.3s step that's ~180ms 

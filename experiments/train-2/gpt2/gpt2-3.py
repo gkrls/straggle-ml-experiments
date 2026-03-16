@@ -609,7 +609,10 @@ def train(args, straggle, best_model_group):
         dist.all_gather(all_ppls, t, group=best_model_group)
         best_idx  = int(torch.stack(all_ppls).argmin().item())
         best_rank = args.best_model_active_ranks[best_idx]
-        print(f"[{now()}] Best model: val_ppl {float(all_ppls[best_idx]):.4f} at rank {best_rank}", flush=True)
+        pairs = [f"{rank}:{ppl.item():.4f}" for rank, ppl in zip(args.best_model_active_ranks, all_ppls)]
+        print(f"[{now()}] All val_ppls: {', '.join(pairs)}")
+        print(f"[{now()}] Best val_ppl: {float(all_ppls[best_idx]):.4f} at rank {best_rank}", flush=True)
+        
 
 
     
