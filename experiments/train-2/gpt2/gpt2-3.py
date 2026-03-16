@@ -524,6 +524,9 @@ def train(args, straggle, best_model_group):
     best_ppl = float('inf')
     global_step = 0  # cumulative optimizer steps so far
 
+    Force the OS to read the entire memmap files into RAM (page cache).
+    _ = train_ds.data[:].sum()
+    _ = val_ds.data[:].sum()
     dist.barrier() # make sure all ranks start together
 
     for epoch in range(args.epochs):

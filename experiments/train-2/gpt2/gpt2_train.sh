@@ -2,19 +2,31 @@
 set -euo pipefail
 
 # Try to set CPU governor to performance; ignore all failures
-if command -v cpupower &>/dev/null; then
-    sudo cpupower frequency-set -g performance 2>/dev/null && \
-        echo "[cpufreq] Set governor to performance" || \
-        echo "[cpufreq] Could not set governor (BIOS-locked or no sudo?), continuing"
-elif [ -d /sys/devices/system/cpu/cpu0/cpufreq ]; then
-    # fallback: write directly if cpupower isn't installed
-    for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-        echo performance | sudo tee "$gov" 2>/dev/null
-    done && \
-        echo "[cpufreq] Set governor to performance (tee fallback)" || \
-        echo "[cpufreq] Could not set governor via tee, continuing"
-else
-    echo "[cpufreq] No cpufreq support on this node, continuing"
+# if command -v cpupower &>/dev/null; then
+#     sudo cpupower frequency-set -g performance 2>/dev/null && \
+#         echo "[cpufreq] Set governor to performance" || \
+#         echo "[cpufreq] Could not set governor (BIOS-locked or no sudo?), continuing"
+# elif [ -d /sys/devices/system/cpu/cpu0/cpufreq ]; then
+#     # fallback: write directly if cpupower isn't installed
+#     for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+#         echo performance | sudo tee "$gov" 2>/dev/null
+#     done && \
+#         echo "[cpufreq] Set governor to performance (tee fallback)" || \
+#         echo "[cpufreq] Could not set governor via tee, continuing"
+# else
+#     echo "[cpufreq] No cpufreq support on this node, continuing"
+# fi
+
+# Try to set CPU governor to performance;
+sudo cpupower frequency-set -g performance 2>/dev/null && \
+  echo "[cpufreq] Set governor to performance" || \
+  echo "[cpufreq] Could not set governor, continuing"
+
+# Disable C-states, restore on exit
+if cpupower idle-info 2>/dev/null | grep -q "C[1-9]"; then
+  sudo cpupower idle-set -D 0 2>/dev/null
+  trap 'sudo cpupower idle-set -E 0 2>/dev/null' EXIT
+  echo "[cpupower] C-states disabled (will restore on exit)"
 fi
 
 BRANCH="wip-simple"
@@ -116,6 +128,9 @@ GDB='gdb -ex run --args'
 
 PY="gpt2-3.py"
 
+# sudo swapoff -a
+# sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+
 # Consumes around ~15.3GB of memory with AMP
 sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/"$PY" \
   --rank "$RANK" \
@@ -156,3 +171,6 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
 
 # for GA=1 use: (maybe the same LR as with GA=5 is also fine)
 # --gradient_accumulation_steps 1 --learning_rate 0.0003 --min_lr 0.00003 --mini_val_every_opt_steps 1500 --log_every_opt_steps 250
+
+# Re-enable C-states
+sudo cpupower idle-set -E 0 2>/dev/null && echo "[cpupower] C-states re-enabled" || echo "[cpupower] No C-states to re-enable"
