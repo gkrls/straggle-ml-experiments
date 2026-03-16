@@ -153,7 +153,8 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --json experiments/train-2/gpt2_sa_natural.json \
   --data ~/datasets/openwebtext/tokenized \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_world_k 5 
+  --dpa_world_k 5 \
+  --best_model
   # --straggle_points 3 \
   # --straggle_prob 15 \
   # --straggle_ranks 1 \
