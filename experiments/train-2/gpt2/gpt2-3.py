@@ -654,7 +654,7 @@ def setup_ddp(args):
         dist.init_process_group(backend=args.backend, init_method=init_method, rank=args.rank, world_size=args.world_size,
                                 timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
         if args.dpa_repin:
-            os.sched_setaffinity(0, set(range(4, os.cpu_count() - dpa_backend.threads - 1)))
+            os.sched_setaffinity(0, set(range(os.cpu_count() - dpa_backend.threads - 1)))
             print(f"[{now()}] re-pinned to cores 0-{os.cpu_count() - dpa_backend.threads - 1}")
     else:
         dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size, timeout=datetime.timedelta(seconds=60))

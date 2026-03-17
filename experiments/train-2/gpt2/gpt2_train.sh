@@ -65,6 +65,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_FASTESTK=ON \
         -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_FASTESTK_BULK=OFF \
+        -DDPA_IMPLICIT_SYN=OFF \
         -DDPA_SYNCHRON_BULK=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
@@ -142,7 +143,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --dpa_conf $DPA_CONF \
   --dpa_repin \
   --workers 0 \
-  --epochs 1 \
+  --epochs 7 \
   --batch_size 12 \
   --micro_steps_per_epoch 6000 \
   --gradient_accumulation_steps 5 --learning_rate 0.0006 --min_lr 0.00006 --mini_val_every_opt_steps 300 --log_every_opt_steps 50 \
@@ -150,17 +151,16 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --json experiments/train-2/gpt2_2_sa_natural.json \
+  --json experiments/train-2/gpt2_sa_aggressive_full.json \
   --data ~/datasets/openwebtext/tokenized \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_world_k 5
-  # --best_model
-  # --straggle_points 3 \
-  # --straggle_prob 15 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 1.66 \
-  # --straggle_skip 5 \
-  # --straggle_multiply 0.5 2
+  --dpa_world_k 5 \
+  --straggle_points 3 \
+  --straggle_prob 15 \
+  --straggle_ranks 1 \
+  --straggle_amount 1.66 \
+  --straggle_skip 5 \
+  --straggle_multiply 0.5 2
   # --best_model \
   # --best_model_ignore 1 \
 
