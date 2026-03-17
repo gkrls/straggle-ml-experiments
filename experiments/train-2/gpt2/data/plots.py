@@ -36,7 +36,7 @@ data = {
     },
   }
 }
-stos = [25,50,75,100,125] #5
+stos = [25,50,75,100,125] #5  
 
 for sto in stos:
   with open(script_dir / "sa" / f"gpt2_ga5_1epoch_sa_{sto}-1_straggl_3.15.50-200.json") as f:
