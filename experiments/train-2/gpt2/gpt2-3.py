@@ -317,7 +317,9 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                 w_token_count = 0
 
             # ----- mini validation -----
-            if val_loader is not None and args.mini_val_every_opt_steps and step_count % args.mini_val_every_opt_steps == 0: #getattr(args, "mini_val_every_opt_steps", 0) > 0
+            steps_remaining = steps_per_epoch - step_count
+            if val_loader and args.mini_val_every_opt_steps and step_count % args.mini_val_every_opt_steps == 0 and steps_remaining >= args.mini_val_every_opt_steps:
+            # if val_loader is not None and args.mini_val_every_opt_steps and step_count % args.mini_val_every_opt_steps == 0: #getattr(args, "mini_val_every_opt_steps", 0) > 0
                 val_metrics = validate(model, val_loader, device, args, max_batches=args.mini_val_max_batches) #getattr(args, "mini_val_max_batches", 64))
                 model.train()
                 # if args.rank == 0:
