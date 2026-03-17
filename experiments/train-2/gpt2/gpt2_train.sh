@@ -174,4 +174,4 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
 # --gradient_accumulation_steps 1 --learning_rate 0.0003 --min_lr 0.00003 --mini_val_every_opt_steps 1500 --log_every_opt_steps 250
 
 # Re-enable C-states
-sudo cpupower idle-set -E 0 2>/dev/null && echo "[cpupower] C-states re-enabled" || echo "[cpupower] No C-states to re-enable"
+# sudo cpupower idle-set -E 0 2>/dev/null && echo "[cpupower] C-states re-enabled" || echo "[cpupower] No C-states to re-enable"
