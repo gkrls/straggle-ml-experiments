@@ -78,10 +78,23 @@ class GPT2MemmapDataset(IterableDataset):
         else:
             self.start = 0
             self.end = len(self.data)
+
         self.n_windows = (self.end - self.start) // self.window
+    # def __init__(self, bin_path, seq_len=1024, world_size=1, rank=0, seed=42):
+    #     super().__init__()
+    #     self.data = np.memmap(bin_path, dtype=np.uint16, mode='r')
+    #     self.seq_len = seq_len
+    #     self.window = seq_len + 1
+    #     self.world_size = world_size
+    #     self.rank = rank
+    #     self.seed = seed
+    #     self.epoch = 0
 
-        print(f"[{now()}]rank {shard_id}: windows={self.n_windows}")
-
+    #     # Each rank gets a contiguous chunk, trimmed to whole windows
+    #     chunk = len(self.data) // world_size
+    #     self.start = rank * chunk
+    #     self.end = self.start + chunk
+    #     self.n_windows = (self.end - self.start) // self.window
 
     def set_epoch(self, epoch: int):
         self.epoch = epoch
@@ -127,9 +140,9 @@ def validate(model, loader, device, args, max_batches=200):
         x = inputs[:, :-1].contiguous().to(device, non_blocking=True)
         y = inputs[:, 1:].contiguous().to(device, non_blocking=True)
         with torch.amp.autocast(device_type='cuda', enabled=args.amp):
-            # attn = torch.ones_like(x, dtype=torch.long)            # <— all tokens attend
-            # logits = model(x, attention_mask=attn)[0]
-            logits = model(x)[0]
+            attn = torch.ones_like(x, dtype=torch.long)            # <— all tokens attend
+            # logits = model(x, attention_mask=attn).logits
+            logits = model(x, attention_mask=attn)[0]
             B, T, V = logits.shape
             loss = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
         losses.update(loss.item(), B*T)
@@ -206,9 +219,9 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         t0 = time.perf_counter()
         with ctx:
             with torch.amp.autocast(device_type="cuda", enabled=args.amp):
-                # attn = torch.ones_like(x, dtype=torch.long)
-                # logits = model(x, attention_mask=attn)[0]
-                logits = model(x)[0]
+                attn = torch.ones_like(x, dtype=torch.long)
+                # logits = model(x, attention_mask=attn).logits
+                logits = model(x, attention_mask=attn)[0]
                 B, T, V = logits.shape
                 loss_full = F.cross_entropy(logits.view(B*T, V), y.view(B*T))
                 loss = loss_full / GA
