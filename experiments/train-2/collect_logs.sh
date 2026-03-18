@@ -1,7 +1,8 @@
 set -euo pipefail
 
-HOSTS=("hpdc-gnode1" "hpdc-gnode2" "hpdc-gnode3" "hpdc-gnode4" "hpdc-gnode5" "hpdc-gnode6")
-RANKS=($(seq 0 $((${#HOSTS[@]} - 1))))
+HOSTS=("hpdc-gnode1" "hpdc-gnode3" "hpdc-gnode4" "hpdc-gnode5" "hpdc-gnode6") #"hpdc-gnode2" 
+# RANKS=($(seq 0 $((${#HOSTS[@]} - 1))))
+RANKS=(0 2 3 4 5)
 
 REMOTE_JSON=""
 OUT_DIR=""
@@ -31,19 +32,23 @@ mkdir -p "$OUT_DIR"
 
 IFS=',' read -ra SKIP <<< "$IGNORE"
 
-for rank in "${RANKS[@]}"; do
+for i in "${!HOSTS[@]}"; do
+  host="${HOSTS[$i]}"
+  rank="${RANKS[$i]}"
+
   skip=0
   for s in "${SKIP[@]}"; do
     [[ "$s" == "$rank" ]] && skip=1
   done
+
   if [[ $skip -eq 1 ]]; then
-    echo "[rank $rank] SKIPPED (${HOSTS[$rank]})"
+    echo "[rank $rank] SKIPPED ($host)"
     continue
   fi
 
-  host="${HOSTS[$rank]}"
   dest="$OUT_DIR/${PREFIX}rank${rank}.json"
   echo -n "[rank $rank] $host:$REMOTE_JSON -> $dest ... "
+
   if scp -q "$host:$REMOTE_JSON" "$dest" 2>/dev/null; then
     echo "OK"
   else
