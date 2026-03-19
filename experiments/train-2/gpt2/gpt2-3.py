@@ -369,25 +369,6 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
         "throughput":    float(tok_per_s),
     }
 
-
-
-# # ------------------------- training driver -------------------------
-# class SimpleDDP(DDP):
-#     def __init__(self, module, **kwargs):
-#         super().__init__(module, broadcast_buffers=False, **kwargs)
-#         self.require_forward_param_sync = False
-    
-#     def _sync_params(self):
-#         pass  # Never sync parameters
-    
-#     def _distributed_broadcast_coalesced(self, *args, **kwargs):
-#         pass  # Never broadcast anything
-    
-#     # Optionally override forward to skip the check entirely
-#     def forward(self, *inputs, **kwargs):
-#         # Skip all DDP's sync logic, just call the module
-#         return self.module(*inputs, **kwargs)
-
 def train(args, straggle, best_model_group):
     device = torch.device(args.device)
 
@@ -396,11 +377,6 @@ def train(args, straggle, best_model_group):
 
     train_ds = GPT2MemmapDataset(data_root / "train.bin", seq_len=args.seq_len, shards=args.world_size, shard_id=args.rank, seed=args.seed)
     val_ds   = GPT2MemmapDataset(data_root / "val.bin", seq_len=args.seq_len, shards=1, shard_id=0, seed=args.seed + args.rank)
-
-    # def _seed_worker(worker_id):
-    #     worker_seed = (args.seed + args.rank * max(1, args.workers) + worker_id) % 2**32
-    #     np.random.seed(worker_seed)
-    #     random.seed(worker_seed)
 
     train_loader = DataLoader(train_ds,batch_size=args.batch_size,num_workers=args.workers,pin_memory=True,
                               prefetch_factor=args.prefetch_factor if args.workers > 0 else None,persistent_workers=(args.workers > 0))
@@ -434,7 +410,8 @@ def train(args, straggle, best_model_group):
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
-        model = dpa.DDPWrapper(model, straggle = args.dpa_world_k if args.dpa_world_k else args.world_size, prescale=args.prescale)
+        model = dpa.DDPWrapper(model, sa_world = args.dpa_k if args.dpa_k else args.world_size, sa_preemptive=args.dpa_preemptive,
+                               prescale=args.prescale)
 
     # Straggle sim
     # straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)
@@ -695,7 +672,8 @@ def main():
 
     parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     parser.add_argument("--dpa_repin", action="store_true")
-    parser.add_argument("--dpa_world_k", type=int, default=0, help="Configure fastest-k amount. Disabled if 0 or world_size")
+    parser.add_argument("--dpa_k", type=int, default=0, help="Configure fastest-k amount. Disabled if 0 or world_size")
+    parser.add_argument('--dpa_preemptive', action='store_true',help="Preemptive K-sync: do not wait for STO")
     parser.add_argument("--dpa_prescale", action="store_true", help="Enable prescaling")
 
     # Training
@@ -764,8 +742,8 @@ def main():
     # args.seed = args.seed + args.rank * 1000
 
 
-    if args.dpa_world_k and args.dpa_world_k < args.world_size:
-        print(f"[{now()}] Straggler mitigation ENABLED with straggle_k={args.dpa_world_k} !!")
+    if args.dpa_k and args.dpa_k < args.world_size:
+        print(f"[{now()}] Straggler mitigation ENABLED with straggle_k={args.dpa_k} !!")
     else:
         print(f"[{now()}] Straggler mitigation DISABLED !!")
 

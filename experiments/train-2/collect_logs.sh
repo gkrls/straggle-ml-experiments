@@ -1,8 +1,8 @@
 set -euo pipefail
 
-HOSTS=("hpdc-gnode1" "hpdc-gnode3" "hpdc-gnode4" "hpdc-gnode5" "hpdc-gnode6") #"hpdc-gnode2" 
+HOSTS=("hpdc-gnode1" "hpdc-gnode2" "hpdc-gnode3" "hpdc-gnode4" "hpdc-gnode5" "hpdc-gnode6") #"hpdc-gnode2" 
 # RANKS=($(seq 0 $((${#HOSTS[@]} - 1))))
-RANKS=(0 2 3 4 5)
+RANKS=(0 1 2 3 4 5)
 
 REMOTE_JSON=""
 OUT_DIR=""
