@@ -56,7 +56,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
-        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_BUILD_TYPE=Debug \
         -DDPA_TRACE=OFF \
         -DDPA_DEVELOP=OFF \
         -DDPA_PROFILE=OFF \
@@ -133,7 +133,7 @@ PY="gpt2-3.py"
 # sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
 
 # Consumes around ~15.3GB of memory with AMP
-sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/"$PY" \
+sudo -E DPA_LOG=DEBUG DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/"$PY" \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -154,13 +154,14 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --json experiments/train-2/gpt2_su_aggressive_full.json \
   --data ~/datasets/openwebtext/tokenized \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_world_k 6 \
-  --straggle_points 3 \
-  --straggle_prob 15 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.66 \
-  --straggle_skip 5 \
-  --straggle_multiply 0.5 2
+  --dpa_k 5 \
+  --dpa_preemptive
+  # --straggle_points 3 \
+  # --straggle_prob 15 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 1.66 \
+  # --straggle_skip 5 \
+  # --straggle_multiply 0.5 2
   # --best_model \
   # --best_model_ignore 1 \
 

@@ -48,8 +48,8 @@ def init(args):
         if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
         with open(args.dpa_conf) as f:
             conf = json.loads(f.read())
-            if not conf["switch"]["program"].get("straggle_aware", False) and args.dpa_world_k < args.world_size:
-                raise RuntimeError(f"--dpa_world_k cannot be used with straggle unaware program")
+            if not conf["switch"]["program"].get("straggle_aware", False) and args.dpa_k < args.world_size:
+                raise RuntimeError(f"--dpa_k cannot be used with straggle unaware program")
 
         # Load DPA config
         dpdk = args.backend == "dpa_dpdk"
@@ -195,7 +195,7 @@ def benchmark(args):
 
     # DPA context options
     dpa_ctx = {"quantization": 'float' in args.type, "averaging": args.avg, "prescaled": args.dpa_pre,
-               "pipes": args.dpa_pipes, "straggle": args.dpa_world_k}
+               "pipes": args.dpa_pipes, "sa_world": args.dpa_k, "sa_preemptive": args.dpa_preemptive}
     dpa_ctx_wu = {"quantization": 'float' in args.type, "averaging": args.avg, "prescaled": args.dpa_pre, "pipes": args.dpa_pipes, "straggle": 0}
 
     op = dist.ReduceOp.AVG if args.avg else dist.ReduceOp.SUM # if (args.backend.startswith("dpa") and (args.dpa_avg or args.dpa_pre)) else dist.ReduceOp.SUM
@@ -406,7 +406,9 @@ if __name__ == "__main__":
     parser.add_argument("--dpa_timeout_init_scaling", type=float, default=None, help="Scale the RTX timeout during initial burst")
     parser.add_argument("--dpa_profile_skip",type=int, default=0, help="Start profiling after N operations")
     parser.add_argument("--dpa_pipes", type=int, default=2, help="Number of pipes")
-    parser.add_argument("--dpa_world_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
+    parser.add_argument("--dpa_k", type=int, default=0, help="Straggle awareness ignore thresh. If 0 or world_size straggle awareness is disabled (default = 0)")
+    parser.add_argument('--dpa_preemptive', action='store_true',help="Preemptive K-sync: do not wait for STO")
+
 
     # parser.add_argument("--dpa_qnt", action="store_true", help="Quantization (single exponent)")
     parser.add_argument("--dpa_pre", action="store_true", help="Enable prescaling on averaging operations (--avg)")
@@ -423,13 +425,13 @@ if __name__ == "__main__":
     args.json = args.json if args.json is not None else os.path.join(os.path.dirname(__file__), "allreduce-benchmark3-out.json")
     args.dtype = torch.float32 if args.type == "float32" else torch.int32
     args.batch = args.iters if args.batch == 0 else args.batch
-    args.dpa_world_k = args.world_size if args.dpa_world_k == 0 else args.dpa_world_k
+    args.dpa_k = args.world_size if args.dpa_k == 0 else args.dpa_k
 
     # Validation
     if args.dpa_pre and not args.avg: raise RuntimeError("--dpa_pre only available with --avg")
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
-    if args.verify and args.dpa_world_k not in [0, args.world_size]: raise RuntimeError(f"Cannot reliably verify results with straggle awareness enabled")
+    if args.verify and args.dpa_k not in [0, args.world_size]: raise RuntimeError(f"Cannot reliably verify results with straggle awareness enabled")
     
     init(args)
     benchmark(args)

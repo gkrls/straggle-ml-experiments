@@ -32,7 +32,7 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
-        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_BUILD_TYPE=Debug \
         -DDPA_TRACE=OFF \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
@@ -89,9 +89,9 @@ GDB="gdb --args"
 LOGFILE="allreduce_bench_$(date +%Y%m%d_%H%M%S).log"
 
 echo "[STRAGGLE AWARE BENCHMARK]"
-sudo -E DPA_LOG=Info DPA_SCHEDULER=OFF $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+sudo -E DPA_LOG=Debug DPA_SCHEDULER=OFF $(which python) $PROG3 --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
   --dpa_conf $CONF --dpa_pipes 4 -b dpa_dpdk -d cuda -t float32 -s 25000000 -w 4 -i 20 --pattern 2 --avg \
-  --dpa_world_k 5 --dpa_window 64 --dpa_threads 6 --dpa_timeout_us 100 --dpa_profile_skip 4 --dpa_timeout_init_scaling 5 #\
+  --dpa_k 5 --dpa_preemptive --dpa_window 64 --dpa_threads 6 --dpa_timeout_us 100 --dpa_profile_skip 4 --dpa_timeout_init_scaling 5
   # --straggle_rank 1 --straggle_ms 1000 --straggle_num 1 --straggle_start 0 --straggle_mode batch
 #   # --gloo_socket_ifname $IFACE --gloo_num_threads 2
   # --nccl_socket_nthreads 6 --nccl_nsocks_perthread 2
