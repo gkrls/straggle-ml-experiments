@@ -133,7 +133,7 @@ def get_lr(update_idx, warmup_steps, learning_rate, lr_decay_iters, min_lr):
 def validate(model, loader, device, args, max_batches=200):
     model.eval()
     losses = AverageMeter()
-    step_start = time.perf_counter()
+    val_start = time.perf_counter()
     for batch_idx, inputs in enumerate(loader):
         if batch_idx >= max_batches: break
         if inputs.size(1) != args.seq_len + 1: continue
@@ -149,7 +149,7 @@ def validate(model, loader, device, args, max_batches=200):
     # losses.all_reduce()
     val_loss = losses.avg
     val_ppl = float(np.exp(np.clip(val_loss, 0, 20)))
-    return {'loss': val_loss, 'ppl': val_ppl, 'time': time.perf_counter() - step_start}
+    return {'loss': val_loss, 'ppl': val_ppl, 'time': time.perf_counter() - val_start}
 
 
 # ------------------------- train  -------------------------
@@ -405,13 +405,14 @@ def train(args, straggle, best_model_group):
     model.require_forward_param_sync = False
 
     if straggle is not None:
-        if straggle.attach(model): print(f"{straggle} created and active for rank {args.rank}")
-        else: print(f"{straggle} inactive for rank {args.rank}")
+        if straggle.attach(model): print(f"[{now()}] {straggle} created and active for rank {args.rank}")
+        else: print(f"[{now()}] {straggle} inactive for rank {args.rank}")
+    else: print(f"[{now()}] straggle-sim off")
 
     # Wrap the model if DPA backend is requested
     if args.backend.startswith("dpa"):
         model = dpa.DDPWrapper(model, sa_world = args.dpa_k if args.dpa_k else args.world_size, sa_preemptive=args.dpa_preemptive,
-                               prescale=args.prescale)
+                               prescale=args.dpa_prescale)
 
     # Straggle sim
     # straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks)
@@ -506,10 +507,10 @@ def train(args, straggle, best_model_group):
     #Force the OS to read the entire memmap files into RAM (page cache).
     _ = train_ds.data[:].sum()
     _ = val_ds.data[:].sum()
-    dist.barrier() # make sure all ranks start together
 
+    dist.barrier() # make sure all ranks start together
     for epoch in range(args.epochs):
-        print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
+        print(f"[{now()}][Epoch {epoch:03d}] ...")
         
         epoch_start = time.time()
 
@@ -602,12 +603,12 @@ def setup_ddp(args):
     def env_int(k, d): return d if os.environ.get(k) in (None, "") else int(os.environ.get(k))
     def env_str(k, d): return d if os.environ.get(k) in (None, "") else os.environ.get(k)
 
-    args.rank = env_int("RANK", args.rank)
-    args.world_size = env_int("WORLD_SIZE", args.world_size)
+    args.rank        = env_int("RANK", args.rank)
+    args.world_size  = env_int("WORLD_SIZE", args.world_size)
     args.master_addr = env_str("MASTER_ADDR", args.master_addr)
     args.master_port = env_int("MASTER_PORT", args.master_port)
-    args.iface = env_str("IFACE", args.iface)
-    args.local_rank = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
+    args.iface       = env_str("IFACE", args.iface)
+    args.local_rank  = (args.rank % torch.cuda.device_count()) if torch.cuda.device_count() else 0
 
     if args.device == 'cuda' and torch.cuda.is_available(): torch.cuda.set_device(args.local_rank)
 
@@ -619,7 +620,7 @@ def setup_ddp(args):
     os.environ.setdefault("GLOO_SOCKET_IFNAME", args.iface)
     os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
 
-    init_method = f"tcp://{args.master_addr}:{args.master_port}" # "env://"
+    # init_method = f"tcp://{args.master_addr}:{args.master_port}" # "env://"
     init_method="env://"
 
     # Initialize process group
@@ -641,7 +642,7 @@ def setup_ddp(args):
     print(f"[{now()}] DDP setup with backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
     
-    args.best_model_group = None
+    args.best_model_group        = None
     args.best_model_active_ranks = None
     if args.best_model:
         args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
@@ -653,7 +654,7 @@ def setup_ddp(args):
 
 # ------------------------- main -------------------------
 def main():
-    parser = argparse.ArgumentParser(description='GPT-2 DDP on OpenWebText (with periodic update logging)')
+    parser = argparse.ArgumentParser(description='GPT-2 on OpenWebText')
 
     # DDP/System
     parser.add_argument('--rank', type=int, default=0)
@@ -679,7 +680,7 @@ def main():
     # Training
     parser.add_argument('--data', type=str, required=True)
     parser.add_argument('--tokenizer', type=str, default='gpt2')
-    parser.add_argument('--epochs', type=int, default=12)
+    parser.add_argument('--epochs', type=int, default=6)
     parser.add_argument('--micro_steps_per_epoch', '--steps_per_epoch', dest='micro_steps_per_epoch', type=int, default=6000,
                         help='Micro-batches per epoch. Optimizer steps/epoch ~= this / GA.')
     parser.add_argument('--batch_size', type=int, default=12)
@@ -697,7 +698,7 @@ def main():
     parser.add_argument('--mini_val_every_opt_steps', type=int, default=0, help='Run a small validation every N optimizer steps. 0=off.')
     parser.add_argument('--mini_val_max_batches', type=int, default=64, help='Batches to use for mini validation.')
 
-    parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
+    # parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
     parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
 
     # Model config -- mostly fixed

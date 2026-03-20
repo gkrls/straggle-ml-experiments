@@ -1,23 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Try to set CPU governor to performance; ignore all failures
-# if command -v cpupower &>/dev/null; then
-#     sudo cpupower frequency-set -g performance 2>/dev/null && \
-#         echo "[cpufreq] Set governor to performance" || \
-#         echo "[cpufreq] Could not set governor (BIOS-locked or no sudo?), continuing"
-# elif [ -d /sys/devices/system/cpu/cpu0/cpufreq ]; then
-#     # fallback: write directly if cpupower isn't installed
-#     for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-#         echo performance | sudo tee "$gov" 2>/dev/null
-#     done && \
-#         echo "[cpufreq] Set governor to performance (tee fallback)" || \
-#         echo "[cpufreq] Could not set governor via tee, continuing"
-# else
-#     echo "[cpufreq] No cpufreq support on this node, continuing"
-# fi
-
-# Try to set CPU governor to performance;
 sudo cpupower frequency-set -g performance 2>/dev/null && \
   echo "[cpufreq] Set governor to performance" || \
   echo "[cpufreq] Could not set governor, continuing"
@@ -78,10 +61,10 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
   source $HOME/straggle-ml-experiments/venv/bin/activate
 
   # Make sure env is ok
-  python -m pip install --upgrade -q pip 
-  python -m pip install --no-user -q -r "$HOME/straggle-ml-experiments/requirements.txt"
+  python -m pip install --upgrade pip 
+  python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
 
-  # Compile the plugin
+  # # Compile the plugin
   # PYTHONWARNINGS="ignore::setuptools.errors.SetuptoolsDeprecationWarning,ignore::setuptools.errors.EasyInstallDeprecationWarning" \
   python $HOME/straggle-ml/build/install/lib/dpa_plugin_pytorch/setup.py -q develop
 else
@@ -115,7 +98,6 @@ RANK=$(( ${IP##*.} - 1 ))
 # else
 #     RANK=$(( IP_LAST - 1 ))
 # fi
-
 # MASTER_ADDR="${MASTER_ADDR:-$(awk -F. '{print $1"."$2"."$3".1"}' <<< "$IP")}"
 
 echo "[$SCRIPT] iface=$IFACE ip=$IP rank=$RANK world_size=$WORLD_SIZE master=${MASTER_ADDR}:${MASTER_PORT} backend=$BACKEND"
@@ -127,13 +109,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-PY="gpt2-3.py"
-
-# sudo swapoff -a
-# sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
-
-# Consumes around ~15.3GB of memory with AMP
-sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/"$PY" \
+sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resnet/resnet.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -142,60 +118,36 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --backend $BACKEND \
   --dpa_conf $DPA_CONF \
   --dpa_repin \
-  --workers 0 \
-  --epochs 7 \
-  --batch_size 12 \
-  --micro_steps_per_epoch 6000 \
-  --gradient_accumulation_steps 5 --learning_rate 0.0006 --min_lr 0.00006 --mini_val_every_opt_steps 300 --log_every_opt_steps 50 \
-  --seq_len 1024 \
-  --amp \
+  --model resnet50 \
+  --data ~/datasets/imagenet \
+  --workers 8 \
+  --epochs 92 \
+  --batch_size 128 \
   --deterministic \
   --prefetch_factor 4 \
-  --json experiments/train-2/gpt2_su_moderate.json \
-  --data ~/datasets/openwebtext/tokenized  \
-  --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_k 6 \
-  --straggle_points 1 \
+  --drop_last_val \
+  --json experiments/train-2/resnet_sa_aggressive.json \
+  --dpa_k 5 \
+  --straggle_points 3 \
   --straggle_prob 15 \
   --straggle_ranks 1 \
-  --straggle_amount 1.66 \
+  --straggle_amount 0.65 \
   --straggle_multiply 0.5 2.0
-
-  # --straggle_points 1 \
-  # --straggle_prob 15 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 1.66 \
-  # --straggle_skip 10 \
-  # --straggle_skip_every 5 \
-  # --straggle_multiply 0.5 2.0
-
-# MILD/MODERATE
-  # --straggle_points 1 \
-  # --straggle_prob 10 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 1.66 \
-  # --straggle_skip 5 \
-  # --straggle_multiply 0.25 0.75
-# AGGRESIVE 
-  # --straggle_points 3 \
-  # --straggle_prob 15 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 1.66 \
-  # --straggle_skip 5 \
-  # --straggle_multiply 0.5 2
-
-
-  # --best_model \
-  # --best_model_ignore 1 \
-
-  # --straggle_skip 33 \
-  # --straggle_skip_every 66 \
-
-# for GA=5 use:
-# --gradient_accumulation_steps 5 --learning_rate 0.0006 --min_lr 0.00006 --mini_val_every_opt_steps 300 --log_every_opt_steps 50
-
-# for GA=1 use: (maybe the same LR as with GA=5 is also fine)
-# --gradient_accumulation_steps 1 --learning_rate 0.0003 --min_lr 0.00003 --mini_val_every_opt_steps 1500 --log_every_opt_steps 250
-
-# Re-enable C-states
-# sudo cpupower idle-set -E 0 2>/dev/null && echo "[cpupower] C-states re-enabled" || echo "[cpupower] No C-states to re-enable"
+  
+# sudo -E $(which python) experiments/train/resnet.py \
+#   --rank "$RANK" \
+#   --world_size "$WORLD_SIZE" \
+#   --iface "$IFACE" \
+#   --master_addr "$MASTER_ADDR" \
+#   --master_port "$MASTER_PORT" \
+#   --dpa_conf $DPA_CONF \
+#   --backend $BACKEND \
+#   --data ~/datasets/imagenet \
+#   --model resnet50 \
+#   --batch_size 128 \
+#   --workers 8 \
+#   --deterministic \
+#   --drop_last_val \
+#   --prefetch_factor 4 \
+#   --json experiments/train/resnet50.json \
+#   "$@"
