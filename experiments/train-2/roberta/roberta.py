@@ -28,8 +28,7 @@ from transformers import (
 
 
 # ------------------------- utilities -------------------------
-def now():
-    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+def now(): return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 def save_log(path, log):
     tmp = f"{path}.tmp"
@@ -184,11 +183,10 @@ def _f1(pred: str, golds: List[str]) -> float:
     return max(score(pred, g) for g in golds) if len(golds) > 0 else score(pred, "")
 
 
-# ------------------------- validate (per-rank, no gather) -------------------------
+# ------------------------- validate -------------------------
 @torch.no_grad()
 def validate(model, loader, device, args, max_batches=0):
-    """Per-rank validation on this rank's shard. No cross-rank communication.
-    max_batches=0 means all batches."""
+    """Per-rank validation on this rank's shard. No cross-rank communication. max_batches=0 means all batches."""
     model.eval()
     losses = AverageMeter()
     tokenizer = args._tokenizer; id2ex = args._id2ex
@@ -197,8 +195,7 @@ def validate(model, loader, device, args, max_batches=0):
 
     t0 = time.perf_counter()
     for batch_idx, batch in enumerate(loader):
-        if max_batches > 0 and batch_idx >= max_batches:
-            break
+        if max_batches > 0 and batch_idx >= max_batches: break
 
         inputs = {
             "input_ids":       batch["input_ids"].to(device, non_blocking=True),
@@ -485,7 +482,7 @@ def train(args, straggle, best_model_group):
     # DPA wrapper
     if args.backend.startswith("dpa") and dpa is not None:
         model = dpa.DDPWrapper(model, sa_world=args.dpa_k if args.dpa_k else args.world_size, sa_preemptive=args.dpa_preemptive,
-                               prescale=args.prescale)
+                               prescale=args.dpa_prescale)
 
     print(f"\n[{now()}] Dataset: SQuAD {args.squad_version} at {args.data}")
     print(f"  Model: {args.model_name} | Params: {sum(p.numel() for p in model.parameters()):,}")
@@ -701,8 +698,7 @@ def main():
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--json', type=str, default='roberta_squad.json', help='Path to JSON run log')
-    parser.add_argument('--log_every_opt_steps', type=int, default=0,
-                        help='Log every N optimizer updates during training. 0=disabled.')
+    parser.add_argument('--log_every_opt_steps', type=int, default=0, help='Log every N optimizer updates during training. 0=disabled.')
 
     parser.add_argument('--dpa_conf', type=str, default=None, help='Path to dpa config.json')
     parser.add_argument('--dpa_repin', action='store_true')
@@ -776,8 +772,8 @@ def main():
         with open(args.dpa_conf) as f:
             args.dpa_dpdk = json.load(f).get("dpdk", {})
 
-    if args.dpa_world_k and args.dpa_world_k < args.world_size:
-        print(f"[{now()}] Straggler mitigation ENABLED with dpa_world_k={args.dpa_world_k}")
+    if args.dpa_k and args.dpa_k < args.world_size:
+        print(f"[{now()}] Straggler mitigation ENABLED with dpa_k={args.dpa_k}")
     else:
         print(f"[{now()}] Straggler mitigation DISABLED")
 
