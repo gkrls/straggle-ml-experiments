@@ -126,7 +126,7 @@ set -x
 
 
 # squad v2
-sudo -E $(which python) experiments/train/roberta_finetune2.py \
+sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/roberta/roberta.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -152,5 +152,5 @@ sudo -E $(which python) experiments/train/roberta_finetune2.py \
   --straggle_points 3 \
   --straggle_prob 15 \
   --straggle_ranks 1 \
-  --straggle_amount 0.65 \
+  --straggle_amount 1.2 \
   --straggle_multiply 0.5 2.0

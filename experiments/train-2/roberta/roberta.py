@@ -2,7 +2,6 @@
 """
 RoBERTa-base SQuAD v1/v2 DDP fine-tuning trainer.
 Training logic follows standard HF run_qa.py conventions.
-Benchmarking infrastructure (args, JSON, timing, straggle) aligned with GPT-2 DDP trainer.
 """
 
 import os, sys, argparse, time, datetime, json, math, random, re, string, collections
