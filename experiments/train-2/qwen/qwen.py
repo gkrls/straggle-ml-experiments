@@ -675,6 +675,10 @@ def train(args, straggle, best_model_group):
         print(f"[{now()}] All val_ppls: {', '.join(pairs)}")
         print(f"[{now()}] Best val_ppl: {float(all_ppls[best_idx]):.4f} at rank {best_rank}", flush=True)
 
+    if args.save_model:
+        model.module.save_pretrained(args.save_model)
+        tokenizer.save_pretrained(args.save_model)
+        print(f"[{now()}] Model saved to {args.save_model}", flush=True)
 
 # ------------------------- DDP setup/teardown -------------------------
 def setup_ddp(args):
@@ -800,10 +804,17 @@ def main():
 
     parser.add_argument("--best_model", action="store_true", help="Select model with best val ppl among participating ranks")
     parser.add_argument("--best_model_ignore", type=csv_ints, default=[], help="Ranks to exclude from --best_model comparison.")
+    parser.add_argument("--save_model", type=str, default="", help="Path to save fine-tuned model after training (rank 0 only). Empty = no save.")
 
     args, unknown = parser.parse_known_args()
     if unknown:
         print(f"[{now()}][Warning] Ignoring unknown args: {unknown}", flush=True)
+
+    if args.save_model:
+        save_path = os.path.join(args.save_model, f"qwen_rank{args.rank}")
+        os.makedirs(save_path, exist_ok=True)
+        assert os.access(save_path, os.W_OK), f"Cannot write to {save_path}"
+        args.save_model = save_path
 
     args.local_rank = 0
     args.dpa_dpdk = {}

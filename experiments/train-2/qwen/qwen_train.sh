@@ -110,23 +110,25 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --model_name Qwen/Qwen2.5-0.5B \
   --dataset tatsu-lab/alpaca \
   --data ~/datasets/qwen-alpaca \
-  --epochs 5 \
-  --batch_size 2 \
+  --epochs 6 \
+  --batch_size 3 \
   --seq_len 512 \
   --learning_rate 2e-5 \
   --sched cosine \
   --amp \
   --deterministic \
   --prefetch_factor 4 \
+  --gradient_accumulation_steps 1 \
   --log_every_opt_steps 100 \
   --mini_val_every_opt_steps 350 \
-  --json experiments/train-2/qwen_alpaca_sa_aggressive.json \
+  --json experiments/train-2/qwen_alpaca_su_aggressive.json \
   --dpa_k 6 \
   --straggle_points 3 \
   --straggle_prob 15 \
   --straggle_ranks 1 \
-  --straggle_amount 1.1 \
-  --straggle_multiply 0.5 2.0
+  --straggle_amount 1.63 \
+  --straggle_multiply 0.5 2.0 \
+  --save_model ~/straggle-ml-experiments
 
   # --gradient_accumulation_steps 2 \
 
