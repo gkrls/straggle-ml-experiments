@@ -251,6 +251,7 @@ def extract_tta(data, metric, minival_metric=None, max_epochs=None):
         mins.append(cum / 60)
         vals.append(ep[metric])
     return np.array(mins), np.array(vals)
+    # return np.array(mins), np.round(np.array(vals), 2)
 
 
 def find_crossing(m, v, target, hib=False, tolerance=0.0):
@@ -400,9 +401,9 @@ def plot_tta(input_a, input_b, metric, labels=("BSP", "SA-INA"),
             color="0.4", fontweight="bold")
 
     print(f"\n% Fixed-epoch ({epochs or 'auto'}):")
-    print(f"%   {labels[0]} ends at {end_times[0]:.0f} min, {metric}={end_vals[0]:.2f}")
-    print(f"%   {labels[1]} ends at {end_times[1]:.0f} min, {metric}={end_vals[1]:.2f}")
-    print(f"%   Time ratio: {ratio:.2f}x ({abs(end_times[0] - end_times[1]):.0f} min saved)")
+    print(f"%   {labels[0]} ends at {end_times[0]:.2f} min, {metric}={end_vals[0]:.2f}")
+    print(f"%   {labels[1]} ends at {end_times[1]:.2f} min, {metric}={end_vals[1]:.2f}")
+    print(f"%   Time ratio: {ratio:.2f}x ({abs(end_times[0] - end_times[1]):.2f} min saved)")
 
     ax.set_xlabel("Time (minutes)")
     ax.set_ylabel(metric_label(metric))
@@ -425,10 +426,10 @@ if __name__ == "__main__":
     p.add_argument("--input_b", default=None, help="Optimized: directory or rank*.json file")
     p.add_argument("--metric", default="val_ppl")
     p.add_argument("--minival", default=None)
-    p.add_argument("--labels", nargs=2, default=["BSP", "SA-INA"])
+    p.add_argument("--labels", nargs=2, default=["SU", "SA"])
     p.add_argument("--target", type=float, default=None)
     p.add_argument("--tolerance", type=float, default=0.0, help="Buffer zone around target")
-    p.add_argument("--rank", default="rank0", help="0, 1, ..., avg, best, fastest (default: rank0)")
+    p.add_argument("--rank", type=str, default="rank0", help="0, 1, ..., avg, best, fastest (default: rank0)")
     p.add_argument("--exclude-ranks", type=int, nargs="*", default=None, help="Rank IDs to exclude (e.g. straggler)")
     p.add_argument("--smooth", action="store_true")
     p.add_argument("--title", default=None)
@@ -440,12 +441,13 @@ if __name__ == "__main__":
 
     DIR = Path(__file__).parent
 
-    # resnet
+    # # resnet
     a.input_a = DIR / "resnet/aggressive/su/"
     a.input_b = DIR / "resnet/aggressive/sa"
     a.metric = "val_top5"
     a.target = 90
-    a.rank = "best"
+    a.tolerance = 0.01
+    a.rank = "avg"
     a.exclude_ranks = [1]
     a.smooth = True
 
@@ -453,12 +455,27 @@ if __name__ == "__main__":
     # a.input_a = DIR / "gpt2/aggressive/su"
     # a.input_b = DIR / "gpt2/aggressive/sa"
     # a.metric = "val_ppl"
-    # a.target = 30
+    # a.target = 28.00
+    # a.tolerance = 0.01
     # a.rank = "avg"
     # a.minival = "mini_val_ppl"
     # a.exclude_ranks = [1]
     # a.smooth = True
 
+    # roberta
+    a.input_a = DIR / "roberta/aggressive/su"
+    a.input_b = DIR / "roberta/aggressive/sa"
+    a.metric = "val_f1"
+    a.target = 80
+    a.rank = "avg"
+    a.minival = "mini_val_f1"
+    a.exclude_ranks = [1]
+    a.smooth = True
+    a.tolerance = 0.01
+    a.epochs = 4
+
     plot_tta(a.input_a, a.input_b, a.metric, a.labels, a.minival, a.target,
              a.output, a.smooth, a.title, a.epochs, a.tolerance,
              a.rank, a.exclude_ranks)
+    
+

@@ -1801,7 +1801,7 @@
       "0900": {
         "global_step": 5700,
         "mini_val_loss": 3.358680587261915,
-        "mini_val_ppl": 28.751231101891193,
+        "mini_val_ppl": 29.751231101891193,
         "max_batches": 64
       }
     },

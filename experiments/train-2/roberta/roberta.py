@@ -553,7 +553,7 @@ def train(args, straggle, best_model_group):
     best_em = 0.0; best_f1 = 0.0
     global_step = 0
 
-    dist.barrier()
+    # dist.barrier()
 
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...", flush=True)
@@ -650,35 +650,31 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_SOCKET_IFNAME", args.iface)
 
     if args.backend.startswith("dpa"):
-        if not args.dpa_conf:
-            raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
+        if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
         dpa_device  = dpa.DPADeviceOptions.from_config(args.dpa_conf)
         dpa_backend = dpa.DPADpdkBackendOptions.from_config(args.dpa_conf)
         pg_options  = dpa.ProcessGroupDPADpdkOptions(dpa_device, dpa_backend)
-        pg_options.hint_pinned_tensor_size = max(200_000_000,
-            args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0)
+        pg_options.hint_pinned_tensor_size = max(200_000_000, args.bucket_cap_mb * (2 ** 20) * 4 if args.bucket_cap_mb is not None else 0)
         pg_options.hint_pinned_tensor_pool_size = 20
-        dist.init_process_group(backend=args.backend, init_method="env://",
-                                rank=args.rank, world_size=args.world_size,
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size,
                                 timeout=datetime.timedelta(seconds=60), pg_options=pg_options)
         if args.dpa_repin:
             os.sched_setaffinity(0, set(range(os.cpu_count() - dpa_backend.threads - 1)))
             print(f"[{now()}] re-pinned to cores 0-{os.cpu_count() - dpa_backend.threads - 1}")
     else:
-        dist.init_process_group(backend=args.backend, init_method="env://",
-                                rank=args.rank, world_size=args.world_size,
+        dist.init_process_group(backend=args.backend, init_method="env://", rank=args.rank, world_size=args.world_size,
                                 timeout=datetime.timedelta(seconds=60))
 
     print(f"[{now()}] DDP setup with backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
-    args.best_model_group = None
-    args.best_model_active_ranks = None
-    if args.best_model:
-        args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
-        best_model_group = dist.new_group(ranks=args.best_model_active_ranks, backend="gloo")
-        print(f"[{now()}] DDP best model selection ENABLED. Ranks considered: {args.best_model_active_ranks}")
-        return best_model_group
+    # args.best_model_group = None
+    # args.best_model_active_ranks = None
+    # if args.best_model:
+    #     args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
+    #     best_model_group = dist.new_group(ranks=args.best_model_active_ranks, backend="gloo")
+    #     print(f"[{now()}] DDP best model selection ENABLED. Ranks considered: {args.best_model_active_ranks}")
+    #     return best_model_group
 
 
 # ------------------------- main -------------------------
@@ -718,8 +714,7 @@ def main():
     parser.add_argument('--learning_rate', type=float, default=3e-5)
     parser.add_argument('--weight_decay', type=float, default=0.01)
     parser.add_argument('--warmup_ratio', type=float, default=0.06)
-    parser.add_argument('--warmup_steps', type=int, default=-1,
-                        help='Warmup in optimizer steps. -1=use warmup_ratio.')
+    parser.add_argument('--warmup_steps', type=int, default=-1, help='Warmup in optimizer steps. -1=use warmup_ratio.')
     parser.add_argument('--sched', choices=['cosine', 'linear'], default='linear')
     parser.add_argument('--grad_clip', type=float, default=1.0)
     parser.add_argument('--amp', action='store_true')
@@ -727,10 +722,8 @@ def main():
     parser.add_argument('--drop_last_train', action='store_true')
     parser.add_argument('--drop_last_val', action='store_true')
     parser.add_argument('--val_max_batches', type=int, default=0, help='Max batches for end-of-epoch val. 0=all.')
-    parser.add_argument('--mini_val_every_opt_steps', type=int, default=0,
-                        help='Run mini validation every N optimizer steps. 0=off.')
-    parser.add_argument('--mini_val_max_batches', type=int, default=64,
-                        help='Batches to use for mini validation.')
+    parser.add_argument('--mini_val_every_opt_steps', type=int, default=0, help='Run mini validation every N optimizer steps. 0=off.')
+    parser.add_argument('--mini_val_max_batches', type=int, default=64, help='Batches to use for mini validation.')
 
     parser.add_argument('--prescale', action='store_true', help='Prescale gradients for allreduce')
     parser.add_argument('--bucket_cap_mb', type=int, default=None, help='DDP bucket capacity')

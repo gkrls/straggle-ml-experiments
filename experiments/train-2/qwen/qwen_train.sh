@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Try to set CPU governor to performance;
 sudo cpupower frequency-set -g performance 2>/dev/null && \
   echo "[cpufreq] Set governor to performance" || \
   echo "[cpufreq] Could not set governor, continuing"
@@ -14,7 +15,6 @@ fi
 
 BRANCH="wip-simple"
 
-# export PKG_CONFIG_PATH=/opt/mellanox/dpdk/23.11/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
 export PKG_CONFIG_PATH=/opt/mellanox/dpdk/lib/x86_64-linux-gnu/pkgconfig
 
 # Sync the repos if needed
@@ -25,7 +25,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
 
   git -C "$HOME/straggle-ml" fetch -q origin || true
   git -C "$HOME/straggle-ml" checkout "$BRANCH" 2>/dev/null || true
-  git -C "$HOME/straggle-ml" reset --hard origin/"$BRANCH" 2>/dev/null || true #git -C "$DIR" reset --hard || true
+  git -C "$HOME/straggle-ml" reset --hard origin/"$BRANCH" 2>/dev/null || true
   git -C "$HOME/straggle-ml" pull --ff-only origin "$BRANCH" 2>/dev/null || true
   git -C "$HOME/straggle-ml" clean -ffd || true
 
@@ -57,15 +57,11 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_TORCH_WORKSTEALING=ON ..
   make -j4 install
 
-  # Install the plugin
   source $HOME/straggle-ml-experiments/venv/bin/activate
 
-  # Make sure env is ok
-  python -m pip install --upgrade pip 
-  python -m pip install --no-user -r "$HOME/straggle-ml-experiments/requirements.txt"
+  python -m pip install --upgrade -q pip
+  python -m pip install --no-user -q -r "$HOME/straggle-ml-experiments/requirements.txt"
 
-  # Compile the plugin
-  # PYTHONWARNINGS="ignore::setuptools.errors.SetuptoolsDeprecationWarning,ignore::setuptools.errors.EasyInstallDeprecationWarning" \
   python $HOME/straggle-ml/build/install/lib/dpa_plugin_pytorch/setup.py -q develop
 else
   source $HOME/straggle-ml-experiments/venv/bin/activate
@@ -76,8 +72,8 @@ cd $HOME/straggle-ml-experiments
 
 SCRIPT=${0##*/}
 DPA_CONF=$HOME/straggle-ml-experiments/configs/edgecore.json
-IFACE="${IFACE:-ens4f1}"                 # network interface to read IP from
-WORLD_SIZE="${WORLD_SIZE:-6}"            # set by launcher or leave 1 for single-node
+IFACE="${IFACE:-ens4f1}"
+WORLD_SIZE="${WORLD_SIZE:-6}"
 BACKEND="${BACKEND:-dpa_dpdk}"
 MASTER_ADDR="${MASTER_ADDR:-"42.0.1.1"}"
 MASTER_PORT="${MASTER_PORT:-"29500"}"
@@ -98,35 +94,10 @@ NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 set -x
 
-GDB='gdb -ex run --args'
 
-set -x
-# squad_v1
-# sudo -E $(which python) experiments/train/roberta_finetune.py \
-#   --rank "$RANK" \
-#   --world_size "$WORLD_SIZE" \
-#   --iface "$IFACE" \
-#   --master_addr "$MASTER_ADDR" \
-#   --master_port "$MASTER_PORT" \
-#   --backend $BACKEND \
-#   --dpa_conf $DPA_CONF \
-#   --data ~/datasets/squad_v1 \
-#   --squad_version v1 \
-#   --n_best_size 100 \
-#   --epochs 6 \
-#   --batch_size 32 \
-#   --learning_rate 5e-5 \
-#   --warmup_ratio 0.1 \
-#   --deterministic \
-#   --workers 4 \
-#   --prefetch_factor 4 \
-#   --log_interval 20 \
-#   --json experiments/train/roberta_finetune.json \
-#   "$@"
-
-
-# squad v2
-sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/roberta/roberta.py \
+# Qwen2.5-0.5B full fine-tuning on Alpaca
+# Memory: ~8GB params/optim + ~6GB activations with AMP, batch=4, seq=512
+sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/qwen.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -135,22 +106,39 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/rober
   --backend $BACKEND \
   --dpa_conf $DPA_CONF \
   --dpa_repin \
-  --data ~/datasets/squad_v2 \
-  --squad_version v2 \
-  --n_best_size 100 \
-  --epochs 8 \
-  --batch_size 32 \
-  --learning_rate 3e-5 \
-  --warmup_ratio 0.2 \
+  --workers 0 \
+  --model_name Qwen/Qwen2.5-0.5B \
+  --dataset tatsu-lab/alpaca \
+  --data ~/datasets/qwen-alpaca \
+  --epochs 5 \
+  --batch_size 4 \
+  --seq_len 512 \
+  --learning_rate 2e-5 \
+  --sched cosine \
+  --amp \
   --deterministic \
-  --workers 4 \
   --prefetch_factor 4 \
   --log_every_opt_steps 100 \
-  --mini_val_every_opt_steps 150 \
-  --json experiments/train-2/roberta_su_aggressive.json \
+  --mini_val_every_opt_steps 350 \
+  --json experiments/train-2/qwen_alpaca_sa_aggressive.json \
   --dpa_k 6 \
   --straggle_points 3 \
   --straggle_prob 15 \
   --straggle_ranks 1 \
-  --straggle_amount 1.3 \
+  --straggle_amount 1.1 \
   --straggle_multiply 0.5 2.0
+
+  # --gradient_accumulation_steps 2 \
+
+# Notes:
+# --straggle_amount 1.1 is estimated micro-step time for Qwen 0.5B (batch=4, seq=512, AMP)
+#   Calibrated from GPT-2 micro-step time of 1.66s:
+#   Qwen tokens/micro = 2048, GPT-2 tokens/micro = 12288
+#   FLOPs ratio ~ (494M * 2048) / (124M * 12288) ~ 0.66x
+#   Estimated: 1.66 * 0.66 ~ 1.1s (may need adjustment after first run)
+#
+# For baseline (no stragglers), comment out straggle_* lines and set:
+#   --json experiments/train-2/qwen_alpaca_baseline.json
+#
+# For gloo baseline:
+#   BACKEND=gloo and remove --dpa_conf, --dpa_repin, --dpa_k lines
