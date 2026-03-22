@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Qwen2.5-0.5B instruction fine-tuning on Alpaca.
+Qwen2.5-0.5B (or any HF causal LM) instruction fine-tuning on Alpaca.
 """
 
 import os, sys, argparse, time, datetime, json, math, random, warnings, re
@@ -197,8 +197,12 @@ def validate(model, loader, device, args, max_batches=0):
         attention_mask  = batch["attention_mask"].to(device, non_blocking=True)
 
         with torch.amp.autocast(device_type="cuda", enabled=args.amp):
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-            loss = outputs.loss
+            # Same manual loss as training — avoid HF's logits.float() OOM (see training loop comment)
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+            shift_logits = logits[:, :-1, :].contiguous().view(-1, logits.size(-1))
+            shift_labels = labels[:, 1:].contiguous().view(-1)
+            loss = F.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
 
         # count non-masked tokens for proper perplexity
         n_tokens = (labels != -100).sum().item()
@@ -270,8 +274,20 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
         t0 = time.perf_counter()
         with ctx:
             with torch.amp.autocast(device_type="cuda", enabled=args.amp):
-                outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-                loss_full = outputs.loss
+                # NOTE: We do NOT pass labels= to the model. HuggingFace internally does
+                # logits.float() which allocates a full FP32 copy of [B, T, 151936] = ~1.2GB
+                # and OOMs on P100. Instead we compute the loss ourselves using F.cross_entropy
+                # which handles FP16 inputs without that copy.
+                #
+                # The shift below is equivalent to what GPT-2 does with x=batch[:,:-1], y=batch[:,1:]
+                # but HF models expect the full sequence as input, so we shift the output instead.
+                # Given tokens [A,B,C,D,E]: model predicts at each position, then we align
+                # predictions [A→?,B→?,C→?,D→?] with targets [B,C,D,E]. Same next-token loss.
+                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+                logits = outputs.logits
+                shift_logits = logits[:, :-1, :].contiguous().view(-1, logits.size(-1))
+                shift_labels = labels[:, 1:].contiguous().view(-1)
+                loss_full = F.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
                 loss = loss_full / GA
             _sync()
             if scaler is not None and scaler.is_enabled():
@@ -751,7 +767,7 @@ def main():
     # Training
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=2)
     parser.add_argument("--learning_rate", type=float, default=2e-5)
     parser.add_argument("--weight_decay", type=float, default=0.01)
     parser.add_argument("--warmup_steps", type=int, default=-1, help="Warmup in optimizer steps. -1=auto (10%% capped at 100).")
