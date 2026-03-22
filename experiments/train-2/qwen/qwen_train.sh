@@ -111,7 +111,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --dataset tatsu-lab/alpaca \
   --data ~/datasets/qwen-alpaca \
   --epochs 5 \
-  --batch_size 4 \
+  --batch_size 2 \
   --seq_len 512 \
   --learning_rate 2e-5 \
   --sched cosine \

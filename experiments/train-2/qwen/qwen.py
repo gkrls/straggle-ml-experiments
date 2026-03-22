@@ -496,6 +496,7 @@ def train(args, straggle, best_model_group):
         torch_dtype=torch.float32,  # P100 needs FP32 master weights; AMP handles FP16 forward
     ).to(device)
     model.config.use_cache = False  # disable KV cache during training
+    model.gradient_checkpointing_enable()
 
     # ---- DDP ----
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,
@@ -767,7 +768,7 @@ def main():
     # Training
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=2)
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
     parser.add_argument("--learning_rate", type=float, default=2e-5)
     parser.add_argument("--weight_decay", type=float, default=0.01)
     parser.add_argument("--warmup_steps", type=int, default=-1, help="Warmup in optimizer steps. -1=auto (10%% capped at 100).")
