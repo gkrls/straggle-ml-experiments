@@ -491,7 +491,7 @@ def train(args, straggle, best_model_group):
 
     train_ds = SFTDataset(train_examples, tokenizer, max_seq_len=args.seq_len, mask_prompt=args.mask_prompt,
                           formatter=formatter,response_marker=response_marker)
-    val_ds   = SFTDataset(val_examples,   tokenizer, max_seq_len=args.seq_len, mask_prompt=False,
+    val_ds   = SFTDataset(val_examples,   tokenizer, max_seq_len=args.seq_len, mask_prompt=True, #False
                           formatter=formatter,response_marker=response_marker)
 
     # ---- samplers + loaders ----
