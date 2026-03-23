@@ -117,15 +117,15 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --data ~/datasets/qwen-codealpaca \
   --seq_len 512 \
   --epochs 10 \
-  --batch_size 4 \
+  --batch_size 2 \
   --learning_rate 0.000005 \
-  --gradient_accumulation_steps 1 \
+  --gradient_accumulation_steps 10 \
   --sched cosine \
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --log_every_opt_steps 1 \
-  --mini_val_every_opt_steps 50 \
+  --log_every_opt_steps 2 \
+  --mini_val_every_opt_steps 5 \
   --mini_val_0 \
   --json experiments/train-2/qwen_codealpaca_su_aggressive.json \
   --dpa_k 6 \

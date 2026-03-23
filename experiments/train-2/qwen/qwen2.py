@@ -500,6 +500,28 @@ def train(args, straggle, best_model_group):
     val_ds   = SFTDataset(val_examples,   tokenizer, max_seq_len=args.seq_len, mask_prompt=args.mask_prompt, #False
                           formatter=formatter,response_marker=response_marker)
 
+    for name, ds in [("train", train_ds), ("val", val_ds)]:
+        total = len(ds)
+        truncated = 0
+        empty_response = 0
+        response_lengths = []
+        for ids, mask_len in ds.data:
+            orig_len = len(ids)
+            if orig_len >= args.seq_len + 1:
+                truncated += 1
+            resp_tokens = max(0, min(orig_len, args.seq_len + 1) - mask_len)
+            response_lengths.append(resp_tokens)
+            if resp_tokens <= 1:
+                empty_response += 1
+        response_lengths.sort()
+        p50 = response_lengths[len(response_lengths) // 2]
+        p90 = response_lengths[int(len(response_lengths) * 0.9)]
+        p99 = response_lengths[int(len(response_lengths) * 0.99)]
+        print(f"[{now()}] {name}: {total} examples, "
+              f"{truncated} truncated ({100*truncated/total:.1f}%), "
+              f"{empty_response} with <=1 response token ({100*empty_response/total:.1f}%), "
+              f"response token lengths p50={p50} p90={p90} p99={p99}")
+    
     # ---- samplers + loaders ----
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_ds, num_replicas=args.world_size, rank=args.rank, shuffle=True, drop_last=True)
