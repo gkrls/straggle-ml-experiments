@@ -57,7 +57,7 @@ class AverageMeter:
             self.avg = self.sum / max(1.0, self.count)
 
 
-# ------------------------- Alpaca prompt formatting -------------------------
+# ------------------------- Dataset prompt formatting -------------------------
 ALPACA_PROMPT_NO_INPUT = (
     "Below is an instruction that describes a task. "
     "Write a response that appropriately completes the request.\n\n"
@@ -74,31 +74,45 @@ ALPACA_PROMPT_WITH_INPUT = (
 )
 
 def format_alpaca(example):
+
     """Format a single Alpaca example into a single string."""
     if example.get("input", "").strip():
         return ALPACA_PROMPT_WITH_INPUT.format(**example)
     else:
         return ALPACA_PROMPT_NO_INPUT.format(**example)
+    
+METAMATH_PROMPT = (
+    "Below is an instruction that describes a task. "
+    "Write a response that appropriately completes the request.\n\n"
+    "### Instruction:\n{query}\n\n"
+    "### Response: Let's think step by step.\n{response}"
+)
+
+def format_metamath(example):
+    return METAMATH_PROMPT.format(**example)
+
+
 
 
 # ------------------------- dataset -------------------------
-class AlpacaSFTDataset(Dataset):
+class SFTDataset(Dataset):
     """
-    Pre-tokenized Alpaca instruction-tuning dataset.
+    Pre-tokenized Alpaca/Metamath instruction-tuning dataset.
     Each item is a (seq_len+1,) tensor for causal-LM style x=tokens[:-1], y=tokens[1:].
-    Optionally masks the prompt portion of the loss (only trains on response tokens).
     """
-    def __init__(self, examples, tokenizer, max_seq_len=512, mask_prompt=True):
+    def __init__(self, examples, tokenizer, max_seq_len=512, mask_prompt=True, formatter=format_alpaca, response_marker="\n### Response:\n"):
         super().__init__()
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
         self.mask_prompt = mask_prompt
         self.data = []
-        self.response_marker = tokenizer.encode("\n### Response:\n", add_special_tokens=False)
+        # self.response_marker = tokenizer.encode("\n### Response:\n", add_special_tokens=False)
+        self.response_marker = tokenizer.encode(response_marker, add_special_tokens=False)
+
 
         skipped = 0
         for ex in examples:
-            text = format_alpaca(ex)
+            text = formatter(ex)
             ids = tokenizer.encode(text, add_special_tokens=True)
             if tokenizer.eos_token_id is not None and (len(ids) == 0 or ids[-1] != tokenizer.eos_token_id):
                 ids.append(tokenizer.eos_token_id)
@@ -469,8 +483,16 @@ def train(args, straggle, best_model_group):
         val_examples   = raw["validation"]
 
     print(f"[{now()}] Tokenizing {len(train_examples)} train + {len(val_examples)} val examples (max_seq_len={args.seq_len})")
-    train_ds = AlpacaSFTDataset(train_examples, tokenizer, max_seq_len=args.seq_len, mask_prompt=args.mask_prompt)
-    val_ds   = AlpacaSFTDataset(val_examples,   tokenizer, max_seq_len=args.seq_len, mask_prompt=False)
+    
+    if "metamath" in args.dataset.lower():
+        formatter, response_marker = format_metamath, "\n### Response: Let's think step by step.\n"
+    else:
+        formatter, response_marker = format_alpaca, "\n### Response:\n"
+
+    train_ds = SFTDataset(train_examples, tokenizer, max_seq_len=args.seq_len, mask_prompt=args.mask_prompt,
+                          formatter=formatter,response_marker=response_marker)
+    val_ds   = SFTDataset(val_examples,   tokenizer, max_seq_len=args.seq_len, mask_prompt=False,
+                          formatter=formatter,response_marker=response_marker)
 
     # ---- samplers + loaders ----
     train_sampler = torch.utils.data.distributed.DistributedSampler(

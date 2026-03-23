@@ -108,8 +108,8 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --dpa_repin \
   --workers 0 \
   --model_name Qwen/Qwen2.5-0.5B \
-  --dataset tatsu-lab/alpaca \
-  --data ~/datasets/qwen-alpaca \
+  --dataset meta-math/MetaMathQA-40K \
+  --data ~/datasets/qwen-metamath \
   --epochs 6 \
   --batch_size 3 \
   --seq_len 512 \
@@ -119,19 +119,22 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --deterministic \
   --prefetch_factor 4 \
   --gradient_accumulation_steps 1 \
-  --log_every_opt_steps 100 \
+  --log_every_opt_steps 1 \
   --mini_val_every_opt_steps 100 \
   --mini_val_0 \
   --json experiments/train-2/qwen_alpaca_su_aggressive.json \
-  --save_model ~/straggle-ml-experiments/saved_models \
-  --dpa_k 6 \
-  --straggle_points 3 \
-  --straggle_prob 15 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.47 \
-  --straggle_multiply 0.5 2.0 \
+  --dpa_k 6
+  # --save_model ~/straggle-ml-experiments/saved_models \
+  # --straggle_points 3 \
+  # --straggle_prob 15 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 1.47 \
+  # --straggle_multiply 0.5 2.0 \
 
   # --gradient_accumulation_steps 2 \
+
+  # --dataset tatsu-lab/alpaca \
+  # --data ~/datasets/qwen-alpaca \
 
 # Notes:
 # --straggle_amount 1.1 is estimated micro-step time for Qwen 0.5B (batch=4, seq=512, AMP)
