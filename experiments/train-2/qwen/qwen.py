@@ -593,6 +593,18 @@ def train(args, straggle, best_model_group):
     global_step = 0
 
     dist.barrier()  # make sure all ranks start together
+
+    if args.mini_val_0:
+        val0 = validate(model, val_loader, device, args, max_batches=args.mini_val_max_batches)
+        print(f"[{now()}][Pre-train] val_loss={val0['loss']:.4f} val_ppl={val0['ppl']:.2f}", flush=True)
+        log.setdefault("minival", {}).setdefault("0", {})["0000"] = {
+            "global_step": 0,
+            "mini_val_loss": val0["loss"],
+            "mini_val_ppl": val0["ppl"],
+            "max_batches": int(args.mini_val_max_batches),
+        }
+        save_log(args.json, log)
+
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
 
@@ -783,6 +795,7 @@ def main():
     parser.add_argument("--val_max_batches", type=int, default=0, help="Max batches for end-of-epoch val. 0=all.")
     parser.add_argument("--mini_val_every_opt_steps", type=int, default=0, help="Run mini validation every N optimizer steps. 0=off.")
     parser.add_argument("--mini_val_max_batches", type=int, default=64, help="Batches for mini validation.")
+    parser.add_argument("--mini_val_0", action="store_true", help="Run a validation pass before training starts (step 0 baseline)")
 
     parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
 

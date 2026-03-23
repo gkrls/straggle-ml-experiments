@@ -120,15 +120,16 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --prefetch_factor 4 \
   --gradient_accumulation_steps 1 \
   --log_every_opt_steps 100 \
-  --mini_val_every_opt_steps 350 \
+  --mini_val_every_opt_steps 100 \
+  --mini_val_0 \
   --json experiments/train-2/qwen_alpaca_su_aggressive.json \
+  --save_model ~/straggle-ml-experiments/saved_models \
   --dpa_k 6 \
   --straggle_points 3 \
   --straggle_prob 15 \
   --straggle_ranks 1 \
-  --straggle_amount 1.63 \
+  --straggle_amount 1.47 \
   --straggle_multiply 0.5 2.0 \
-  --save_model ~/straggle-ml-experiments
 
   # --gradient_accumulation_steps 2 \
 

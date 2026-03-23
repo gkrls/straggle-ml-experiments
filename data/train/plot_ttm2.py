@@ -442,14 +442,14 @@ if __name__ == "__main__":
     DIR = Path(__file__).parent
 
     # # resnet
-    a.input_a = DIR / "resnet/aggressive/su/"
-    a.input_b = DIR / "resnet/aggressive/sa"
-    a.metric = "val_top5"
-    a.target = 90
-    a.tolerance = 0.01
-    a.rank = "avg"
-    a.exclude_ranks = [1]
-    a.smooth = True
+    # a.input_a = DIR / "resnet/aggressive/su/"
+    # a.input_b = DIR / "resnet/aggressive/sa"
+    # a.metric = "val_top5"
+    # a.target = 90
+    # a.tolerance = 0.01
+    # a.rank = "avg"
+    # a.exclude_ranks = [1]
+    # a.smooth = True
 
     # gpt2
     # a.input_a = DIR / "gpt2/aggressive/su"
