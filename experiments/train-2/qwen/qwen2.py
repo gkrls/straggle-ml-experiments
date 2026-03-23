@@ -106,22 +106,32 @@ class SFTDataset(Dataset):
         self.max_seq_len = max_seq_len
         self.mask_prompt = mask_prompt
         self.data = []
-        # self.response_marker = tokenizer.encode("\n### Response:\n", add_special_tokens=False)
-        self.response_marker = tokenizer.encode(response_marker, add_special_tokens=False)
-
 
         skipped = 0
         for ex in examples:
             text = formatter(ex)
+            
+            # 1. Determine exactly how long the prompt is in tokens to mask it
+            mask_len = 0
+            if self.mask_prompt:
+                split_idx = text.find(response_marker)
+                if split_idx != -1:
+                    prompt_text = text[:split_idx + len(response_marker)]
+                    prompt_ids = tokenizer.encode(prompt_text, add_special_tokens=True)
+                    mask_len = len(prompt_ids)
+
+            # 2. Encode full text
             ids = tokenizer.encode(text, add_special_tokens=True)
             if tokenizer.eos_token_id is not None and (len(ids) == 0 or ids[-1] != tokenizer.eos_token_id):
                 ids.append(tokenizer.eos_token_id)
+            
             if len(ids) < 4:
                 skipped += 1
                 continue
-            # truncate to max_seq_len + 1 (need +1 for shifted targets)
+                
+            # truncate to max_seq_len + 1
             ids = ids[:max_seq_len + 1]
-            self.data.append(ids)
+            self.data.append((ids, mask_len)) # Store mask_len alongside ids
 
         if skipped > 0:
             print(f"[{now()}] AlpacaSFTDataset: skipped {skipped} examples (too short)")
@@ -130,7 +140,8 @@ class SFTDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        ids = self.data[idx]
+        ids, mask_len = self.data[idx]
+        
         # pad to max_seq_len + 1
         pad_len = (self.max_seq_len + 1) - len(ids)
         attention_len = len(ids)
@@ -140,25 +151,18 @@ class SFTDataset(Dataset):
             ids = ids + [pad_id] * pad_len
 
         input_ids = torch.tensor(ids, dtype=torch.long)
-
-        # build labels: -100 for padding (and optionally prompt)
         labels = input_ids.clone()
         labels[attention_len:] = -100  # mask padding
 
-        if self.mask_prompt:
-            # find the response marker in the token ids and mask everything before it
-            resp_start = _find_sublist(ids, self.response_marker)
-            if resp_start >= 0:
-                # mask up to and including the marker
-                mask_end = resp_start + len(self.response_marker)
-                labels[:mask_end] = -100
+        if self.mask_prompt and mask_len > 0:
+            # Mask everything up to the calculated prompt length
+            labels[:min(mask_len, self.max_seq_len + 1)] = -100
 
         return {
             "input_ids": input_ids,
             "labels": labels,
-            "attention_len": attention_len,  # for building attention mask
+            "attention_len": attention_len,
         }
-
 
 def _find_sublist(lst, sub):
     """Find first occurrence of sub in lst. Returns index or -1."""
@@ -210,7 +214,8 @@ def validate(model, loader, device, args, max_batches=0):
         labels         = batch["labels"].to(device, non_blocking=True)
         attention_mask  = batch["attention_mask"].to(device, non_blocking=True)
 
-        with torch.amp.autocast(device_type="cuda", enabled=args.amp):
+        # with torch.amp.autocast(device_type="cuda", enabled=args.amp):
+        with torch.amp.autocast(device_type="cuda", dtype=torch.float16, enabled=args.amp):
             # Same manual loss as training — avoid HF's logits.float() OOM (see training loop comment)
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             logits = outputs.logits
@@ -287,7 +292,8 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
         _sync()
         t0 = time.perf_counter()
         with ctx:
-            with torch.amp.autocast(device_type="cuda", enabled=args.amp):
+            # with torch.amp.autocast(device_type="cuda", enabled=args.amp):
+            with torch.amp.autocast(device_type="cuda", dtype=torch.float16, enabled=args.amp):
                 # NOTE: We do NOT pass labels= to the model. HuggingFace internally does
                 # logits.float() which allocates a full FP32 copy of [B, T, 151936] = ~1.2GB
                 # and OOMs on P100. Instead we compute the loss ourselves using F.cross_entropy
@@ -509,16 +515,30 @@ def train(args, straggle, best_model_group):
                             num_workers=args.workers, pin_memory=True,
                             collate_fn=_collate_fn)
 
+    # # ---- model ----
+    # print(f"[{now()}] Loading model: {args.model_name}")
+    # model = AutoModelForCausalLM.from_pretrained(
+    #     args.model_name, cache_dir=os.environ["TRANSFORMERS_CACHE"],
+    #     trust_remote_code=args.trust_remote_code,
+    #     force_download=args.force_download,
+    #     torch_dtype=torch.float32,  # P100 needs FP32 master weights; AMP handles FP16 forward
+    # ).to(device)
+    # model.config.use_cache = False  # disable KV cache during training
+    # model.gradient_checkpointing_enable()
+
     # ---- model ----
     print(f"[{now()}] Loading model: {args.model_name}")
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name, cache_dir=os.environ["TRANSFORMERS_CACHE"],
         trust_remote_code=args.trust_remote_code,
         force_download=args.force_download,
-        torch_dtype=torch.float32,  # P100 needs FP32 master weights; AMP handles FP16 forward
+        torch_dtype=torch.float32,
     ).to(device)
-    model.config.use_cache = False  # disable KV cache during training
+    model.config.use_cache = False  
     model.gradient_checkpointing_enable()
+    # This prevents gradient checkpointing from breaking autograd
+    if hasattr(model, "enable_input_require_grads"):
+        model.enable_input_require_grads()
 
     # ---- DDP ----
     model = DDP(model, device_ids=[args.local_rank] if device.type == "cuda" else None,

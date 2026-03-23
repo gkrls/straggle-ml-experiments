@@ -94,10 +94,15 @@ NCCL_SOCKET_IFNAME=ens4f0 NCCL_IB_HCA=mlx5_0,mlx5_1 \
 
 set -x
 
-
 # Qwen2.5-0.5B full fine-tuning on Alpaca
 # Memory: ~8GB params/optim + ~6GB activations with AMP, batch=4, seq=512
-sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/qwen.py \
+
+QWEN_15=Qwen/Qwen1.5-0.5B #--learning_rate 0.00002
+QWEN_25=Qwen/Qwen2.5-0.5B #--learning_rate 0.000002
+
+# https://debuggercafe.com/fine-tuning-qwen-1-5-for-coding/
+
+sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/qwen2.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -107,32 +112,46 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --dpa_conf $DPA_CONF \
   --dpa_repin \
   --workers 0 \
-  --model_name Qwen/Qwen2.5-0.5B \
-  --dataset tatsu-lab/alpaca \
-  --data ~/datasets/qwen-alpaca \
-  --epochs 6 \
-  --batch_size 3 \
+  --model_name $QWEN_15 \
+  --dataset sahil2801/CodeAlpaca-20k \
+  --data ~/datasets/qwen-codealpaca \
   --seq_len 512 \
-  --learning_rate 2e-5 \
+  --epochs 10 \
+  --batch_size 4 \
+  --learning_rate 0.000005 \
+  --gradient_accumulation_steps 1 \
   --sched cosine \
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --gradient_accumulation_steps 1 \
-  --log_every_opt_steps 100 \
-  --mini_val_every_opt_steps 150 \
+  --log_every_opt_steps 1 \
+  --mini_val_every_opt_steps 50 \
   --mini_val_0 \
-  --json experiments/train-2/qwen_alpaca_su_aggressive.json \
+  --json experiments/train-2/qwen_codealpaca_su_aggressive.json \
   --dpa_k 6 \
-  --save_model ~/straggle-ml-experiments/saved_models \
-  --straggle_points 3 \
-  --straggle_prob 15 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.47 \
-  --straggle_multiply 0.5 2.0 \
+  --save_model ~/straggle-ml-experiments/saved_models/qwen15
+  # --straggle_points 3 \
+  # --straggle_prob 15 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 1.47 \
+  # --straggle_multiply 0.5 2.0 \
+
+  # --epochs 6 \
+  # --batch_size 3 \
+  # --learning_rate 0.00002 \
+  # --gradient_accumulation_steps 1 \
+
+  # --epochs 10 \
+  # --batch_size 4 \
+  # --learning_rate 0.0001 \
+  # --gradient_accumulation_steps 21 \
+
+  # --epochs 10 \
+  # --batch_size 4 \
+  # --learning_rate 0.000005 \
+  # --gradient_accumulation_steps 1 \
 
   # --gradient_accumulation_steps 2 \
-
 # DATASETS
   # --dataset tatsu-lab/alpaca \
   # --data ~/datasets/qwen-alpaca \
