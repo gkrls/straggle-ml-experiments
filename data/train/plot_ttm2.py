@@ -148,7 +148,7 @@ def aggregate_data(rank_datas, metric, agg, minival_metric=None):
 
 
 def find_fastest_rank(rank_datas, metric, minival_metric=None,
-                      target=None, tolerance=0.0):
+                      target=None, tolerance=0.0, exclude_pre_train=False):
     """Find the rank whose curve crosses the target earliest.
 
     Returns that rank's raw data dict (unmodified).
@@ -161,7 +161,7 @@ def find_fastest_rank(rank_datas, metric, minival_metric=None,
     best_rid = None
 
     for rid in rank_ids:
-        m, v = extract_tta(rank_datas[rid], metric, minival_metric)
+        m, v = extract_tta(rank_datas[rid], metric, minival_metric, exclude_pre_train)
         if target is not None:
             tc = find_crossing(m, v, target, hib, tolerance)
             if tc is not None and (best_time is None or tc < best_time):
@@ -189,7 +189,7 @@ def find_fastest_rank(rank_datas, metric, minival_metric=None,
 
 def load_input(path_or_dir, rank="rank0", exclude_ranks=None,
                metric=None, minival_metric=None,
-               target=None, tolerance=0.0):
+               target=None, tolerance=0.0,exclude_pre_train=False):
     """Load from a file or directory with rank aggregation.
 
     rank: 'rank0', 'rank1', ..., 'avg', 'best', 'fastest'
@@ -221,7 +221,7 @@ def load_input(path_or_dir, rank="rank0", exclude_ranks=None,
 
     if rank == "fastest":
         return find_fastest_rank(rank_datas, metric, minival_metric,
-                                 target, tolerance)
+                                 target, tolerance, exclude_pre_train)
 
     return aggregate_data(rank_datas, metric, rank, minival_metric)
 
@@ -230,7 +230,7 @@ def load_input(path_or_dir, rank="rank0", exclude_ranks=None,
 # Core TTA logic
 # ---------------------------------------------------------------------------
 
-def extract_tta(data, metric, minival_metric=None, max_epochs=None):
+def extract_tta(data, metric, minival_metric=None, max_epochs=None, exclude_pre_train=False):
     epochs = data["epochs"]
     minival = data.get("minival", {})
     cum = 0.0
@@ -245,6 +245,8 @@ def extract_tta(data, metric, minival_metric=None, max_epochs=None):
         steps = ep["steps"]
         if minival_metric and ek in minival:
             for sk in sorted(minival[ek], key=int):
+                if exclude_pre_train and int(sk) == 0:
+                    continue
                 mins.append((start + (int(sk) / steps) * dur) / 60)
                 vals.append(minival[ek][sk][minival_metric])
         cum += dur
@@ -286,19 +288,19 @@ def print_tex_coordinates(series, crossings, labels, target):
 # Plotting
 # ---------------------------------------------------------------------------
 
-def plot_tta(input_a, input_b, metric, labels=("BSP", "SA-INA"),
+def plot_tta(input_a, input_b, metric, labels=("A", "B"),
              minival_metric=None, target=None, output=None, smooth=False,
              title=None, epochs=None, tolerance=0.0,
-             rank="rank0", exclude_ranks=None):
+             rank="rank0", exclude_ranks=None, exclude_pre_train=False):
     import plot_conf
     import matplotlib.pyplot as plt
 
     hib = higher_is_better(metric)
 
     da = load_input(input_a, rank, exclude_ranks, metric, minival_metric,
-                    target, tolerance)
+                    target, tolerance, exclude_pre_train)
     db = load_input(input_b, rank, exclude_ranks, metric, minival_metric,
-                    target, tolerance)
+                    target, tolerance, exclude_pre_train)
 
     if epochs is None:
         na = len(da["epochs"])
@@ -309,7 +311,7 @@ def plot_tta(input_a, input_b, metric, labels=("BSP", "SA-INA"),
     series = []
     crossings = []
     for data, label in [(da, labels[0]), (db, labels[1])]:
-        m, v = extract_tta(data, metric, minival_metric, epochs)
+        m, v = extract_tta(data, metric, minival_metric, epochs, exclude_pre_train)
         series.append((m, v, label))
         crossings.append(find_crossing(m, v, target, hib, tolerance) if target else None)
 
@@ -434,6 +436,7 @@ if __name__ == "__main__":
     p.add_argument("--smooth", action="store_true")
     p.add_argument("--title", default=None)
     p.add_argument("--epochs", type=int, default=None, help="Max epochs to show (auto-matches if unset)")
+    p.add_argument("--exclude-pre-train", action="store_true", help="Ignore minival at step 0 (pre-training eval)")
     p.add_argument("-o", "--output", default=None)
     a = p.parse_args()
 
@@ -463,19 +466,32 @@ if __name__ == "__main__":
     # a.smooth = True
 
     # roberta
-    a.input_a = DIR / "roberta/aggressive/su"
-    a.input_b = DIR / "roberta/aggressive/sa"
-    a.metric = "val_f1"
-    a.target = 80
+    # a.input_a = DIR / "roberta/aggressive/su"
+    # a.input_b = DIR / "roberta/aggressive/sa"
+    # a.metric = "val_f1"
+    # a.target = 80
+    # a.rank = "avg"
+    # a.minival = "mini_val_f1"
+    # a.exclude_ranks = [1]
+    # a.smooth = True
+    # a.tolerance = 0.01
+    # a.epochs = 4
+
+    #qwen
+    a.input_a = DIR / "qwen25-metamath40k/natural/su"
+    a.input_b = DIR / "qwen25-metamath40k/natural/su"
+    a.exclude_pre_train = False
+    a.metric = "val_ppl"
+    a.target = 0.2
     a.rank = "avg"
-    a.minival = "mini_val_f1"
+    a.minival = "mini_val_ppl"
     a.exclude_ranks = [1]
     a.smooth = True
     a.tolerance = 0.01
-    a.epochs = 4
+    a.epochs = 3
 
     plot_tta(a.input_a, a.input_b, a.metric, a.labels, a.minival, a.target,
              a.output, a.smooth, a.title, a.epochs, a.tolerance,
-             a.rank, a.exclude_ranks)
+             a.rank, a.exclude_ranks, exclude_pre_train=a.exclude_pre_train)
     
 

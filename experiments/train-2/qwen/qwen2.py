@@ -402,12 +402,20 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
 
             # ----- mini validation -----
             steps_remaining = steps_per_epoch - step_count
-            if (val_loader and args.mini_val_every_opt_steps
-                    and step_count % args.mini_val_every_opt_steps == 0
-                    and steps_remaining >= args.mini_val_every_opt_steps):
+            do_mini_val = False
+            if val_loader and steps_remaining >= min(args.mini_val_every_opt_steps, args.mini_val_early_every or float('inf')):
+                if (args.mini_val_early_every and global_step <= args.mini_val_early_until and step_count % args.mini_val_early_every == 0):
+                    do_mini_val = True
+                elif (args.mini_val_every_opt_steps and step_count % args.mini_val_every_opt_steps == 0):
+                    do_mini_val = True
+
+            # if (val_loader and args.mini_val_every_opt_steps
+            #         and step_count % args.mini_val_every_opt_steps == 0
+            #         and steps_remaining >= args.mini_val_every_opt_steps):
+            if do_mini_val:
                 val_metrics = validate(model, val_loader, device, args, max_batches=args.mini_val_max_batches)
                 model.train()
-                print(f"[{now()}][MiniVal][Epoch {epoch:03d}][Step {step_count:04d}] "
+                print(f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}][minival] "
                       f"val_loss={val_metrics['loss']:.4f} val_ppl={val_metrics['ppl']:.2f} val_time={val_metrics['time']:.2f}s",
                       flush=True)
                 if log is not None:
@@ -860,9 +868,10 @@ def main():
     parser.add_argument("--mini_val_every_opt_steps", type=int, default=0, help="Run mini validation every N optimizer steps. 0=off.")
     parser.add_argument("--mini_val_max_batches", type=int, default=64, help="Batches for mini validation.")
     parser.add_argument("--mini_val_0", action="store_true", help="Run a validation pass before training starts (step 0 baseline)")
+    parser.add_argument("--mini_val_early_every", type=int, default=0, help="Run mini-val every N steps for the first --mini_val_early_until steps. 0=disabled.")
+    parser.add_argument("--mini_val_early_until", type=int, default=0, help="Step count after which early frequent mini-val stops.")
 
     parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
-
     parser.add_argument("--seq_len", type=int, default=512, help="Max sequence length for tokenization")
 
     # Straggle sim

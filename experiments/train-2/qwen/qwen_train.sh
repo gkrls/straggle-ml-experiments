@@ -112,24 +112,35 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --dpa_conf $DPA_CONF \
   --dpa_repin \
   --workers 0 \
-  --model_name $QWEN_15 \
-  --dataset sahil2801/CodeAlpaca-20k \
-  --data ~/datasets/qwen-codealpaca \
+  --model_name $QWEN_25 \
+  --dataset meta-math/MetaMathQA-40K \
+  --data ~/datasets/qwen-metamath40k \
   --seq_len 512 \
-  --epochs 10 \
+  --epochs 3 \
   --batch_size 2 \
   --learning_rate 0.000005 \
   --gradient_accumulation_steps 10 \
+  --no_mask_prompt \
   --sched cosine \
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --log_every_opt_steps 2 \
-  --mini_val_every_opt_steps 5 \
+  --log_every_opt_steps 20 \
+  --mini_val_early_every 5 \
+  --mini_val_early_until 20 \
+  --mini_val_every_opt_steps 60 \
+  --mini_val_max_batches 0 \
   --mini_val_0 \
-  --json experiments/train-2/qwen_codealpaca_su_aggressive.json \
+  --json experiments/train-2/qwen_metamath_su_aggressive.json \
   --dpa_k 6 \
   --save_model ~/straggle-ml-experiments/saved_models/qwen15
+
+
+  # --epochs 10 \
+  # --batch_size 2 \
+  # --learning_rate 0.000005 \
+  # --gradient_accumulation_steps 10 \
+
   # --straggle_points 3 \
   # --straggle_prob 15 \
   # --straggle_ranks 1 \
@@ -161,6 +172,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
 
   # --dataset meta-math/MetaMathQA-40K \
   # --data ~/datasets/qwen-metamath \
+
 
 # Notes:
 # --straggle_amount 1.1 is estimated micro-step time for Qwen 0.5B (batch=4, seq=512, AMP)
