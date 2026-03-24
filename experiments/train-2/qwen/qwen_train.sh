@@ -115,25 +115,51 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --model_name $QWEN_25 \
   --dataset meta-math/MetaMathQA-40K \
   --data ~/datasets/qwen-metamath40k \
-  --seq_len 512 \
   --epochs 3 \
   --batch_size 2 \
   --learning_rate 0.000005 \
   --gradient_accumulation_steps 10 \
   --no_mask_prompt \
+  --seq_len 512 \
   --sched cosine \
   --amp \
   --deterministic \
   --prefetch_factor 4 \
   --log_every_opt_steps 20 \
+  --log_flush_on_minival \
+  --mini_val_every_opt_steps 60 \
   --mini_val_early_every 5 \
   --mini_val_early_until 20 \
-  --mini_val_every_opt_steps 60 \
   --mini_val_max_batches 0 \
   --mini_val_0 \
-  --json experiments/train-2/qwen_metamath_su_aggressive.json \
-  --dpa_k 6 \
-  --save_model ~/straggle-ml-experiments/saved_models/qwen15
+  --json experiments/train-2/qwen_metamath40k_sa_aggressive_75.json \
+  --dpa_k 5 \
+  --save_model ~/straggle-ml-experiments/saved_models/qwen25-sa-metamath40k \
+  --straggle_points 3 \
+  --straggle_prob 15 \
+  --straggle_ranks 1 \
+  --straggle_amount 0.9 \
+  --straggle_multiply 0.5 2.0
+
+# METAMATH-40k
+  # --model_name $QWEN_25 \
+  # --dataset meta-math/MetaMathQA-40K \
+  # --data ~/datasets/qwen-metamath40k \
+  # --epochs 3 \
+  # --batch_size 2 \
+  # --learning_rate 0.000005 \
+  # --gradient_accumulation_steps 10 \
+  # --no_mask_prompt \
+#METAMATH-FULL
+  # --model_name Qwen/Qwen2.5-0.5B \
+  # --dataset meta-math/MetaMathQA \
+  # --data ~/datasets/qwen-metamath \
+  # --epochs 1 \
+  # --batch_size 2 \
+  # --learning_rate 0.000005 \
+  # --gradient_accumulation_steps 10 \
+  # --no_mask_prompt \
+  # --val_split_pct 1 \
 
 
   # --epochs 10 \
@@ -141,11 +167,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   # --learning_rate 0.000005 \
   # --gradient_accumulation_steps 10 \
 
-  # --straggle_points 3 \
-  # --straggle_prob 15 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 1.47 \
-  # --straggle_multiply 0.5 2.0 \
+
 
   # --epochs 6 \
   # --batch_size 3 \

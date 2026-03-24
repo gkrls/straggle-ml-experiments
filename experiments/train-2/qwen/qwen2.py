@@ -426,6 +426,8 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
                         "mini_val_ppl":   float(val_metrics['ppl']),
                         "max_batches":    int(args.mini_val_max_batches),
                     }
+                    if args.log_flush_on_minival:
+                        save_log(args.json, log)
 
     # ----- epoch summary -----
     _sync()
@@ -836,6 +838,8 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--json", type=str, default="qwen_alpaca.json", help="Path to JSON run log")
     parser.add_argument("--log_every_opt_steps", type=int, default=0, help="Log every N optimizer updates during training. 0=disabled.")
+    parser.add_argument("--log_flush_on_minival", action="store_true", help="Write JSON log to disk after every mini-val and periodic log")
+
 
     parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
     parser.add_argument("--dpa_repin", action="store_true")

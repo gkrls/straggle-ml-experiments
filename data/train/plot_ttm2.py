@@ -478,12 +478,12 @@ if __name__ == "__main__":
     # a.epochs = 4
 
     #qwen
-    a.input_a = DIR / "qwen25-metamath40k/natural/su"
-    a.input_b = DIR / "qwen25-metamath40k/natural/su"
-    a.exclude_pre_train = False
+    a.input_a = DIR / "qwen25-metamath40k/aggressive/su"
+    a.input_b = DIR / "qwen25-metamath40k/aggressive/sa"
+    a.exclude_pre_train = 1
     a.metric = "val_ppl"
-    a.target = 0.2
-    a.rank = "avg"
+    a.target = 1.3
+    a.rank = "0"
     a.minival = "mini_val_ppl"
     a.exclude_ranks = [1]
     a.smooth = True
