@@ -147,9 +147,9 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/rober
   --prefetch_factor 4 \
   --log_every_opt_steps 100 \
   --mini_val_every_opt_steps 150 \
-  --json experiments/train-2/roberta_su_aggressive.json \
-  --dpa_k 6 \
-  --straggle_points 3 \
+  --json experiments/train-2/roberta_sa_moderate.json \
+  --dpa_k 5 \
+  --straggle_points 1 \
   --straggle_prob 15 \
   --straggle_ranks 1 \
   --straggle_amount 1.3 \

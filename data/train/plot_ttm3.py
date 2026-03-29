@@ -160,16 +160,8 @@ def plot_tta(input_a, input_b, metric, labels=("SU", "SA"),
     da = load_input(input_a, rank, exclude_ranks_a, **kw)
     db = load_input(input_b, rank, exclude_ranks_b, **kw)
 
-    na, nb = len(da["epochs"]), len(db["epochs"])
-    available = min(na, nb)
-    if epochs is None:
-        epochs = available
-        if na != nb:
-            print(f"% WARNING: epoch count mismatch ({labels[0]}={na}, {labels[1]}={nb}), using {epochs}")
-    elif epochs > available:
-        print(f"% WARNING: requested {epochs} epochs but only {available} available "
-              f"({labels[0]}={na}, {labels[1]}={nb}), using {available}")
-        epochs = available
+    if epochs is None and len(da["epochs"]) != len(db["epochs"]):
+        epochs = min(len(da["epochs"]), len(db["epochs"]))
 
     series, crossings = [], []
     for data, label in zip([da, db], labels):
@@ -248,8 +240,8 @@ def plot_tta(input_a, input_b, metric, labels=("SU", "SA"),
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Time-to-accuracy plot")
-    p.add_argument("--input-a",           )
-    p.add_argument("--input-b",           )
+    p.add_argument("--input-a")
+    p.add_argument("--input-b")
     p.add_argument("--metric",            default="val_ppl")
     p.add_argument("--minival",           default=None)
     p.add_argument("--labels",            nargs=2, default=["SU", "SA"])
@@ -272,64 +264,56 @@ if __name__ == "__main__":
 
     # # resnet
     # a.input_a = DIR / "resnet/aggressive/su/"
-    # a.input_b = DIR / "resnet/aggressive-25b/sa"
-    a.input_a = DIR / "resnet/moderate-25b/su/"
-    a.input_b = DIR / "resnet/aggressive-25b/sa"
-    a.metric = "val_top5"
-    a.target = 90
-    a.tolerance = 0.01
-    a.rank = "avg"
-    a.exclude_ranks_a = None
-    a.exclude_ranks_b = [1]
-    a.smooth = True
-    a.epochs=45
-
-    # gpt2
-    # a.input_a = DIR / "gpt2/aggressive/su"
-    # a.input_b = DIR / "gpt2/aggressive/sa"
-    # a.input_a = DIR / "gpt2/moderate/su"
-    # a.input_b = DIR / "gpt2/moderate/sa"
-    # a.metric = "val_ppl"
-    # a.target = 28.00
+    # a.input_b = DIR / "resnet/aggressive/sa"
+    # a.metric = "val_top5"
+    # a.target = 90
     # a.tolerance = 0.01
     # a.rank = "avg"
-    # a.minival = "mini_val_ppl"
     # a.exclude_ranks_a = None
     # a.exclude_ranks_b = [1]
     # a.smooth = True
-    # a.epochs = 6
+
+    # gpt2
+    a.input_a = DIR / "gpt2/moderate/su"
+    a.input_b = DIR / "gpt2/moderate/sa"
+    a.metric = "val_ppl"
+    a.target = 28.00
+    a.tolerance = 0.01
+    a.rank = "best"
+    a.minival = "mini_val_ppl"
+    a.exclude_ranks_a = [1]
+    a.exclude_ranks_b = [1]
+    a.smooth = True
+    a.epochs = 6
 
     # roberta
-    # a.input_a   = DIR/"roberta/aggressive/su"
-    # a.input_b   = DIR/"roberta/aggressive/sa"
-    # a.metric    = "val_f1"
-    # a.target    = 80
-    # a.rank      = "avg"
-    # a.tolerance = 0.01
-    # a.smooth    = True
-    # a.minival   = "mini_val_f1"
-    # a.epochs    = 4 # 8
-    # a.exclude_ranks_a = None,
+    # a.input_a = DIR / "roberta/moderate/su"
+    # a.input_b = DIR / "roberta/moderate/sa"
+    # a.exclude_ranks_a = [1]
     # a.exclude_ranks_b = [1]
+    # a.metric = "val_f1"
+    # a.target = 80
+    # a.rank = "avg"
+    # a.minival = "mini_val_f1"
+    # a.smooth = True
+    # a.tolerance = 0.01
+    # a.epochs = 4
 
     #qwen
-    # a.input_a = DIR / "qwen25-metamath40k/moderate-75/su"
-    # a.input_b = DIR / "qwen25-metamath40k/moderate-75/sa"
     # a.input_a = DIR / "qwen25-metamath40k/aggressive-75/su"
-    # a.input_b = DIR / "qwen25-metamath40k/aggressive-100/sa"
+    # a.input_b = DIR / "qwen25-metamath40k/aggressive-75/sa"
     # a.exclude_pre_train = 0
     # a.metric = "val_ppl"
-    # a.target = 1.3
+    # a.target = 1.30
     # a.rank = "avg"
     # a.minival = "mini_val_ppl"
     # a.exclude_ranks_a = None
     # a.exclude_ranks_b = [1]
     # a.smooth = False
-    # # a.tolerance = 0.1
+    # # a.tolerance = 0.01
     # a.epochs = 3
 
     plot_tta(a.input_a, a.input_b, a.metric, a.labels, a.minival, a.target,
              a.output, a.smooth, a.title, a.epochs, a.tolerance, a.rank,
-             exclude_ranks_a=getattr(a, "exclude_ranks_a", None),
-             exclude_ranks_b=getattr(a, "exclude_ranks_b", None),
+             exclude_ranks_a=a.exclude_ranks_a, exclude_ranks_b=a.exclude_ranks_b,
              exclude_pre_train=a.exclude_pre_train)

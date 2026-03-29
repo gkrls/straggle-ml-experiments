@@ -132,14 +132,14 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --mini_val_early_until 20 \
   --mini_val_max_batches 0 \
   --mini_val_0 \
-  --json experiments/train-2/qwen_metamath40k_sa_aggressive_75.json \
-  --dpa_k 5 \
-  --save_model ~/straggle-ml-experiments/saved_models/qwen25-sa-metamath40k \
-  --straggle_points 3 \
-  --straggle_prob 15 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.9 \
-  --straggle_multiply 0.5 2.0
+  --json experiments/train-2/qwen_metamath40k_sa_moderate_25.json \
+  --dpa_k 6 \
+  --save_model ~/straggle-ml-experiments/saved_models/qwen25-sa-metamath40k
+  # --straggle_points 1 \
+  # --straggle_prob 15 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 0.9 \
+  # --straggle_multiply 0.5 2.0
 
 # METAMATH-40k
   # --model_name $QWEN_25 \

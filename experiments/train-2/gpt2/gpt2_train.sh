@@ -151,7 +151,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --json experiments/train-2/gpt2_su_moderate.json \
+  --json experiments/train-2/gpt2_sa_moderate.json \
   --data ~/datasets/openwebtext/tokenized  \
   --cache_dir ~/datasets/openwebtext/cache \
   --dpa_k 6 \

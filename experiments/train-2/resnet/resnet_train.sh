@@ -126,12 +126,12 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resne
   --deterministic \
   --prefetch_factor 4 \
   --drop_last_val \
-  --json experiments/train-2/resnet_su_aggressive.json \
+  --json experiments/train-2/resnet_su_moderate.json \
   --dpa_k 6 \
-  --straggle_points 3 \
+  --straggle_points 1 \
   --straggle_prob 15 \
   --straggle_ranks 1 \
-  --straggle_amount 0.65 \
+  --straggle_amount 0.6 \
   --straggle_multiply 0.5 2.0
   
 # sudo -E $(which python) experiments/train/resnet.py \

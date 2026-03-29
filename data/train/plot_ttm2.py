@@ -478,17 +478,17 @@ if __name__ == "__main__":
     # a.epochs = 4
 
     #qwen
-    a.input_a = DIR / "qwen25-metamath40k/aggressive/su"
-    a.input_b = DIR / "qwen25-metamath40k/aggressive/sa"
-    a.exclude_pre_train = 1
-    a.metric = "val_ppl"
-    a.target = 1.3
-    a.rank = "0"
-    a.minival = "mini_val_ppl"
-    a.exclude_ranks = [1]
-    a.smooth = True
-    a.tolerance = 0.01
-    a.epochs = 3
+    # a.input_a = DIR / "qwen25-metamath40k/aggressive-75/su"
+    # a.input_b = DIR / "qwen25-metamath40k/aggressive-75/sa"
+    # a.exclude_pre_train = 1
+    # a.metric = "val_loss"
+    # a.target = 1.29
+    # a.rank = "avg"
+    # a.minival = "mini_val_loss"
+    # a.exclude_ranks = [1]
+    # a.smooth = True
+    # a.tolerance = 0.01
+    # a.epochs = 3
 
     plot_tta(a.input_a, a.input_b, a.metric, a.labels, a.minival, a.target,
              a.output, a.smooth, a.title, a.epochs, a.tolerance,

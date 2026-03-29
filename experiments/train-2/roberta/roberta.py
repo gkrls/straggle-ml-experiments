@@ -668,13 +668,14 @@ def setup_ddp(args):
     print(f"[{now()}] DDP setup with backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
 
-    # args.best_model_group = None
-    # args.best_model_active_ranks = None
+    args.best_model_group = None
+    args.best_model_active_ranks = None
     # if args.best_model:
     #     args.best_model_active_ranks = [r for r in range(args.world_size) if r not in args.best_model_ignore]
     #     best_model_group = dist.new_group(ranks=args.best_model_active_ranks, backend="gloo")
     #     print(f"[{now()}] DDP best model selection ENABLED. Ranks considered: {args.best_model_active_ranks}")
     #     return best_model_group
+    return args.best_model_group
 
 
 # ------------------------- main -------------------------
