@@ -327,7 +327,7 @@ def train(args,straggle):
         train_loader.sampler.set_epoch(epoch)
 
         # Train for one epoch and get metrics
-        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler, args)
+        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler, epoch, args)
 
         global_step += len(train_loader)
 
