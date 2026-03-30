@@ -226,7 +226,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
         step_time.update(time.perf_counter() - step_start, n=1)
 
         step_idx += 1
-        if args.log_interval > 0 and step_idx % args.log_interval == 0:
+        if args.log_every_steps > 0 and step_idx % args.log_every_steps == 0:
             print(
                 f"[{now()}][Epoch {epoch:03d}][Step {step_idx}] "
                 f"step_time avg={step_time.avg:.4f} min={step_time.min:.4f} max={step_time.max:.4f} "
@@ -505,6 +505,8 @@ def main():
 
     parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
     parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
+    parser.add_argument("--log_every_steps", type=int, default=0, help="Print step stats every N steps (0=off)")
+
 
     # Straggle
     def csv_ints(s: str) -> list[int]:
