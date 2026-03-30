@@ -128,12 +128,12 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resne
   --drop_last_val \
   --json experiments/train-2/resnet_nat_50steps.json \
   --log_every_steps 50 \
-  --dpa_k 6
-  # --straggle_points 3 \
-  # --straggle_prob 15 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 0.6 \
-  # --straggle_multiply 0.5 2.0
+  --dpa_k 6 \
+  --straggle_points 3 \
+  --straggle_prob 1 \
+  --straggle_ranks 1 \
+  --straggle_amount 0.6 \
+  --straggle_multiply 0.5 2.0
   
 # sudo -E $(which python) experiments/train/resnet.py \
 #   --rank "$RANK" \

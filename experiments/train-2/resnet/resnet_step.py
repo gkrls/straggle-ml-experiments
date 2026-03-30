@@ -232,6 +232,10 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
                 f"step_time avg={step_time.avg:.4f} min={step_time.min:.4f} max={step_time.max:.4f} "
                 f"fwd avg={fwd_time.avg:.4f} bwd avg={bwd_time.avg:.4f}",
                 flush=True)
+            step_time.reset()
+            data_time.reset()
+            fwd_time.reset()
+            bwd_time.reset()
 
         step_start = time.perf_counter()
 
