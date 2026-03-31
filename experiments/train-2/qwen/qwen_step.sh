@@ -102,6 +102,10 @@ QWEN_25=Qwen/Qwen2.5-0.5B #--learning_rate 0.000002
 
 # https://debuggercafe.com/fine-tuning-qwen-1-5-for-coding/
 
+# --mini_val_every_opt_steps 60 \
+# --mini_val_early_every 5 \
+# --mini_val_early_until 20 \
+
 sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/qwen_step.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
@@ -125,21 +129,18 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --log_every_opt_steps 20 \
+  --log_every_opt_steps 2 \
   --log_flush_on_minival \
-  --mini_val_every_opt_steps 60 \
-  --mini_val_early_every 5 \
-  --mini_val_early_until 20 \
   --mini_val_max_batches 0 \
   --mini_val_0 \
   --json experiments/train-2/qwen_metamath40k_sa_aggressive_50.json \
   --save_model ~/straggle-ml-experiments/saved_models/qwen25-sa-metamath40k \
-  --dpa_k 6
-  # --straggle_points 3 \
-  # --straggle_prob 15 \
-  # --straggle_ranks 1 \
-  # --straggle_amount 0.9 \
-  # --straggle_multiply 0.5 2.0
+  --dpa_k 6 \
+  --straggle_points 3 \
+  --straggle_prob 20 \
+  --straggle_ranks 1 \
+  --straggle_amount 0.9 \
+  --straggle_multiply 0.5 2.0
 
 # METAMATH-40k
   # --model_name $QWEN_25 \

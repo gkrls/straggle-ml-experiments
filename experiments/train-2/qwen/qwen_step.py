@@ -265,7 +265,12 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
     w_start = time.perf_counter()
     w_step_time = 0.0
     w_step_count = 0
+    w_step_time_min, w_step_time_max = float("inf"), 0.0
     w_micro_time = 0.0
+    w_micro_count = 0
+    w_micro_time_min, w_micro_time_max = float("inf"), 0.0
+    w_fwd_time = 0.0
+    w_bwd_time = 0.0
     w_tokens = 0
     w_loss_sum = 0.0
     w_token_count = 0
@@ -292,17 +297,7 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
         _sync()
         t0 = time.perf_counter()
         with ctx:
-            # with torch.amp.autocast(device_type="cuda", enabled=args.amp):
             with torch.amp.autocast(device_type="cuda", dtype=torch.float16, enabled=args.amp):
-                # NOTE: We do NOT pass labels= to the model. HuggingFace internally does
-                # logits.float() which allocates a full FP32 copy of [B, T, 151936] = ~1.2GB
-                # and OOMs on P100. Instead we compute the loss ourselves using F.cross_entropy
-                # which handles FP16 inputs without that copy.
-                #
-                # The shift below is equivalent to what GPT-2 does with x=batch[:,:-1], y=batch[:,1:]
-                # but HF models expect the full sequence as input, so we shift the output instead.
-                # Given tokens [A,B,C,D,E]: model predicts at each position, then we align
-                # predictions [A→?,B→?,C→?,D→?] with targets [B,C,D,E]. Same next-token loss.
                 outputs = model(input_ids=input_ids, attention_mask=attention_mask)
                 logits = outputs.logits
                 shift_logits = logits[:, :-1, :].contiguous().view(-1, logits.size(-1))
@@ -310,6 +305,7 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
                 loss_full = F.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
                 loss = loss_full / GA
             _sync()
+            t1 = time.perf_counter()
             if scaler is not None and scaler.is_enabled():
                 scaler.scale(loss).backward()
             else:
@@ -330,9 +326,15 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
         micros_in_step += 1
 
         micro_time += micro_dt
-        w_micro_time += micro_dt
         micro_time_min = min(micro_time_min, micro_dt)
         micro_time_max = max(micro_time_max, micro_dt)
+
+        w_micro_time += micro_dt
+        w_micro_count += 1
+        w_micro_time_min = min(w_micro_time_min, micro_dt)
+        w_micro_time_max = max(w_micro_time_max, micro_dt)
+        w_fwd_time += (t1 - t0)
+        w_bwd_time += (t2 - t1)
 
         # ----- finish GA -> optimizer -----
         if is_last_micro:
@@ -354,10 +356,13 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
             global_step = global_step_start + step_count
 
             step_time += step_dt
-            w_step_time += step_dt
-            w_step_count += 1
             step_time_min = min(step_time_min, step_dt)
             step_time_max = max(step_time_max, step_dt)
+
+            w_step_time += step_dt
+            w_step_count += 1
+            w_step_time_min = min(w_step_time_min, step_dt)
+            w_step_time_max = max(w_step_time_max, step_dt)
 
             micros_in_step = 0
 
@@ -369,36 +374,46 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
                 train_ppl = float(np.exp(np.clip(train_loss, 0, 20))) if math.isfinite(train_loss) else float("nan")
 
                 step_time_win = w_step_time / max(1, w_step_count)
-                micro_time_win = w_micro_time / max(1, w_step_count * GA)
+                micro_time_win = w_micro_time / max(1, w_micro_count)
+                fwd_avg = w_fwd_time / max(1, w_micro_count)
+                bwd_avg = w_bwd_time / max(1, w_micro_count)
                 tok_per_s = w_tokens / elapsed
                 lr = optimizer.param_groups[0]["lr"]
 
                 print(f"[{now()}][Epoch {epoch:03d}][Step {step_count:04d}/{steps_per_epoch}] global_step={global_step} "
                       f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
-                      f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
-                      f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s", flush=True)
+                      f"step avg={step_time_win:.3f}s min={w_step_time_min:.3f} max={w_step_time_max:.3f} "
+                      f"micro avg={micro_time_win:.3f}s min={w_micro_time_min:.3f} max={w_micro_time_max:.3f} "
+                      f"fwd={fwd_avg:.3f}s bwd={bwd_avg:.3f}s "
+                      f"tp={tok_per_s:.0f} tok/s", flush=True)
 
                 if log is not None:
                     ep = log.setdefault("updates", {}).setdefault(str(epoch), {})
                     ep[f"{step_count:04d}"] = {
-                        "global_step": int(global_step),
-                        "train_loss":  float(train_loss),
-                        "train_ppl":   float(train_ppl),
-                        "lr":          float(lr),
-                        "step_time":       float(step_time_win),
-                        "micro_step_time": float(micro_time_win),
-                        "throughput":      float(tok_per_s),
-                        "tokens":          int(w_tokens),
+                        "global_step":         int(global_step),
+                        "train_loss":          float(train_loss),
+                        "train_ppl":           float(train_ppl),
+                        "lr":                  float(lr),
+                        "step_time":           float(step_time_win),
+                        "step_time_min":       float(w_step_time_min),
+                        "step_time_max":       float(w_step_time_max),
+                        "micro_step_time":     float(micro_time_win),
+                        "micro_step_time_min": float(w_micro_time_min),
+                        "micro_step_time_max": float(w_micro_time_max),
+                        "fwd_time":            float(fwd_avg),
+                        "bwd_time":            float(bwd_avg),
+                        "throughput":          float(tok_per_s),
+                        "tokens":              int(w_tokens),
                     }
 
                 # reset window
                 w_start = time.perf_counter()
-                w_step_time = 0.0
-                w_step_count = 0
-                w_micro_time = 0.0
-                w_tokens = 0
-                w_loss_sum = 0.0
-                w_token_count = 0
+                w_step_time = 0.0; w_step_count = 0
+                w_step_time_min, w_step_time_max = float("inf"), 0.0
+                w_micro_time = 0.0; w_micro_count = 0
+                w_micro_time_min, w_micro_time_max = float("inf"), 0.0
+                w_fwd_time = 0.0; w_bwd_time = 0.0
+                w_tokens = 0; w_loss_sum = 0.0; w_token_count = 0
 
             # ----- mini validation -----
             steps_remaining = steps_per_epoch - step_count
@@ -409,9 +424,6 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
                 elif (args.mini_val_every_opt_steps and step_count % args.mini_val_every_opt_steps == 0):
                     do_mini_val = True
 
-            # if (val_loader and args.mini_val_every_opt_steps
-            #         and step_count % args.mini_val_every_opt_steps == 0
-            #         and steps_remaining >= args.mini_val_every_opt_steps):
             if do_mini_val:
                 val_metrics = validate(model, val_loader, device, args, max_batches=args.mini_val_max_batches)
                 model.train()
@@ -458,8 +470,6 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
 
         "throughput": float(tok_per_s),
     }
-
-
 # ------------------------- training driver -------------------------
 def train(args, straggle, best_model_group):
     device = torch.device(args.device)
