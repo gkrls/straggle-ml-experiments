@@ -54,6 +54,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
+        -DDPA_TORCH_PINNEDPOOL_PRETOUCH=ON \
         -DDPA_TORCH_WORKSTEALING=ON ..
   make -j4 install
 
@@ -132,7 +133,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/rober
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --backend $BACKEND \
+  --backend dpa_dpdk \
   --dpa_conf $DPA_CONF \
   --dpa_repin \
   --data ~/datasets/squad_v2 \
@@ -148,9 +149,9 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/rober
   --log_every_opt_steps 10 \
   --mini_val_every_opt_steps 150 \
   --json experiments/train-2/roberta_sa_moderate.json \
-  --dpa_k 5 \
-  --straggle_points 3 \
-  --straggle_prob 20 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.3 \
-  --straggle_multiply 0.5 2.0
+  --dpa_k 6 #\
+  # --straggle_points 3 \
+  # --straggle_prob 20 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 1.3 \
+  # --straggle_multiply 0.5 2.0

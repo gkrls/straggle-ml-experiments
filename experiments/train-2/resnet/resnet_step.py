@@ -426,9 +426,9 @@ def setup_ddp(args):
     os.environ.setdefault("NCCL_P2P_DISABLE", "1")  # P100 P2P is limited
     os.environ.setdefault("NCCL_TREE_THRESHOLD", "0")  # Force ring for stability
     os.environ.setdefault("NCCL_IB_DISABLE", "0")  # Enable IB if available on 100G
-    os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
-    os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
-    os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
+    # os.environ.setdefault("NCCL_BUFFSIZE", "8388608")
+    # os.environ.setdefault("NCCL_SOCKET_NTHREADS", "4")  # More NCCL threads
+    # os.environ.setdefault("NCCL_NSOCKS_PERTHREAD", "4")
 
     # init_method = f"tcp://{args.master_addr}:{args.master_port}" # "env://"
     init_method="env://"

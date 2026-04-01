@@ -54,6 +54,7 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
+        -DDPA_TORCH_PINNEDPOOL_PRETOUCH=ON \
         -DDPA_TORCH_WORKSTEALING=ON ..
   make -j4 install
 
@@ -115,7 +116,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resne
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --backend $BACKEND \
+  --backend dpa_dpdk \
   --dpa_conf $DPA_CONF \
   --dpa_repin \
   --model resnet50 \
@@ -128,12 +129,12 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resne
   --drop_last_val \
   --json experiments/train-2/resnet_nat_50steps.json \
   --log_every_steps 50 \
-  --dpa_k 5 \
-  --straggle_points 3 \
-  --straggle_prob 20 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.6 \
-  --straggle_multiply 0.5 2.0
+  --dpa_k 6
+  # --straggle_points 3 \
+  # --straggle_prob 20 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 0.6 \
+  # --straggle_multiply 0.5 2.0
   
 # sudo -E $(which python) experiments/train/resnet.py \
 #   --rank "$RANK" \
