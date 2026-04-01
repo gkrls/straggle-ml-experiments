@@ -135,7 +135,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --mini_val_0 \
   --json experiments/train-2/qwen_metamath40k_sa_aggressive_50.json \
   --save_model ~/straggle-ml-experiments/saved_models/qwen25-sa-metamath40k \
-  --dpa_k 6 \
+  --dpa_k 5 \
   --straggle_points 3 \
   --straggle_prob 20 \
   --straggle_ranks 1 \
