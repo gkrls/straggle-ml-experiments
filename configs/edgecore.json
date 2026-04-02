@@ -65,7 +65,7 @@
     "drain_queues": true,
     "timeout_us": 1000,
     "timeout_init_scaling": 25.5,
-    "threads": 6,
+    "threads": 8,
     "window":  64,
     "tx_burst": 64,
     "rx_burst": 64,
