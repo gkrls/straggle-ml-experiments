@@ -178,19 +178,24 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
     samples_seen = 0.0
     step_idx = 0
 
-# -------- PROFILER SETUP --------
+    # -------- PROFILER SETUP --------
     prof = None
     if getattr(args, 'torch_profile', False) and epoch == 0:
+        # The built-in handler
         tb_handler = torch.profiler.tensorboard_trace_handler('./log/resnet_profile_tensorboard')
+        
+        # Wrap it so we can print a completion message!
+        def trace_wrapper(p):
+            tb_handler(p)
+            print(f"[{now()}][Profiler] DONE! Saved TensorBoard trace. You can kill the script now.", flush=True)
 
         prof = torch.profiler.profile(
             activities=[
                 torch.profiler.ProfilerActivity.CPU,
                 torch.profiler.ProfilerActivity.CUDA,
             ],
-            # Sensible defaults: skip first 5 steps, warm up for 2, record 5
             schedule=torch.profiler.schedule(wait=5, warmup=2, active=5, repeat=1),
-            on_trace_ready=tb_handler,
+            on_trace_ready=trace_wrapper, # <-- Call the wrapper instead
             record_shapes=True,
             with_stack=True,
             profile_memory=True
