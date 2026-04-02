@@ -178,26 +178,27 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
     samples_seen = 0.0
     step_idx = 0
 
-    # -------- PROFILER SETUP --------
+# -------- PROFILER SETUP --------
     prof = None
     if getattr(args, 'torch_profile', False) and epoch == 0:
-        def trace_handler(p):
-            filename = f"trace_rank_{args.rank}_step_{p.step_num}.json"
-            p.export_chrome_trace(filename)
-            print(f"[{now()}][Profiler] Saved Chrome trace to {filename}", flush=True)
+        tb_handler = torch.profiler.tensorboard_trace_handler('./log/resnet_profile_tensorboard')
 
         prof = torch.profiler.profile(
             activities=[
                 torch.profiler.ProfilerActivity.CPU,
                 torch.profiler.ProfilerActivity.CUDA,
             ],
-            schedule=torch.profiler.schedule(wait=5, warmup=2, active=3, repeat=1),
-            on_trace_ready=trace_handler,
+            # Sensible defaults: skip first 5 steps, warm up for 2, record 5
+            schedule=torch.profiler.schedule(wait=5, warmup=2, active=5, repeat=1),
+            on_trace_ready=tb_handler,
             record_shapes=True,
             with_stack=True,
             profile_memory=True
         )
         prof.start()
+    # --------------------------------
+
+
     # --------------------------------
 
     for images, targets in dataloader:

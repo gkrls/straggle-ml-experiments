@@ -111,7 +111,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resnet/resnet_step.py \
+sudo -E DPA_LOG=INFO DPA_SCHEDULER=ON $(which python) experiments/train-2/resnet/resnet_step.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
@@ -124,13 +124,14 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resne
   --data ~/datasets/imagenet \
   --workers 8 \
   --epochs 92 \
-  --batch_size 16 \
+  --batch_size 32 \
   --deterministic \
   --bucket_cap_mb 200 \
   --prefetch_factor 4 \
   --drop_last_val \
   --json experiments/train-2/resnet_nat_50steps.json \
   --log_every_steps 50 \
+  --torch_profile \
   --dpa_k 6
   # --straggle_points 3 \
   # --straggle_prob 20 \
