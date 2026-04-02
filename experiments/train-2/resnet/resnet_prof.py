@@ -188,7 +188,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
         # Wrap it so we can print a completion message!
         def trace_wrapper(p):
             tb_handler(p)
-            print(f"[{now()}][Profiler] DONE! Saved TensorBoard trace at "{os.path.abspath(trc_file)}". You can kill the script now.", flush=True)
+            print(f"[{now()}][Profiler] DONE! Saved TensorBoard trace at "{os.path.abspath(trc_file)}", flush=True)
 
         prof = torch.profiler.profile(
             activities=[
