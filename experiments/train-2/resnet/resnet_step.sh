@@ -45,13 +45,14 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_PROFILE=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
-        -DDPA_FASTESTK=ON \
+        -DDPA_FASTESTK=OFF \
         -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_FASTESTK_BULK=OFF \
         -DDPA_IMPLICIT_SYN=OFF \
         -DDPA_SYNCHRON_BULK=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
+        -DDPA_DPDK_RE_DISABLE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
         -DDPA_TORCH_PINNEDPOOL_PRETOUCH=ON \
@@ -123,8 +124,9 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resne
   --data ~/datasets/imagenet \
   --workers 8 \
   --epochs 92 \
-  --batch_size 128 \
+  --batch_size 16 \
   --deterministic \
+  --bucket_cap_mb 200 \
   --prefetch_factor 4 \
   --drop_last_val \
   --json experiments/train-2/resnet_nat_50steps.json \

@@ -112,7 +112,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --backend $BACKEND \
+  --backend dpa_dpdk \
   --dpa_conf $DPA_CONF \
   --dpa_repin \
   --workers 0 \
@@ -122,7 +122,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --epochs 3 \
   --batch_size 2 \
   --learning_rate 0.000005 \
-  --gradient_accumulation_steps 10 \
+  --gradient_accumulation_steps 20 \
   --no_mask_prompt \
   --seq_len 512 \
   --sched cosine \
@@ -133,14 +133,15 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --log_flush_on_minival \
   --mini_val_max_batches 0 \
   --mini_val_0 \
+  --batch_size 1 \
   --json experiments/train-2/qwen_metamath40k_sa_aggressive_50.json \
   --save_model ~/straggle-ml-experiments/saved_models/qwen25-sa-metamath40k \
-  --dpa_k 5 \
-  --straggle_points 3 \
-  --straggle_prob 20 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.9 \
-  --straggle_multiply 0.5 2.0
+  --dpa_k 6
+  # --straggle_points 3 \
+  # --straggle_prob 20 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 0.9 \
+  # --straggle_multiply 0.5 2.0
 
 # METAMATH-40k
   # --model_name $QWEN_25 \
