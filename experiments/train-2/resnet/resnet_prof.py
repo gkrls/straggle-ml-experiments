@@ -181,13 +181,14 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
     # -------- PROFILER SETUP --------
     prof = None
     if getattr(args, 'torch_profile', False) and epoch == 0:
+        trc_file="./log/resnet_profile_tensorboard"
         # The built-in handler
-        tb_handler = torch.profiler.tensorboard_trace_handler('./log/resnet_profile_tensorboard')
+        tb_handler = torch.profiler.tensorboard_trace_handler(trc_file)
         
         # Wrap it so we can print a completion message!
         def trace_wrapper(p):
             tb_handler(p)
-            print(f"[{now()}][Profiler] DONE! Saved TensorBoard trace. You can kill the script now.", flush=True)
+            print(f"[{now()}][Profiler] DONE! Saved TensorBoard trace at "{os.path.abspath(trc_file)}". You can kill the script now.", flush=True)
 
         prof = torch.profiler.profile(
             activities=[

@@ -111,7 +111,7 @@ set -x
 
 GDB='gdb -ex run --args'
 
-sudo -E DPA_LOG=INFO DPA_SCHEDULER=ON $(which python) experiments/train-2/resnet/resnet_step.py \
+sudo -E DPA_LOG=INFO DPA_SCHEDULER=ON $(which python) experiments/train-2/resnet/resnet_prof.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
   --iface "$IFACE" \
