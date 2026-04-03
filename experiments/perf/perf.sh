@@ -136,11 +136,11 @@ XXXXL=125000000 # 500MB
 echo "[STRAGGLE AWARE BENCHMARK]"
 sudo -E DPA_LOG=Info DPA_SCHEDULER=OFF $(which python) $PROG \
   --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  -d cpu -t float32 -s $L -w 5 -i 20 --pattern 3 --batch --verify \
-  -b nccl \
-  --dpa_conf $CONF --dpa_pipes 4 --dpa_window 86 --dpa_threads 6 \
-  --dpa_k 6 --dpa_timeout_us 1000 --dpa_timeout_init_scaling 25 \
-  --gloo_socket_ifname $IFACE
+  -d cuda -t float32 -s $L -w 5 -i 20 --pattern 3 --batch --verify \
+  -b dpa_dpdk \
+  --dpa_conf $CONF --dpa_pipes 4 --dpa_window 64 --dpa_threads 6 \
+  --dpa_k 6 --dpa_timeout_us 1000 --dpa_timeout_init_scaling 25
+  # --gloo_socket_ifname $IFACE
   # --dpa_k 5 --dpa_preemptive --dpa_window 64 --dpa_threads 6 --dpa_timeout_us 100 --dpa_profile_skip 4 --dpa_timeout_init_scaling 5 --batch
   # --straggle_rank 1 --straggle_ms 1000 --straggle_num 1 --straggle_start 0 --straggle_mode batch
 #   # --gloo_socket_ifname $IFACE --gloo_num_threads 2

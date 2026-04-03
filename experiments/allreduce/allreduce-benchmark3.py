@@ -66,7 +66,7 @@ def init(args):
             print(f"WARNING: Overriding config.json window {backend.window} -> {args.dpa_window}")
             backend.window = args.dpa_window
         if args.dpa_threads is not None:
-            print(f"WARNING: Overriding config.json window {backend.threads} -> {args.dpa_threads}")
+            print(f"WARNING: Overriding config.json threads {backend.threads} -> {args.dpa_threads}")
             backend.threads = args.dpa_threads
 
         pg_options = dpa.ProcessGroupDPADpdkOptions(device, backend) if dpdk else dpa.ProcessGroupDPASocketOptions(device, backend)

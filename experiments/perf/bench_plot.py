@@ -17,16 +17,17 @@ def avg_gbit(runs):
 
 # Primary bars (full width) — order matters
 PRIMARY = [
+    "dpa-256", "dpa-128", "dpa-64",
     "gloo",
     "nccl-tcp-tree", "nccl-tcp-ring",
     "nccl-rdma-tree", "nccl-rdma-tree-gdr/1",
     "nccl-rdma-ring", "nccl-rdma-ring-gdr/1",
-    "dpa-64", "dpa-128", "dpa-256",
+    
 ]
 # Ceiling markers: base_key -> [(overlay_key, linestyle, label), ...]
 OVERLAYS = {
-    "nccl-rdma-tree-gdr/1": [("nccl-rdma-tree-gdr/4", "--", "4ch"), ("nccl-rdma-tree-gdr/8", ":", "8ch")],
-    "nccl-rdma-ring-gdr/1": [("nccl-rdma-ring-gdr/4", "--", "4ch"), ("nccl-rdma-ring-gdr/8", ":", "8ch")],
+    "nccl-rdma-tree-gdr/1": [("nccl-rdma-tree-gdr/4", "--")],
+    "nccl-rdma-ring-gdr/1": [("nccl-rdma-ring-gdr/4", "--")],
 }
 
 # ==========================================================
@@ -76,15 +77,13 @@ for size, ax, title in [("25", ax1, "25 M elements (100 MB)"), ("100", ax2, "100
     # ceiling markers for GDR channel variants
     for i, k in enumerate(keys):
         if k not in OVERLAYS: continue
-        bx = x[i] - W_MAIN/2  # left edge of bar
-        for ovl_key, ls, label in OVERLAYS[k]:
+        bx = x[i] - W_MAIN/2
+        for ovl_key, ls in OVERLAYS[k]:
             runs = tp.get(ovl_key, {}).get("data", {}).get(size, [])
             if not runs: continue
             m, _ = avg_gbit(runs)
-            ax.hlines(m, bx, bx + W_MAIN, linestyles=ls, colors='#222',
-                      linewidth=1.0, zorder=5)
-            ax.text(bx + W_MAIN + 0.04, m, label, ha='left', va='center',
-                    fontsize=5, color='#444')
+            ax.hlines(m, bx, bx + W_MAIN, linestyles=ls, colors='#8B1A1A',
+                      linewidth=2.0, zorder=5)
 
     ax.set_title(title, fontweight='bold', fontsize=9, pad=8)
     ax.set_ylabel("Throughput (Gbit/s)", fontweight='bold')
@@ -109,10 +108,9 @@ legend_h = [
     Patch(fc='#C4843E', ec='#222', lw=0.5, label='NCCL/TCP'),
     Patch(fc='#5B8373', ec='#222', lw=0.5, label='NCCL/RDMA'),
     Patch(fc='#5A8DB5', ec='#222', lw=0.5, label='DPA (ours)'),
-    mlines.Line2D([], [], color='#222', ls='--', lw=1.0, label='GDR 4ch'),
-    mlines.Line2D([], [], color='#222', ls=':',  lw=1.0, label='GDR 8ch'),
+    mlines.Line2D([], [], color='#8B1A1A', ls='--', lw=2.0, label='GDR 4ch'),
 ]
-fig.legend(handles=legend_h, loc='upper center', ncol=6, frameon=True,
+fig.legend(handles=legend_h, loc='upper center', ncol=5, frameon=True,
            edgecolor='#CCC', fancybox=False, bbox_to_anchor=(0.5, 1.02), fontsize=7)
 
 plt.tight_layout(rect=[0, 0, 1, 0.92])
