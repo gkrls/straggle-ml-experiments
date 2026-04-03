@@ -139,20 +139,40 @@
         "perf": {"iface":"ens4f1","port":4242,"async":true,"drain_queues":true,"timeout_us":1000,"timeout_init_scaling":25.0,"threads":6,"window":90,"tx_burst":64,"rx_burst":64,"rx_pool_size":65536,"rx_pool_cache":512,"tx_pool_size":65536,"tx_pool_cache":512,"rx_ring_size":1024,"tx_ring_size":1024,"tx_interval_us":10,"rx_interval_us":0,"eal_port":"0000:41:00.1","debug_trace_packet":true,"debug_trace_packet_rtx":true  },
         "data": {
           "100": [{"bytes":100000000,"times":[21.8876244],"counts":[20],"time_all":437.76435,"time_unit":"ms","time_mean":21.8876244,"time_std":0.0,"time_min":21.8876244,"time_max":21.8876244,"time_p50":21.8876244,"time_p95":21.8876244,"time_p99":21.8876244,"elem_per_sec":1142197962.7903337,"gbit_per_sec":36.55033480929068}
-                 ]
+                 ,{"bytes":25000000,"times":[3.8628476999999997],"counts":[20],"time_all":77.266212,"time_unit":"ms","time_mean":3.8628476999999997,"time_std":0.0,"time_min":3.8628476999999997,"time_max":3.8628476999999997,"time_p50":3.8628476999999997,"time_p95":3.8628476999999997,"time_p99":3.8628476999999997,"elem_per_sec":1617977327.9697256,"gbit_per_sec":51.77527449503122  }
+              ]
         }
       },
       "dpa-128" : {
-        "conf": {},
+        "conf": {"iface":"ens4f1","port":4242,"async":true,"drain_queues":true,"timeout_us":1000,"timeout_init_scaling":25.0,"threads":8,"window":96,"tx_burst":64,"rx_burst":64,"rx_pool_size":65536,"rx_pool_cache":512,"tx_pool_size":65536,"tx_pool_cache":512,"rx_ring_size":1024,"tx_ring_size":1024,"tx_interval_us":10,"rx_interval_us":0,"eal_port":"0000:41:00.1","debug_trace_packet":true,"debug_trace_packet_rtx":true  },
         "data": {
-          "100": [{"bytes":100000000,"times":[16.12017845],"counts":[20],"time_all":322.415311,"time_unit":"ms","time_mean":16.12017845,"time_std":0.0,"time_min":16.12017845,"time_max":16.12017845,"time_p50":16.12017845,"time_p95":16.12017845,"time_p99":16.12017845,"elem_per_sec":1550851318.2743332,"gbit_per_sec":49.627242184778666  }
-                 ]
+          "100": [{"bytes":25000000,"times":[3.7016018],"counts":[20],"time_all":74.050341,"time_unit":"ms","time_mean":3.7016018,"time_std":0.0,"time_min":3.7016018,"time_max":3.7016018,"time_p50":3.7016018,"time_p95":3.7016018,"time_p99":3.7016018,"elem_per_sec":1688458223.6803536,"gbit_per_sec":54.030663157771315  }
+          ]
         }
       },
       "dpa-256" : {
-        "conf": {},
+        "conf": {"iface":"ens4f1","port":4242,"async":true,"drain_queues":true,"timeout_us":1000,"timeout_init_scaling":25.0,"threads":6,"window":96,"tx_burst":64,"rx_burst":64,"rx_pool_size":65536,"rx_pool_cache":512,"tx_pool_size":65536,"tx_pool_cache":512,"rx_ring_size":1024,"tx_ring_size":1024,"tx_interval_us":10,"rx_interval_us":0,"eal_port":"0000:41:00.1","debug_trace_packet":true,"debug_trace_packet_rtx":true  },
         "data": {
-          "100": [{"bytes":100000000,"times":[13.22887265],"counts":[20],"time_all":264.589145,"time_unit":"ms","time_mean":13.22887265,"time_std":0.0,"time_min":13.22887265,"time_max":13.22887265,"time_p50":13.22887265,"time_p95":13.22887265,"time_p99":13.22887265,"elem_per_sec":1889805780.2378197,"gbit_per_sec":60.47378496761023  }
+          "25" : [{"bytes":25000000,"times":[3.9936982],"counts":[20],"time_all":79.884345,"time_unit":"ms","time_mean":3.9936982,"time_std":0.0,"time_min":3.9936982,"time_max":3.9936982,"time_p50":3.9936982,"time_p95":3.9936982,"time_p99":3.9936982,"elem_per_sec":1564965524.936261,"gbit_per_sec":50.07889679796035  }
+                 ,{"bytes":25000000,"times":[3.99342725],"counts":[20],"time_all":79.879076,"time_unit":"ms","time_mean":3.99342725,"time_std":0.0,"time_min":3.99342725,"time_max":3.99342725,"time_p50":3.99342725,"time_p95":3.99342725,"time_p99":3.99342725,"elem_per_sec":1565071706.2643373,"gbit_per_sec":50.082294600458795  } 
+                 ,{"bytes":25000000,"times":[3.8628476999999997],"counts":[20],"time_all":77.266212,"time_unit":"ms","time_mean":3.8628476999999997,"time_std":0.0,"time_min":3.8628476999999997,"time_max":3.8628476999999997,"time_p50":3.8628476999999997,"time_p95":3.8628476999999997,"time_p99":3.8628476999999997,"elem_per_sec":1617977327.9697256,"gbit_per_sec":51.77527449503122  }
+                ],
+          "100": [{"bytes":100000000,"times":[13.0465761],"counts":[20],"time_all":260.941913,"time_unit":"ms","time_mean":13.0465761,"time_std":0.0,"time_min":13.0465761,"time_max":13.0465761,"time_p50":13.0465761,"time_p95":13.0465761,"time_p99":13.0465761,"elem_per_sec":1916211564.5038857,"gbit_per_sec":61.318770064124344  }
+                 ,{"bytes":100000000,"times":[12.96784795],"counts":[20],"time_all":259.368813,"time_unit":"ms","time_mean":12.96784795,"time_std":0.0,"time_min":12.96784795,"time_max":12.967847950000001,"time_p50":12.967847950000001,"time_p95":12.967847950000001,"time_p99":12.967847950000001,"elem_per_sec":1927844935.9054983,"gbit_per_sec":61.691037948975946  }
+                 ,{"bytes":100000000,"times":[13.04684845],"counts":[20],"time_all":260.948652,"time_unit":"ms","time_mean":13.046848449999999,"time_std":0.0,"time_min":13.046848449999999,"time_max":13.046848449999999,"time_p50":13.046848449999999,"time_p95":13.046848449999999,"time_p99":13.046848449999999,"elem_per_sec":1916171564.0224211,"gbit_per_sec":61.317490048717474  }
+                 ]
+        }
+      },
+      "dpa-256/8": {
+        "conf": {"iface":"ens4f1","port":4242,"async":true,"drain_queues":true,"timeout_us":1000,"timeout_init_scaling":25.0,"threads":8,"window":96,"tx_burst":64,"rx_burst":64,"rx_pool_size":65536,"rx_pool_cache":512,"tx_pool_size":65536,"tx_pool_cache":512,"rx_ring_size":1024,"tx_ring_size":1024,"tx_interval_us":10,"rx_interval_us":0,"eal_port":"0000:41:00.1","debug_trace_packet":true,"debug_trace_packet_rtx":true  },
+        "data": {
+          "25" : [{"bytes":25000000,"times":[3.6925236],"counts":[20],"time_all":73.872394,"time_unit":"ms","time_mean":3.6925236,"time_std":0.0,"time_min":3.6925236,"time_max":3.6925236,"time_p50":3.6925236,"time_p95":3.6925236,"time_p99":3.6925236,"elem_per_sec":1692609358.0011244,"gbit_per_sec":54.16349945603598  }
+                 ,{"bytes":25000000,"times":[3.7650537],"counts":[20],"time_all":75.327976,"time_unit":"ms","time_mean":3.7650537,"time_std":0.0,"time_min":3.7650537,"time_max":3.7650537,"time_p50":3.7650537,"time_p95":3.7650537,"time_p99":3.7650537,"elem_per_sec":1660002883.88981,"gbit_per_sec":53.12009228447392  }
+                 ,{"bytes":25000000,"times":[3.6138958000000003],"counts":[20],"time_all":72.298525,"time_unit":"ms","time_mean":3.6138958000000003,"time_std":0.0,"time_min":3.6138958000000003,"time_max":3.6138958000000003,"time_p50":3.6138958000000003,"time_p95":3.6138958000000003,"time_p99":3.6138958000000003,"elem_per_sec":1729435585.8295636,"gbit_per_sec":55.341938746546035  }
+                 ],
+          "100": [{"bytes":100000000,"times":[12.3330248],"counts":[20],"time_all":246.690644,"time_unit":"ms","time_mean":12.3330248,"time_std":0.0,"time_min":12.3330248,"time_max":12.3330248,"time_p50":12.3330248,"time_p95":12.3330248,"time_p99":12.3330248,"elem_per_sec":2027077736.841979,"gbit_per_sec":64.86648757894334  }
+                 ,{"bytes":100000000,"times":[12.1845652],"counts":[20],"time_all":243.719158,"time_unit":"ms","time_mean":12.1845652,"time_std":0.0,"time_min":12.1845652,"time_max":12.1845652,"time_p50":12.1845652,"time_p95":12.1845652,"time_p99":12.1845652,"elem_per_sec":2051776127.3910701,"gbit_per_sec":65.65683607651424  }
+                 ,{"bytes":100000000,"times":[12.4207033],"counts":[20],"time_all":248.439113,"time_unit":"ms","time_mean":12.4207033,"time_std":0.0,"time_min":12.4207033,"time_max":12.4207033,"time_p50":12.4207033,"time_p95":12.4207033,"time_p99":12.4207033,"elem_per_sec":2012768471.8143137,"gbit_per_sec":64.40859109805804  } 
                  ]
         }
       }

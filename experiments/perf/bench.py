@@ -66,7 +66,7 @@ def init(args):
             print(f"WARNING: Overriding config.json window {backend.window} -> {args.dpa_window}")
             backend.window = args.dpa_window
         if args.dpa_threads is not None:
-            print(f"WARNING: Overriding config.json window {backend.threads} -> {args.dpa_threads}")
+            print(f"WARNING: Overriding config.json threads {backend.threads} -> {args.dpa_threads}")
             backend.threads = args.dpa_threads
 
         pg_options = dpa.ProcessGroupDPADpdkOptions(device, backend) if dpdk else dpa.ProcessGroupDPASocketOptions(device, backend)
@@ -211,6 +211,8 @@ def benchmark(args):
         for j in jobs: j.wait()
         torch.cuda.synchronize()
     # Normal
+    time.sleep(0.1)  # 50ms gap — visible in monitor data
+
     with dpa.DataplaneContext(**dpa_ctx) if args.backend.startswith("dpa") else nullcontext():
         jobs = []
         times = []
