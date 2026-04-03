@@ -1,0 +1,44 @@
+
+
+
+
+[2026-04-02 18:18:20][Epoch 000][Step 50] step_time avg=0.1986 min=0.1723 max=1.4478 fwd avg=0.0185 bwd avg=0.0429
+[2026-04-02 18:18:28][Epoch 000][Step 100] step_time avg=0.1727 min=0.1722 max=0.1733 fwd avg=0.0079 bwd avg=0.0383
+[2026-04-02 18:18:37][Epoch 000][Step 150] step_time avg=0.1726 min=0.1724 max=0.1732 fwd avg=0.0078 bwd avg=0.0384
+[2026-04-02 18:18:46][Epoch 000][Step 200] step_time avg=0.1727 min=0.1723 max=0.1731 fwd avg=0.0076 bwd avg=0.0386
+[2026-04-02 18:18:54][Epoch 000][Step 250] step_time avg=0.1727 min=0.1724 max=0.1731 fwd avg=0.0078 bwd avg=0.0385
+[2026-04-02 18:19:03][Epoch 000][Step 300] step_time avg=0.1726 min=0.1724 max=0.1733 fwd avg=0.0078 bwd avg=0.0385
+[2026-04-02 18:19:11][Epoch 000][Step 350] step_time avg=0.1727 min=0.1723 max=0.1733 fwd avg=0.0079 bwd avg=0.0385
+[2026-04-02 18:19:20][Epoch 000][Step 400] step_time avg=0.1727 min=0.1724 max=0.1731 fwd avg=0.0078 bwd avg=0.0385
+[2026-04-02 18:19:29][Epoch 000][Step 450] step_time avg=0.1726 min=0.1722 max=0.1732 fwd avg=0.0077 bwd avg=0.0386
+[2026-04-02 18:19:37][Epoch 000][Step 500] step_time avg=0.1727 min=0.1723 max=0.1730 fwd avg=0.0079 bwd avg=0.0385
+[2026-04-02 18:19:46][Epoch 000][Step 550] step_time avg=0.1727 min=0.1724 max=0.1734 fwd avg=0.0078 bwd avg=0.0385
+[2026-04-02 18:19:55][Epoch 000][Step 600] step_time avg=0.1727 min=0.1724 max=0.1730 fwd avg=0.0078 bwd avg=0.0385
+[2026-04-02 18:20:03][Epoch 000][Step 650] step_time avg=0.1727 min=0.1722 max=0.1734 fwd avg=0.0075 bwd avg=0.0387
+[2026-04-02 18:20:12][Epoch 000][Step 700] step_time avg=0.1727 min=0.1722 max=0.1731 fwd avg=0.0077 bwd avg=0.0386
+[2026-04-02 18:20:21][Epoch 000][Step 750] step_time avg=0.1726 min=0.1722 max=0.1730 fwd avg=0.0078 bwd avg=0.0385
+[2026-04-02 18:20:29][Epoch 000][Step 800] step_time avg=0.1727 min=0.1723 max=0.1732 fwd avg=0.0079 bwd avg=0.0384
+
+
+[2026-04-02 18:15:41][Epoch 000][Step  50] step_time avg=0.2013 min=0.1750 max=1.4287 fwd avg=0.0180 bwd avg=0.1698
+[2026-04-02 18:15:50][Epoch 000][Step 100] step_time avg=0.1762 min=0.1753 max=0.1776 fwd avg=0.0079 bwd avg=0.1644
+[2026-04-02 18:15:59][Epoch 000][Step 150] step_time avg=0.1763 min=0.1753 max=0.1776 fwd avg=0.0079 bwd avg=0.1645
+[2026-04-02 18:16:08][Epoch 000][Step 200] step_time avg=0.1761 min=0.1750 max=0.1775 fwd avg=0.0079 bwd avg=0.1643
+[2026-04-02 18:16:17][Epoch 000][Step 250] step_time avg=0.1760 min=0.1750 max=0.1774 fwd avg=0.0079 bwd avg=0.1641
+[2026-04-02 18:16:25][Epoch 000][Step 300] step_time avg=0.1759 min=0.1750 max=0.1771 fwd avg=0.0079 bwd avg=0.1640
+[2026-04-02 18:16:34][Epoch 000][Step 350] step_time avg=0.1759 min=0.1750 max=0.1772 fwd avg=0.0079 bwd avg=0.1641
+[2026-04-02 18:16:43][Epoch 000][Step 400] step_time avg=0.1758 min=0.1752 max=0.1771 fwd avg=0.0079 bwd avg=0.1640
+
+
+
+NCCL
+[2026-04-02 18:23:25][Epoch 000][Step 50] step_time avg=0.2110 min=0.1848 max=1.4568 fwd avg=0.0188 bwd avg=0.0425
+[2026-04-02 18:23:34][Epoch 000][Step 100] step_time avg=0.1851 min=0.1847 max=0.1856 fwd avg=0.0078 bwd avg=0.0380
+[2026-04-02 18:23:43][Epoch 000][Step 150] step_time avg=0.1851 min=0.1847 max=0.1854 fwd avg=0.0078 bwd avg=0.0379
+[2026-04-02 18:23:53][Epoch 000][Step 200] step_time avg=0.1851 min=0.1847 max=0.1855 fwd avg=0.0078 bwd avg=0.0379
+[2026-04-02 18:24:02][Epoch 000][Step 250] step_time avg=0.1851 min=0.1847 max=0.1855 fwd avg=0.0078 bwd avg=0.0379
+[2026-04-02 18:24:11][Epoch 000][Step 300] step_time avg=0.1850 min=0.1846 max=0.1857 fwd avg=0.0079 bwd avg=0.0379
+[2026-04-02 18:24:20][Epoch 000][Step 350] step_time avg=0.1850 min=0.1846 max=0.1854 fwd avg=0.0079 bwd avg=0.0379
+[2026-04-02 18:24:30][Epoch 000][Step 400] step_time avg=0.1851 min=0.1847 max=0.1856 fwd avg=0.0079 bwd avg=0.0380
+[2026-04-02 18:24:39][Epoch 000][Step 450] step_time avg=0.1851 min=0.1847 max=0.1855 fwd avg=0.0079 bwd avg=0.0380
+[2026-04-02 18:24:48][Epoch 000][Step 500] step_time avg=0.1851 min=0.1846 max=0.1855 fwd avg=0.0079 bwd avg=0.0380

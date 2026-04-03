@@ -386,11 +386,11 @@ if __name__ == "__main__":
     
     # NCCL specific arguments
     parser.add_argument("--nccl_socket_ifname", help="Network interface for NCCL TCP/socket operations (e.g., ens4f1, eth0)")
-    parser.add_argument("--nccl_ib_hca", help="RDMA HCA device for NCCL RDMA mode (e.g., mlx5_0, mlx5_1)")
+    parser.add_argument("--nccl_ib_hca", default=None, help="RDMA HCA device for NCCL RDMA mode (e.g., mlx5_0, mlx5_1)")
     parser.add_argument("--nccl_ib_qps_per_connection", type=int, default=1)
     parser.add_argument("--nccl_debug", action="store_true", help="Enable NCCL debug output")
-    parser.add_argument("--nccl_nsocks_perthread", type=int, default=1)
-    parser.add_argument("--nccl_socket_nthreads", type=int, default=1)
+    parser.add_argument("--nccl_nsocks_perthread", type=int, default=None)
+    parser.add_argument("--nccl_socket_nthreads", type=int, default=None)
     parser.add_argument("--nccl_max_channels", type=int, default=None)
     parser.add_argument("--nccl_buffsize", type=int, default=None)
     
@@ -430,7 +430,7 @@ if __name__ == "__main__":
     # Validation
     if args.dpa_pre and not args.avg: raise RuntimeError("--dpa_pre only available with --avg")
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
-    if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
+    # if args.backend in ["nccl", "nccl_rdma", "nccl_tcp"] and args.device == "cpu": raise ValueError("NCCL backends require --device cuda")
     if args.verify and args.dpa_k not in [0, args.world_size]: raise RuntimeError(f"Cannot reliably verify results with straggle awareness enabled")
     
     init(args)

@@ -1,0 +1,193 @@
+=======================================
+NCCL
+=======================================
+RESNET-NOSTRAGGLE-BA8
+[2026-04-02 02:26:00][Epoch 000][Step 50] step_time avg=0.0872 min=0.0732 max=0.7560 fwd avg=0.0134 bwd avg=0.0115
+[2026-04-02 02:26:04][Epoch 000][Step 100] step_time avg=0.0735 min=0.0732 max=0.0738 fwd avg=0.0073 bwd avg=0.0098
+[2026-04-02 02:26:08][Epoch 000][Step 150] step_time avg=0.0734 min=0.0732 max=0.0738 fwd avg=0.0073 bwd avg=0.0098
+[2026-04-02 02:26:11][Epoch 000][Step 200] step_time avg=0.0734 min=0.0732 max=0.0738 fwd avg=0.0073 bwd avg=0.0098
+[2026-04-02 02:26:15][Epoch 000][Step 250] step_time avg=0.0734 min=0.0732 max=0.0738 fwd avg=0.0073 bwd avg=0.0098
+[2026-04-02 02:26:19][Epoch 000][Step 300] step_time avg=0.0734 min=0.0732 max=0.0738 fwd avg=0.0073 bwd avg=0.0098
+[2026-04-02 02:26:22][Epoch 000][Step 350] step_time avg=0.0735 min=0.0731 max=0.0738 fwd avg=0.0073 bwd avg=0.0099
+RESNET-NOSTRAGGLE-BA16
+[2026-04-02 02:19:46][Epoch 000][Step 50] step_time avg=0.1216 min=0.1038 max=0.9762 fwd avg=0.0167 bwd avg=0.0186
+[2026-04-02 02:19:51][Epoch 000][Step 100] step_time avg=0.1040 min=0.1037 max=0.1043 fwd avg=0.0079 bwd avg=0.0168
+[2026-04-02 02:19:57][Epoch 000][Step 150] step_time avg=0.1040 min=0.1038 max=0.1044 fwd avg=0.0077 bwd avg=0.0170
+RESNET-NOSTRAGGLE-BA32
+[2026-04-02 02:17:45][Epoch 000][Step 50] step_time avg=0.1988 min=0.1723 max=1.4433 fwd avg=0.0183 bwd avg=0.0433
+[2026-04-02 02:17:54][Epoch 000][Step 100] step_time avg=0.1727 min=0.1722 max=0.1732 fwd avg=0.0078 bwd avg=0.0384
+[2026-04-02 02:18:02][Epoch 000][Step 150] step_time avg=0.1727 min=0.1723 max=0.1731 fwd avg=0.0078 bwd avg=0.0385
+[2026-04-02 02:18:11][Epoch 000][Step 200] step_time avg=0.1727 min=0.1723 max=0.1732 fwd avg=0.0077 bwd avg=0.0385
+RESNET-NOSTRAGGLE-BA128
+[2026-04-02 01:22:54][Epoch 000][Step 50] step_time avg=0.6412 min=0.5877 max=3.0588 fwd avg=0.0240 bwd avg=0.1713
+[2026-04-02 01:23:24][Epoch 000][Step 100] step_time avg=0.5883 min=0.5876 max=0.5889 fwd avg=0.0079 bwd avg=0.1619
+[2026-04-02 01:23:53][Epoch 000][Step 150] step_time avg=0.5883 min=0.5878 max=0.5890 fwd avg=0.0079 bwd avg=0.1618
+RESNET-STRAGGLE
+[2026-04-02 01:19:40][Epoch 000][Step 50] step_time avg=0.9634 min=0.5879 max=3.0922 fwd avg=0.0240 bwd avg=0.1697
+[2026-04-02 01:20:30][Epoch 000][Step 100] step_time avg=1.0145 min=0.5879 max=2.2667 fwd avg=0.0082 bwd avg=0.1616
+[2026-04-02 01:21:21][Epoch 000][Step 150] step_time avg=1.0217 min=0.5877 max=2.5400 fwd avg=0.0083 bwd avg=0.1615
+
+QWEN-NOSTRAGGLE-BA1-GA1
+[2026-04-02 02:01:16][Epoch 000][Step 0002/6333] global_step=2 train_loss=0.7199 train_ppl=2.05 lr=0.000000 step avg=0.786s min=0.695 max=0.878 micro avg=0.761s min=0.673 max=0.850 fwd=0.112s bwd=0.649s tp=386 tok/s
+[2026-04-02 02:01:17][Epoch 000][Step 0004/6333] global_step=4 train_loss=0.8430 train_ppl=2.32 lr=0.000000 step avg=0.858s min=0.786 max=0.930 micro avg=0.747s min=0.667 max=0.828 fwd=0.110s bwd=0.637s tp=366 tok/s
+[2026-04-02 02:01:19][Epoch 000][Step 0006/6333] global_step=6 train_loss=0.6983 train_ppl=2.01 lr=0.000000 step avg=0.854s min=0.769 max=0.938 micro avg=0.751s min=0.667 max=0.836 fwd=0.194s bwd=0.557s tp=411 tok/s
+[2026-04-02 02:01:21][Epoch 000][Step 0008/6333] global_step=8 train_loss=0.8499 train_ppl=2.34 lr=0.000000 step avg=0.844s min=0.771 max=0.917 micro avg=0.742s min=0.669 max=0.814 fwd=0.110s bwd=0.632s tp=194 tok/s
+[2026-04-02 02:01:22][Epoch 000][Step 0010/6333] global_step=10 train_loss=0.8868 train_ppl=2.43 lr=0.000001 step avg=0.770s min=0.769 max=0.771 micro avg=0.668s min=0.667 max=0.669 fwd=0.110s bwd=0.558s tp=247 tok/s
+[2026-04-02 02:01:24][Epoch 000][Step 0012/6333] global_step=12 train_loss=0.6748 train_ppl=1.96 lr=0.000001 step avg=0.729s min=0.688 max=0.771 micro avg=0.667s min=0.666 max=0.669 fwd=0.110s bwd=0.558s tp=300 tok/s
+[2026-04-02 02:01:25][Epoch 000][Step 0014/6333] global_step=14 train_loss=0.7785 train_ppl=2.18 lr=0.000001 step avg=0.770s min=0.769 max=0.771 micro avg=0.668s min=0.667 max=0.668 fwd=0.110s bwd=0.558s tp=288 tok/s
+[2026-04-02 02:01:27][Epoch 000][Step 0016/6333] global_step=16 train_loss=0.4894 train_ppl=1.63 lr=0.000001 step avg=0.769s min=0.769 max=0.769 micro avg=0.667s min=0.667 max=0.667 fwd=0.110s bwd=0.557s tp=501 tok/s
+[2026-04-02 02:01:28][Epoch 000][Step 0018/6333] global_step=18 train_loss=0.5843 train_ppl=1.79 lr=0.000001 step avg=0.770s min=0.769 max=0.771 micro avg=0.668s min=0.667 max=0.668 fwd=0.110s bwd=0.558s tp=432 tok/s
+[2026-04-02 02:01:30][Epoch 000][Step 0020/6333] global_step=20 train_loss=0.3896 train_ppl=1.48 lr=0.000001 step avg=0.769s min=0.769 max=0.770 micro avg=0.667s min=0.667 max=0.667 fwd=0.110s bwd=0.557s tp=305 tok/s
+[2026-04-02 02:01:31][Epoch 000][Step 0022/6333] global_step=22 train_loss=0.5382 train_ppl=1.71 lr=0.000001 step avg=0.768s min=0.767 max=0.768 micro avg=0.666s min=0.665 max=0.666 fwd=0.110s bwd=0.556s tp=294 tok/s
+QWEN-NOSTRAGGLE-BA2-GA1
+[2026-04-02 01:44:34][Epoch 000][Step 0002/3167] global_step=2 train_loss=0.7827 train_ppl=2.19 lr=0.000000 step avg=1.148s min=1.092 max=1.204 micro avg=1.074s min=0.973 max=1.175 fwd=0.207s bwd=0.867s tp=539 tok/s
+[2026-04-02 01:44:36][Epoch 000][Step 0004/3167] global_step=4 train_loss=0.7545 train_ppl=2.13 lr=0.000000 step avg=1.033s min=0.995 max=1.072 micro avg=0.971s min=0.970 max=0.973 fwd=0.205s bwd=0.766s tp=498 tok/s
+[2026-04-02 01:44:38][Epoch 000][Step 0006/3167] global_step=6 train_loss=0.8627 train_ppl=2.37 lr=0.000000 step avg=1.073s min=1.073 max=1.074 micro avg=0.971s min=0.971 max=0.972 fwd=0.205s bwd=0.766s tp=381 tok/s
+[2026-04-02 01:44:40][Epoch 000][Step 0008/3167] global_step=8 train_loss=0.7940 train_ppl=2.21 lr=0.000000 step avg=1.074s min=1.073 max=1.075 micro avg=0.972s min=0.971 max=0.972 fwd=0.205s bwd=0.767s tp=565 tok/s
+[2026-04-02 01:44:42][Epoch 000][Step 0010/3167] global_step=10 train_loss=0.7852 train_ppl=2.19 lr=0.000001 step avg=1.073s min=1.072 max=1.073 micro avg=0.970s min=0.970 max=0.971 fwd=0.205s bwd=0.765s tp=528 tok/s
+[2026-04-02 01:44:44][Epoch 000][Step 0012/3167] global_step=12 train_loss=0.8035 train_ppl=2.23 lr=0.000001 step avg=1.073s min=1.072 max=1.073 micro avg=0.970s min=0.970 max=0.971 fwd=0.205s bwd=0.765s tp=409 tok/s
+[2026-04-02 01:44:46][Epoch 000][Step 0014/3167] global_step=14 train_loss=0.6535 train_ppl=1.92 lr=0.000001 step avg=1.072s min=1.070 max=1.073 micro avg=0.969s min=0.968 max=0.971 fwd=0.205s bwd=0.764s tp=507 tok/s
+[2026-04-02 01:44:49][Epoch 000][Step 0016/3167] global_step=16 train_loss=0.4839 train_ppl=1.62 lr=0.000001 step avg=1.072s min=1.071 max=1.073 micro avg=0.970s min=0.969 max=0.971 fwd=0.205s bwd=0.765s tp=564 tok/s
+[2026-04-02 01:44:51][Epoch 000][Step 0018/3167] global_step=18 train_loss=0.3446 train_ppl=1.41 lr=0.000001 step avg=1.073s min=1.072 max=1.074 micro avg=0.971s min=0.970 max=0.972 fwd=0.205s bwd=0.766s tp=491 tok/s
+[2026-04-02 01:44:53][Epoch 000][Step 0020/3167] global_step=20 train_loss=0.4977 train_ppl=1.64 lr=0.000001 step avg=1.073s min=1.071 max=1.074 micro avg=0.971s min=0.969 max=0.972 fwd=0.205s bwd=0.766s tp=513 tok/s
+[2026-04-02 01:44:55][Epoch 000][Step 0022/3167] global_step=22 train_loss=0.3468 train_ppl=1.41 lr=0.000001 step avg=1.072s min=1.072 max=1.072 micro avg=0.969s min=0.969 max=0.970 fwd=0.205s bwd=0.765s tp=618 tok/s
+[2026-04-02 01:44:57][Epoch 000][Step 0024/3167] global_step=24 train_loss=0.2495 train_ppl=1.28 lr=0.000001 step avg=1.073s min=1.072 max=1.073 micro avg=0.970s min=0.970 max=0.971 fwd=0.205s bwd=0.765s tp=543 tok/s
+[2026-04-02 01:44:59][Epoch 000][Step 0026/3167] global_step=26 train_loss=0.3621 train_ppl=1.44 lr=0.000001 step avg=1.072s min=1.071 max=1.073 micro avg=0.970s min=0.969 max=0.971 fwd=0.205s bwd=0.765s tp=354 tok/s
+QWEN-NOSTRAGGLE-BA1-GA10
+[2026-04-02 01:51:16][Epoch 000][Step 0002/633] global_step=2 train_loss=0.8024 train_ppl=2.23 lr=0.000000 step avg=5.303s min=5.292 max=5.314 micro avg=0.519s min=0.473 max=0.858 fwd=0.119s bwd=0.400s tp=512 tok/s
+[2026-04-02 01:51:26][Epoch 000][Step 0004/633] global_step=4 train_loss=0.7903 train_ppl=2.20 lr=0.000000 step avg=5.117s min=5.117 max=5.118 micro avg=0.501s min=0.471 max=0.683 fwd=0.110s bwd=0.391s tp=521 tok/s
+[2026-04-02 01:51:37][Epoch 000][Step 0006/633] global_step=6 train_loss=0.8268 train_ppl=2.29 lr=0.000000 step avg=5.117s min=5.116 max=5.118 micro avg=0.501s min=0.471 max=0.682 fwd=0.110s bwd=0.391s tp=539 tok/s
+QWEN-NOSTRAGGLE-BA2-GA10
+[2026-04-02 01:47:31][Epoch 000][Step 0002/316] global_step=2 train_loss=0.7968 train_ppl=2.22 lr=0.000000 step avg=8.395s min=8.283 max=8.507 micro avg=0.828s min=0.792 max=1.184 fwd=0.205s bwd=0.622s tp=641 tok/s
+[2026-04-02 01:47:47][Epoch 000][Step 0004/316] global_step=4 train_loss=0.8235 train_ppl=2.28 lr=0.000000 step avg=8.275s min=8.272 max=8.279 micro avg=0.817s min=0.787 max=0.987 fwd=0.205s bwd=0.611s tp=658 tok/s
+[2026-04-02 01:48:04][Epoch 000][Step 0006/316] global_step=6 train_loss=0.7719 train_ppl=2.16 lr=0.000000 step avg=8.436s min=8.403 max=8.469 micro avg=0.833s min=0.786 max=1.115 fwd=0.215s bwd=0.618s tp=654 tok/s
+[2026-04-02 01:48:21][Epoch 000][Step 0008/316] global_step=8 train_loss=0.8247 train_ppl=2.28 lr=0.000000 step avg=8.280s min=8.277 max=8.284 micro avg=0.817s min=0.789 max=0.989 fwd=0.205s bwd=0.612s tp=629 tok/s
+QWEN-NOSTRAGGLE-BA1-GA20
+[2026-04-02 03:03:22][Epoch 000][Step 0002/316] global_step=2 train_loss=0.7965 train_ppl=2.22 lr=0.000000 step avg=10.192s min=10.072 max=10.311 micro avg=0.503s min=0.472 max=1.033 fwd=0.114s bwd=0.389s tp=528 tok/s
+[2026-04-02 03:03:42][Epoch 000][Step 0004/316] global_step=4 train_loss=0.8235 train_ppl=2.28 lr=0.000000 step avg=9.929s min=9.918 max=9.940 micro avg=0.491s min=0.429 max=0.713 fwd=0.110s bwd=0.381s tp=549 tok/s
+[2026-04-02 03:04:01][Epoch 000][Step 0006/316] global_step=6 train_loss=0.7718 train_ppl=2.16 lr=0.000000 step avg=9.941s min=9.939 max=9.942 micro avg=0.491s min=0.471 max=0.684 fwd=0.110s bwd=0.382s tp=555 tok/s
+
+
+ROBERTA-NOSTRAGGLE
+[2026-04-02 00:51:58][Epoch 000][Step 0010/687] global_step=10 train_loss=5.9742 lr=0.000000 step avg=1.272s min=1.239 max=1.526 micro avg=1.242s min=1.214 max=1.454 fwd=0.384s bwd=0.858s tp=25 samples/s
+[2026-04-02 00:52:11][Epoch 000][Step 0020/687] global_step=20 train_loss=5.9654 lr=0.000001 step avg=1.244s min=1.240 max=1.247 micro avg=1.219s min=1.215 max=1.222 fwd=0.370s bwd=0.849s tp=26 samples/s
+[2026-04-02 00:52:23][Epoch 000][Step 0030/687] global_step=30 train_loss=5.9368 lr=0.000001 step avg=1.245s min=1.241 max=1.247 micro avg=1.220s min=1.216 max=1.222 fwd=0.371s bwd=0.849s tp=26 samples/s
+[2026-04-02 00:52:36][Epoch 000][Step 0040/687] global_step=40 train_loss=5.9215 lr=0.000001 step avg=1.244s min=1.240 max=1.248 micro avg=1.219s min=1.215 max=1.223 fwd=0.371s bwd=0.848s tp=26 samples/s
+ROBERTA-STRAGGLE
+[2026-04-02 00:55:22][Epoch 000][Step 0010/687] global_step=10 train_loss=5.9742 lr=0.000000 step avg=1.731s min=1.244 max=3.576 micro avg=1.701s min=1.219 max=3.551 fwd=0.387s bwd=1.314s tp=18 samples/s
+[2026-04-02 00:55:39][Epoch 000][Step 0020/687] global_step=20 train_loss=5.9654 lr=0.000001 step avg=1.670s min=1.246 max=3.289 micro avg=1.645s min=1.221 max=3.263 fwd=0.373s bwd=1.273s tp=19 samples/s
+[2026-04-02 00:56:00][Epoch 000][Step 0030/687] global_step=30 train_loss=5.9368 lr=0.000001 step avg=2.117s min=1.241 max=3.671 micro avg=2.092s min=1.216 max=3.646 fwd=0.373s bwd=1.720s tp=15 samples/s
+[2026-04-02 00:56:19][Epoch 000][Step 0040/687] global_step=40 train_loss=5.9215 lr=0.000001 step avg=1.890s min=1.245 max=4.902 micro avg=1.865s min=1.220 max=4.877 fwd=0.372s bwd=1.493s tp=17 samples/s
+[2026-04-02 00:56:37][Epoch 000][Step 0050/687] global_step=50 train_loss=5.8701 lr=0.000001 step avg=1.754s min=1.244 max=3.280 micro avg=1.728s min=1.219 max=3.255 fwd=0.373s bwd=1.355s tp=18 samples/s
+
+
+=======================================
+INA
+=======================================
+RESNET-NOSTRAGGLE-BA8
+[2026-04-02 02:29:37][Epoch 000][Step 50] step_time avg=0.0937 min=0.0780 max=0.8035 fwd avg=0.0134 bwd avg=0.0684
+[2026-04-02 02:29:41][Epoch 000][Step 100] step_time avg=0.0788 min=0.0779 max=0.0795 fwd avg=0.0076 bwd avg=0.0674
+[2026-04-02 02:29:45][Epoch 000][Step 150] step_time avg=0.0788 min=0.0780 max=0.0797 fwd avg=0.0076 bwd avg=0.0673
+[2026-04-02 02:29:49][Epoch 000][Step 200] step_time avg=0.0789 min=0.0779 max=0.0797 fwd avg=0.0076 bwd avg=0.0675
+[2026-04-02 02:29:53][Epoch 000][Step 250] step_time avg=0.0789 min=0.0780 max=0.0797 fwd avg=0.0076 bwd avg=0.0674
+[2026-04-02 02:29:57][Epoch 000][Step 300] step_time avg=0.0787 min=0.0779 max=0.0796 fwd avg=0.0076 bwd avg=0.0672
+[2026-04-02 02:30:01][Epoch 000][Step 350] step_time avg=0.0789 min=0.0780 max=0.0796 fwd avg=0.0076 bwd avg=0.0674
+[2026-04-02 02:30:05][Epoch 000][Step 400] step_time avg=0.0789 min=0.0780 max=0.0794 fwd avg=0.0077 bwd avg=0.0674
+RESNET-NOSTRAGGLE-BA16
+[2026-04-02 02:22:48][Epoch 000][Step 50] step_time avg=0.1285 min=0.1092 max=1.0151 fwd avg=0.0159 bwd avg=0.0995
+[2026-04-02 02:22:54][Epoch 000][Step 100] step_time avg=0.1100 min=0.1091 max=0.1109 fwd avg=0.0076 bwd avg=0.0985
+[2026-04-02 02:22:59][Epoch 000][Step 150] step_time avg=0.1099 min=0.1092 max=0.1105 fwd avg=0.0074 bwd avg=0.0988
+[2026-04-02 02:23:05][Epoch 000][Step 200] step_time avg=0.1099 min=0.1091 max=0.1107 fwd avg=0.0074 bwd avg=0.0989
+---
+[2026-04-02 02:41:42][Epoch 000][Step 50] step_time avg=0.1283 min=0.1086 max=1.0269 fwd avg=0.0165 bwd avg=0.0991
+[2026-04-02 02:41:47][Epoch 000][Step 100] step_time avg=0.1096 min=0.1086 max=0.1102 fwd avg=0.0079 bwd avg=0.0978
+[2026-04-02 02:41:53][Epoch 000][Step 150] step_time avg=0.1095 min=0.1084 max=0.1101 fwd avg=0.0079 bwd avg=0.0977
+[2026-04-02 02:41:58][Epoch 000][Step 200] step_time avg=0.1095 min=0.1085 max=0.1100 fwd avg=0.0079 bwd avg=0.0977
+[2026-04-02 02:42:03][Epoch 000][Step 250] step_time avg=0.1096 min=0.1087 max=0.1101 fwd avg=0.0079 bwd avg=0.0977
+[2026-04-02 02:42:09][Epoch 000][Step 300] step_time avg=0.1096 min=0.1086 max=0.1102 fwd avg=0.0079 bwd avg=0.0979
+[2026-04-02 02:42:14][Epoch 000][Step 350] step_time avg=0.1096 min=0.1089 max=0.1100 fwd avg=0.0079 bwd avg=0.0979
+[2026-04-02 02:42:20][Epoch 000][Step 400] step_time avg=0.1094 min=0.1083 max=0.1102 fwd avg=0.0079 bwd avg=0.0976
+[2026-04-02 02:42:25][Epoch 000][Step 450] step_time avg=0.1094 min=0.1082 max=0.1101 fwd avg=0.0079 bwd avg=0.0975
+RESNET-NOSTRAGGLE-BA32
+[2026-04-02 02:15:36][Epoch 000][Step 50] step_time avg=0.2015 min=0.1758 max=1.3947 fwd avg=0.0185 bwd avg=0.1693
+[2026-04-02 02:15:45][Epoch 000][Step 100] step_time avg=0.1768 min=0.1758 max=0.1777 fwd avg=0.0077 bwd avg=0.1652
+[2026-04-02 02:15:54][Epoch 000][Step 150] step_time avg=0.1767 min=0.1755 max=0.1778 fwd avg=0.0077 bwd avg=0.1651
+[2026-04-02 02:16:02][Epoch 000][Step 200] step_time avg=0.1768 min=0.1760 max=0.1776 fwd avg=0.0077 bwd avg=0.1653
+---
+[2026-04-02 02:53:13][Epoch 000][Step 50] step_time avg=0.2015 min=0.1752 max=1.4522 fwd avg=0.0186 bwd avg=0.1694
+[2026-04-02 02:53:22][Epoch 000][Step 100] step_time avg=0.1758 min=0.1751 max=0.1770 fwd avg=0.0079 bwd avg=0.1639
+[2026-04-02 02:53:30][Epoch 000][Step 150] step_time avg=0.1759 min=0.1750 max=0.1773 fwd avg=0.0080 bwd avg=0.1640
+[2026-04-02 02:53:39][Epoch 000][Step 200] step_time avg=0.1760 min=0.1752 max=0.1772 fwd avg=0.0080 bwd avg=0.1642
+[2026-04-02 02:53:48][Epoch 000][Step 250] step_time avg=0.1759 min=0.1750 max=0.1772 fwd avg=0.0080 bwd avg=0.1640
+
+RESNET-NOSTRAGGLE-BA128
+[2026-04-02 01:26:41][Epoch 000][Step 50] step_time avg=0.6485 min=0.5911 max=3.0755 fwd avg=0.0264 bwd avg=0.6012
+[2026-04-02 01:27:10][Epoch 000][Step 100] step_time avg=0.5923 min=0.5915 max=0.5936 fwd avg=0.0079 bwd avg=0.5804
+[2026-04-02 01:27:40][Epoch 000][Step 150] step_time avg=0.5923 min=0.5916 max=0.5932 fwd avg=0.0080 bwd avg=0.5805
+[2026-04-02 01:28:09][Epoch 000][Step 200] step_time avg=0.5923 min=0.5914 max=0.5933 fwd avg=0.0080 bwd avg=0.5804
+RESNET-STRAGGLE-BA128
+[2026-04-02 01:15:43][Epoch 000][Step 50] step_time avg=0.6940 min=0.6094 max=3.0693 fwd avg=0.0284 bwd avg=0.6446
+[2026-04-02 01:16:15][Epoch 000][Step 100] step_time avg=0.6411 min=0.6402 max=0.6423 fwd avg=0.0081 bwd avg=0.6292
+[2026-04-02 01:16:47][Epoch 000][Step 150] step_time avg=0.6409 min=0.6398 max=0.6423 fwd avg=0.0082 bwd avg=0.6289
+[2026-04-02 01:17:19][Epoch 000][Step 200] step_time avg=0.6411 min=0.6403 max=0.6421 fwd avg=0.0082 bwd avg=0.6290
+
+QWEN-NOSTRAGGLE-BA1-GA1
+[2026-04-02 02:04:16][Epoch 000][Step 0002/6333] global_step=2 train_loss=0.7199 train_ppl=2.05 lr=0.000000 step avg=1.616s min=0.987 max=2.245 micro avg=1.541s min=0.866 max=2.216 fwd=0.160s bwd=1.381s tp=187 tok/s
+[2026-04-02 02:04:18][Epoch 000][Step 0004/6333] global_step=4 train_loss=0.8425 train_ppl=2.32 lr=0.000000 step avg=0.949s min=0.862 max=1.037 micro avg=0.847s min=0.760 max=0.934 fwd=0.110s bwd=0.737s tp=331 tok/s
+[2026-04-02 02:04:20][Epoch 000][Step 0006/6333] global_step=6 train_loss=0.6965 train_ppl=2.01 lr=0.000000 step avg=0.945s min=0.863 max=1.028 micro avg=0.843s min=0.761 max=0.926 fwd=0.192s bwd=0.651s tp=371 tok/s
+[2026-04-02 02:04:22][Epoch 000][Step 0008/6333] global_step=8 train_loss=0.8475 train_ppl=2.33 lr=0.000000 step avg=1.034s min=1.028 max=1.039 micro avg=0.931s min=0.926 max=0.937 fwd=0.110s bwd=0.821s tp=158 tok/s
+[2026-04-02 02:04:24][Epoch 000][Step 0010/6333] global_step=10 train_loss=0.8858 train_ppl=2.42 lr=0.000001 step avg=0.863s min=0.862 max=0.864 micro avg=0.761s min=0.760 max=0.762 fwd=0.110s bwd=0.651s tp=221 tok/s
+[2026-04-02 02:04:25][Epoch 000][Step 0012/6333] global_step=12 train_loss=0.6741 train_ppl=1.96 lr=0.000001 step avg=0.862s min=0.862 max=0.862 micro avg=0.760s min=0.760 max=0.760 fwd=0.110s bwd=0.650s tp=254 tok/s
+[2026-04-02 02:04:27][Epoch 000][Step 0014/6333] global_step=14 train_loss=0.7488 train_ppl=2.11 lr=0.000001 step avg=0.863s min=0.862 max=0.864 micro avg=0.761s min=0.760 max=0.762 fwd=0.110s bwd=0.651s tp=257 tok/s
+[2026-04-02 02:04:29][Epoch 000][Step 0016/6333] global_step=16 train_loss=0.4423 train_ppl=1.56 lr=0.000001 step avg=0.865s min=0.864 max=0.866 micro avg=0.763s min=0.762 max=0.763 fwd=0.110s bwd=0.653s tp=446 tok/s
+[2026-04-02 02:04:30][Epoch 000][Step 0018/6333] global_step=18 train_loss=0.5714 train_ppl=1.77 lr=0.000001 step avg=0.863s min=0.862 max=0.863 micro avg=0.761s min=0.760 max=0.761 fwd=0.110s bwd=0.651s tp=385 tok/s
+[2026-04-02 02:04:32][Epoch 000][Step 0020/6333] global_step=20 train_loss=0.3702 train_ppl=1.45 lr=0.000001 step avg=0.864s min=0.863 max=0.864 micro avg=0.762s min=0.761 max=0.762 fwd=0.110s bwd=0.652s tp=271 tok/s
+[2026-04-02 02:04:34][Epoch 000][Step 0022/6333] global_step=22 train_loss=0.5269 train_ppl=1.69 lr=0.000001 step avg=0.864s min=0.862 max=0.866 micro avg=0.762s min=0.759 max=0.764 fwd=0.110s bwd=0.652s tp=261 tok/s
+[2026-04-02 02:04:36][Epoch 000][Step 0024/6333] global_step=24 train_loss=0.4660 train_ppl=1.59 lr=0.000001 step avg=0.862s min=0.861 max=0.862 micro avg=0.759s min=0.759 max=0.760 fwd=0.110s bwd=0.650s tp=248 tok/s
+[2026-04-02 02:04:37][Epoch 000][Step 0026/6333] global_step=26 train_loss=0.6637 train_ppl=1.94 lr=0.000001 step avg=0.863s min=0.862 max=0.863 micro avg=0.760s min=0.760 max=0.761 fwd=0.110s bwd=0.650s tp=263 tok/s
+
+QWEN-NOSTRAGGLE-BA2-GA1
+[2026-04-02 01:42:02][Epoch 000][Step 0002/3167] global_step=2 train_loss=0.7827 train_ppl=2.19 lr=0.000000 step avg=1.943s min=1.216 max=2.670 micro avg=1.829s min=1.114 max=2.545 fwd=0.208s bwd=1.621s tp=317 tok/s
+[2026-04-02 01:42:04][Epoch 000][Step 0004/3167] global_step=4 train_loss=0.7544 train_ppl=2.13 lr=0.000000 step avg=1.209s min=1.207 max=1.210 micro avg=1.107s min=1.105 max=1.108 fwd=0.205s bwd=0.901s tp=426 tok/s
+[2026-04-02 01:42:07][Epoch 000][Step 0006/3167] global_step=6 train_loss=0.8587 train_ppl=2.36 lr=0.000000 step avg=1.212s min=1.211 max=1.213 micro avg=1.109s min=1.108 max=1.110 fwd=0.205s bwd=0.904s tp=338 tok/s
+[2026-04-02 01:42:09][Epoch 000][Step 0008/3167] global_step=8 train_loss=0.7822 train_ppl=2.19 lr=0.000000 step avg=1.210s min=1.210 max=1.210 micro avg=1.108s min=1.107 max=1.108 fwd=0.205s bwd=0.902s tp=502 tok/s
+[2026-04-02 01:42:12][Epoch 000][Step 0010/3167] global_step=10 train_loss=0.7833 train_ppl=2.19 lr=0.000001 step avg=1.212s min=1.210 max=1.214 micro avg=1.110s min=1.108 max=1.112 fwd=0.205s bwd=0.905s tp=468 tok/s
+[2026-04-02 01:42:14][Epoch 000][Step 0012/3167] global_step=12 train_loss=0.8005 train_ppl=2.23 lr=0.000001 step avg=1.208s min=1.208 max=1.209 micro avg=1.106s min=1.105 max=1.107 fwd=0.205s bwd=0.901s tp=363 tok/s
+[2026-04-02 01:42:17][Epoch 000][Step 0014/3167] global_step=14 train_loss=0.6349 train_ppl=1.89 lr=0.000001 step avg=1.209s min=1.207 max=1.211 micro avg=1.107s min=1.105 max=1.108 fwd=0.205s bwd=0.902s tp=449 tok/s
+[2026-04-02 01:42:19][Epoch 000][Step 0016/3167] global_step=16 train_loss=0.4782 train_ppl=1.61 lr=0.000001 step avg=1.209s min=1.209 max=1.209 micro avg=1.107s min=1.107 max=1.107 fwd=0.205s bwd=0.902s tp=500 tok/s
+QWEN-NOSTRAGGLE-BA1-GA10
+[2026-04-02 01:54:20][Epoch 000][Step 0002/633] global_step=2 train_loss=0.8024 train_ppl=2.23 lr=0.000000 step avg=6.015s min=5.379 max=6.650 micro avg=0.590s min=0.473 max=2.191 fwd=0.118s bwd=0.472s tp=451 tok/s
+[2026-04-02 01:54:30][Epoch 000][Step 0004/633] global_step=4 train_loss=0.7903 train_ppl=2.20 lr=0.000000 step avg=5.211s min=5.211 max=5.211 micro avg=0.511s min=0.471 max=0.779 fwd=0.110s bwd=0.401s tp=511 tok/s
+[2026-04-02 01:54:41][Epoch 000][Step 0006/633] global_step=6 train_loss=0.8268 train_ppl=2.29 lr=0.000000 step avg=5.206s min=5.205 max=5.207 micro avg=0.510s min=0.471 max=0.775 fwd=0.110s bwd=0.400s tp=530 tok/s
+[2026-04-02 01:54:51][Epoch 000][Step 0008/633] global_step=8 train_loss=0.7940 train_ppl=2.21 lr=0.000000 step avg=5.209s min=5.208 max=5.209 micro avg=0.510s min=0.429 max=0.831 fwd=0.110s bwd=0.400s tp=517 tok/s
+[2026-04-02 01:55:02][Epoch 000][Step 0010/633] global_step=10 train_loss=0.7220 train_ppl=2.06 lr=0.000001 step avg=5.217s min=5.207 max=5.228 micro avg=0.511s min=0.471 max=0.796 fwd=0.110s bwd=0.402s tp=524 tok/s
+QWEN-NOSTRAGGLE-BA2-GA10
+[2026-04-02 01:38:26][Epoch 000][Step 0002/316] global_step=2 train_loss=0.7968 train_ppl=2.22 lr=0.000000 step avg=9.092s min=8.409 max=9.776 micro avg=0.897s min=0.791 max=2.463 fwd=0.206s bwd=0.692s tp=592 tok/s
+[2026-04-02 01:38:43][Epoch 000][Step 0004/316] global_step=4 train_loss=0.8235 train_ppl=2.28 lr=0.000000 step avg=8.408s min=8.407 max=8.408 micro avg=0.830s min=0.787 max=1.124 fwd=0.205s bwd=0.625s tp=648 tok/s
+[2026-04-02 01:39:00][Epoch 000][Step 0006/316] global_step=6 train_loss=0.7719 train_ppl=2.16 lr=0.000000 step avg=8.569s min=8.526 max=8.611 micro avg=0.846s min=0.786 max=1.233 fwd=0.215s bwd=0.631s tp=644 tok/s
+[2026-04-02 01:39:17][Epoch 000][Step 0008/316] global_step=8 train_loss=0.8250 train_ppl=2.28 lr=0.000000 step avg=8.411s min=8.409 max=8.412 micro avg=0.830s min=0.787 max=1.126 fwd=0.205s bwd=0.625s tp=619 tok/s
+QWEN-NOSTRAGGLE-BA1-GA20
+[2026-04-02 03:00:35][Epoch 000][Step 0002/316] global_step=2 train_loss=0.7965 train_ppl=2.22 lr=0.000000 step avg=11.124s min=10.332 max=11.915 micro avg=0.550s min=0.473 max=2.624 fwd=0.122s bwd=0.428s tp=484 tok/s
+[2026-04-02 03:00:56][Epoch 000][Step 0004/316] global_step=4 train_loss=0.8235 train_ppl=2.28 lr=0.000000 step avg=10.022s min=10.010 max=10.035 micro avg=0.496s min=0.429 max=0.805 fwd=0.110s bwd=0.386s tp=544 tok/s
+[2026-04-02 03:01:16][Epoch 000][Step 0006/316] global_step=6 train_loss=0.7718 train_ppl=2.16 lr=0.000000 step avg=10.036s min=10.020 max=10.052 micro avg=0.496s min=0.471 max=0.798 fwd=0.110s bwd=0.387s tp=550 tok/s
+
+
+
+ROBERTA-NOSTRAGGLE
+[2026-04-02 01:12:34][Epoch 000][Step 0020/687] global_step=20 train_loss=5.9654 lr=0.000001 step avg=1.280s min=1.278 max=1.283 micro avg=1.256s min=1.254 max=1.258 fwd=0.371s bwd=0.885s tp=25 samples/s
+[2026-04-02 01:12:46][Epoch 000][Step 0030/687] global_step=30 train_loss=5.9368 lr=0.000001 step avg=1.283s min=1.281 max=1.285 micro avg=1.258s min=1.256 max=1.260 fwd=0.372s bwd=0.886s tp=25 samples/s
+[2026-04-02 01:12:59][Epoch 000][Step 0040/687] global_step=40 train_loss=5.9215 lr=0.000001 step avg=1.285s min=1.282 max=1.289 micro avg=1.260s min=1.257 max=1.264 fwd=0.372s bwd=0.887s tp=25 samples/s
+[2026-04-02 01:13:12][Epoch 000][Step 0050/687] global_step=50 train_loss=5.8702 lr=0.000001 step avg=1.286s min=1.284 max=1.290 micro avg=1.261s min=1.259 max=1.265 fwd=0.373s bwd=0.888s tp=25 samples/s
+[2026-04-02 01:13:25][Epoch 000][Step 0060/687] global_step=60 train_loss=5.8010 lr=0.000002 step avg=1.289s min=1.285 max=1.293 micro avg=1.264s min=1.260 max=1.268 fwd=0.375s bwd=0.889s tp=25 samples/s
+ROBERTA-STRAGGLE-SA-OFF
+[2026-04-02 00:58:59][Epoch 000][Step 0010/687] global_step=10 train_loss=5.9742 lr=0.000000 step avg=1.776s min=1.280 max=3.618 micro avg=1.746s min=1.255 max=3.593 fwd=0.386s bwd=1.360s tp=18 samples/s
+[2026-04-02 00:59:16][Epoch 000][Step 0020/687] global_step=20 train_loss=5.9654 lr=0.000001 step avg=1.703s min=1.278 max=3.318 micro avg=1.678s min=1.253 max=3.293 fwd=0.371s bwd=1.307s tp=19 samples/s
+[2026-04-02 00:59:37][Epoch 000][Step 0030/687] global_step=30 train_loss=5.9368 lr=0.000001 step avg=2.151s min=1.278 max=3.702 micro avg=2.126s min=1.253 max=3.677 fwd=0.371s bwd=1.755s tp=15 samples/s
+[2026-04-02 00:59:57][Epoch 000][Step 0040/687] global_step=40 train_loss=5.9215 lr=0.000001 step avg=1.926s min=1.279 max=4.935 micro avg=1.901s min=1.255 max=4.910 fwd=0.372s bwd=1.529s tp=17 samples/s
+[2026-04-02 01:00:15][Epoch 000][Step 0050/687] global_step=50 train_loss=5.8702 lr=0.000001 step avg=1.787s min=1.279 max=3.314 micro avg=1.762s min=1.254 max=3.289 fwd=0.371s bwd=1.391s tp=18 samples/s
+ROBERTA-STRAGGLE-SA-ON
+[2026-04-02 01:02:23][Epoch 000][Step 0010/687] global_step=10 train_loss=5.9742 lr=0.000000 step avg=1.343s min=1.276 max=1.650 micro avg=1.313s min=1.251 max=1.577 fwd=0.387s bwd=0.926s tp=24 samples/s
+[2026-04-02 01:02:36][Epoch 000][Step 0020/687] global_step=20 train_loss=5.9655 lr=0.000001 step avg=1.322s min=1.320 max=1.324 micro avg=1.297s min=1.295 max=1.299 fwd=0.370s bwd=0.927s tp=24 samples/s
+[2026-04-02 01:02:50][Epoch 000][Step 0030/687] global_step=30 train_loss=5.9372 lr=0.000001 step avg=1.323s min=1.321 max=1.326 micro avg=1.298s min=1.296 max=1.301 fwd=0.371s bwd=0.927s tp=24 samples/s
+[2026-04-02 01:03:03][Epoch 000][Step 0040/687] global_step=40 train_loss=5.9224 lr=0.000001 step avg=1.323s min=1.320 max=1.326 micro avg=1.298s min=1.295 max=1.302 fwd=0.371s bwd=0.927s tp=24 samples/s
+[2026-04-02 01:03:16][Epoch 000][Step 0050/687] global_step=50 train_loss=5.8726 lr=0.000001 step avg=1.324s min=1.321 max=1.326 micro avg=1.299s min=1.296 max=1.301 fwd=0.371s bwd=0.927s tp=24 samples/s

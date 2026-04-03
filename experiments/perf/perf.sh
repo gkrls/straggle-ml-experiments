@@ -32,13 +32,13 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
   mkdir -p $HOME/straggle-ml/build
   cd $HOME/straggle-ml/build
   cmake -DCMAKE_INSTALL_MESSAGE=LAZY \
-        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_BUILD_TYPE=Release \
         -DDPA_TRACE=OFF \
         -DDPA_DEVELOP=OFF \
         -DDPA_SWITCH=OFF \
         -DDPA_AVX=ON \
         -DDPA_PROFILE=OFF \
-        -DDPA_IMPLICIT_SYN=ON \
+        -DDPA_IMPLICIT_SYN=OFF \
         -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_FASTESTK_BULK=OFF \
         -DDPA_SYNCHRON_BULK=OFF \
@@ -48,7 +48,8 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
         -DDPA_TORCH_PINNEDPOOL_PRETOUCH=OFF \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PIPELINE=OFF \
+        -DDPA_TORCH_WORKSTEAL=ON ..
   make -j4 install
 
   # Install the plugin
@@ -87,18 +88,60 @@ GDB="gdb --args"
 
 LOGFILE="allreduce_bench_$(date +%Y%m%d_%H%M%S).log"
 
+
+
+# NCCL STUFF
+export NCCL_SOCKET_IFNAME=$IFACE
+export NCCL_IB_HCA=mlx5_1
+export NCCL_DEBUG=INFO
+export NCCL_DEBUG_SUBSYS=NET
+
+# GDR  # export NCCL_IB_PCI_RELAXED_ORDERING=1
+# export NCCL_NET_GDR_LEVEL=SYS  # Tell NCCL that crossing the internal CPU fabric (SYS level) is okay
+# export NCCL_P2P_LEVEL=SYS
+# export NCCL_P2P_DISABLE=0      # Ensure Peer-to-Peer is not restricted
+# export NCCL_IB_GDR_FLUSH=1     # Recommended for Mellanox + GDR performance
+
+
+# export NCCL_PROTO=LL           # LL, LL128, Simple
+export NCCL_ALGO=Ring
+# export NCCL_MIN_NCHANNELS=8
+
+
+sudo modprobe nvidia_peermem 2>/dev/null || true
+
+# DPA STUFF
+export DPA_TORCH_PIPELINE_CHUNKS=4
+W_TP_2=192
+W_TP_4=96
+W_TP_6=64
+W_LA_6=128
+W_LA_8=64
+
+XXXXXXXS=25000  # 0.10MB
+XXXXXXS=62500   # 0.25MB
+XXXXXS=125000   # 0.50MB
+XXXXS=250000    # 1MB
+XXXS=625000     # 2.5MB
+XXS=1250000     # 5.0MB
+XS=2500000      # 10MB
+S=6250000       # 25MB
+M=12500000      # 50MB
+L=25000000      # 100MB
+XL=50000000     # 200MB
+XXL=75000000    # 300ΜΒ
+XXXL=100000000  # 400MB
+XXXXL=125000000 # 500MB
+
 echo "[STRAGGLE AWARE BENCHMARK]"
-sudo -E DPA_LOG=Debug DPA_SCHEDULER=OFF $(which python) $PROG \
+sudo -E DPA_LOG=Info DPA_SCHEDULER=OFF $(which python) $PROG \
   --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  -b nccl_tcp \ #dpa_dpdk \
-  -d cuda \
-  -t float32 \
-  -s 25000000 \
-  -w 5 -i 20 \
-  --pattern 2 \
-  --dpa_conf $CONF \
-  --dpa_pipes 4 \
-  --dpa_k 5 --dpa_preemptive --dpa_window 64 --dpa_threads 6 --dpa_timeout_us 100 --dpa_profile_skip 4 --dpa_timeout_init_scaling 5
+  -d cpu -t float32 -s $L -w 5 -i 20 --pattern 3 --batch --verify \
+  -b nccl \
+  --dpa_conf $CONF --dpa_pipes 4 --dpa_window 86 --dpa_threads 6 \
+  --dpa_k 6 --dpa_timeout_us 1000 --dpa_timeout_init_scaling 25 \
+  --gloo_socket_ifname $IFACE
+  # --dpa_k 5 --dpa_preemptive --dpa_window 64 --dpa_threads 6 --dpa_timeout_us 100 --dpa_profile_skip 4 --dpa_timeout_init_scaling 5 --batch
   # --straggle_rank 1 --straggle_ms 1000 --straggle_num 1 --straggle_start 0 --straggle_mode batch
 #   # --gloo_socket_ifname $IFACE --gloo_num_threads 2
   # --nccl_socket_nthreads 6 --nccl_nsocks_perthread 2
