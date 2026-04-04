@@ -143,7 +143,7 @@
               ]
         }
       },
-      "dpa-128" : {
+      "dpa-128/8" : {
         "conf": {"iface":"ens4f1","port":4242,"async":true,"drain_queues":true,"timeout_us":1000,"timeout_init_scaling":25.0,"threads":8,"window":96,"tx_burst":64,"rx_burst":64,"rx_pool_size":65536,"rx_pool_cache":512,"tx_pool_size":65536,"tx_pool_cache":512,"rx_ring_size":1024,"tx_ring_size":1024,"tx_interval_us":10,"rx_interval_us":0,"eal_port":"0000:41:00.1","debug_trace_packet":true,"debug_trace_packet_rtx":true  },
         "data": {
           "100": [{"bytes":25000000,"times":[3.7016018],"counts":[20],"time_all":74.050341,"time_unit":"ms","time_mean":3.7016018,"time_std":0.0,"time_min":3.7016018,"time_max":3.7016018,"time_p50":3.7016018,"time_p95":3.7016018,"time_p99":3.7016018,"elem_per_sec":1688458223.6803536,"gbit_per_sec":54.030663157771315  }
@@ -181,12 +181,6 @@
   },
 
 
-  "allreduce-int-float" : {
-    "throughput": {},
-    "latency" : {}
-  },
-
-
   "allreduce-tensor-size": {
     "throughput" : {
       "nccl-rdma-ring": {
@@ -204,7 +198,8 @@
           "300": {"bytes":300000000,"times":[55.209833],"counts":[20],"time_all":1104.262256,"time_unit":"ms","time_mean":55.209833,"time_std":0.0,"time_min":55.209833,"time_max":55.209833,"time_p50":55.209833,"time_p95":55.209833,"time_p99":55.209833,"elem_per_sec":1358453665.3099458,"gbit_per_sec":43.47051728991826  }, 
           "400": {"bytes":400000000,"times":[73.8296757],"counts":[20],"time_all":1476.66466,"time_unit":"ms","time_mean":73.8296757,"time_std":0.0,"time_min":73.8296757,"time_max":73.8296757,"time_p50":73.8296757,"time_p95":73.8296757,"time_p99":73.8296757,"elem_per_sec":1354468904.9744804,"gbit_per_sec":43.343004959183375  },
           "500": {"bytes":500000000,"times":[91.86313585],"counts":[20],"time_all":1837.329255,"time_unit":"ms","time_mean":91.86313585,"time_std":0.0,"time_min":91.86313585,"time_max":91.86313585,"time_p50":91.86313585,"time_p95":91.86313585,"time_p99":91.86313585,"elem_per_sec":1360719932.3579373,"gbit_per_sec":43.543037835453994  }
-      }
+      },
+      "dpa-256" : {}
     }
   }
 }

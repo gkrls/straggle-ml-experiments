@@ -6,3 +6,4 @@ env/
 *.pdf
 *.tex
 BAK/
+venv/

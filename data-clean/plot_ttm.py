@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-Time-to-accuracy plot with multi-rank aggregation.
-
-Usage:
-    python plot_tta.py --input-a data/su/ --input-b data/sa/ \\
-        --metric val_ppl --target 28 --rank avg --exclude-ranks-b 3 -o plot.pdf
-
-Rank options: rank0, rank1, ..., avg, best, fastest
-"""
 import json, argparse, glob, os, sys
 import numpy as np
 
@@ -152,7 +143,7 @@ def plot_tta(input_a, input_b, metric, labels=("SU", "SA"),
              minival_metric=None, target=None, output=None, smooth=False,
              title=None, epochs=None, tolerance=0.0, rank="rank0",
              exclude_ranks_a=None, exclude_ranks_b=None, exclude_pre_train=False):
-    import plot_conf, matplotlib.pyplot as plt
+    import plot_cfg as cfg, matplotlib.pyplot as plt
 
     higher = hib(metric)
     kw = dict(metric=metric, minival_metric=minival_metric,
@@ -184,7 +175,7 @@ def plot_tta(input_a, input_b, metric, labels=("SU", "SA"),
     if all(crossings): print(f"% Speedup: {max(crossings)/min(crossings):.2f}x")
 
     colors = ["#E63946", "#2A9D8F"]
-    fig, ax = plt.subplots(figsize=(plot_conf.COLUMN_WIDTH, 2.2))
+    fig, ax = plt.subplots(figsize=(cfg.COLUMN_WIDTH, 2.2))
 
     for i, (m, v, label) in enumerate(series):
         kws = dict(color=colors[i], lw=1.2, label=label, zorder=3)
@@ -271,18 +262,18 @@ if __name__ == "__main__":
     # ---- Uncomment one block to run directly ----
 
     # # resnet
-    # a.input_a = DIR / "resnet/aggressive/su/"
-    # a.input_b = DIR / "resnet/aggressive-25b/sa"
-    # a.input_a = DIR / "resnet/moderate-25b/su/"
-    # a.input_b = DIR / "resnet/aggressive-25b/sa"
-    # a.metric = "val_top5"
-    # a.target = 90
-    # a.tolerance = 0.01
-    # a.rank = "avg"
-    # a.exclude_ranks_a = None
-    # a.exclude_ranks_b = [1]
-    # a.smooth = True
-    # a.epochs=45
+    a.input_a = DIR / "resnet/aggressive-su/"
+    a.input_b = DIR / "resnet/aggressive-sa-25"
+    a.input_a = DIR / "resnet/moderate-su"
+    a.input_b = DIR / "resnet/aggressive-sa-25"
+    a.metric = "val_top5"
+    a.target = 90
+    a.tolerance = 0.01
+    a.rank = "avg"
+    a.exclude_ranks_a = None
+    a.exclude_ranks_b = [1]
+    a.smooth = True
+    a.epochs=45
 
     # gpt2
     # a.input_a = DIR / "gpt2/aggressive/su"
@@ -317,6 +308,11 @@ if __name__ == "__main__":
     # a.input_b = DIR / "qwen25-metamath40k/moderate-50/sa"
     # a.input_a = DIR / "qwen25-metamath40k/aggressive-75/su"
     # a.input_b = DIR / "qwen25-metamath40k/aggressive-50/sa"
+
+    # a.input_a = DIR / "qwen25-metamath40k/aggressive-su"
+    # a.input_b = DIR / "qwen25-metamath40k/aggressive-sa-50"
+    # a.input_a = DIR / "qwen25-metamath40k/moderate-su"
+    # a.input_b = DIR / "qwen25-metamath40k/moderate-sa-50"
     # a.exclude_pre_train = 0
     # a.metric = "val_ppl"
     # a.target = 1.3
@@ -325,7 +321,7 @@ if __name__ == "__main__":
     # a.exclude_ranks_a = None
     # a.exclude_ranks_b = [1]
     # a.smooth = False
-    # a.tolerance = 0.01
+    # # a.tolerance = 0.05
     # a.epochs = 3
 
     plot_tta(a.input_a, a.input_b, a.metric, a.labels, a.minival, a.target,

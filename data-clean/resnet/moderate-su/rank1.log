@@ -1,0 +1,233 @@
++ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF /home/gks/straggle-ml-experiments/venv/bin/python experiments/train-2/resnet/resnet.py --rank 1 --world_size 6 --iface ens4f1 --master_addr 42.0.1.1 --master_port 29500 --backend dpa_dpdk --dpa_conf /home/gks/straggle-ml-experimen
+ts/configs/edgecore.json --dpa_repin --model resnet50 --data /home/gks/datasets/imagenet --workers 8 --epochs 92 --batch_size 128 --deterministic --prefetch_factor 4 --drop_last_val --json experiments/train-2/resnet_su_moderate.json --dpa_k 6 --straggle_points 1 --stragg
+le_prob 15 --straggle_ranks 1 --straggle_amount 0.6 --straggle_multiply 0.5 2.0                                                                                                                                                                                                
+[2026-03-28 16:48:40] Straggler mitigation DISABLED !!                                                                                                                                                                                                                         
+dpa: Logging level set to 'Info'                                                                                                                                                                                                                                               
+dpa: [warn] Context scheduler disabled by env DPA_SCHEDULER=OFF                                                                                                                                                                                                                
+dpa: [warn] session.pool.seqnums not supplied => assuming 1,1,1...                                                                                                                                                                                                             
+dpa: Using address '42.0.1.2', inferred from iface 'ens4f1'                                                                                                                                                                                                                    
+dpa: Auto-selected eal_lcores '17-23'                                                                                                                                                                                                                                          
+dpa: Main lcore: 17                                                                                                                                                                                                                                                            
+dpa: ====================================================================================================                                                                                                                                                                      
+dpa: Context: rank=1 world=6 scheduler=off build=0.1.0-Release avx=2                                                                                                                                                                                                           
+dpa: Device : (edgecore-dcs810) addr: 42.0.1.0:4242 pipes: 4 quants: 1 reducers: 32/2 slots: 16384 straggle_aware: true                                                                                                                                                        
+dpa:          (session-1) pool: [0,16384) seqnums: [1,1,1,1 ... 1,1,1,1] straggle_timeout: 10.000 ms dropsim: 0.00/0.00 %                                                                                                                                                      
+dpa: Backend: (dpa-dpdk) addr: 42.0.1.2:4242 iface: ens4f1 threads: 6,async window: 64 subpool: [0,768) loop: sa                                                                                                                                                               
+dpa:          Outstanding: 384 packets                                                                                                                                                                                                                                         
+dpa:          RTT timeout: 1000 usec, init_scaling: 25.50                                                                                                                                                                                                                      
+dpa:          TX/RX intrv: 10/0 usec                                                                                                                                                                                                                                           
+dpa:          TX/RX burst: 64/64                                                                                                                                                                                                                                               
+dpa:          TX/RX rings: 1024/1024                                                                                                                                                                                                                                           
+dpa:          TX/RX mpool: 65536/65536                                                                                                                                                                                                                                         
+dpa:          TX/RX cache: 512/512                                                                                                                                                                                                                                             
+dpa:             eal_port: 0000:41:00.1 (virtual=no)                                                                                                                                                                                                                           
+dpa:           eal_lcores: 17-23                                                                                                                                                                                                                                               
+dpa:       eal_extra_args: n/a                                                                                                                                                                                                                                                 
+dpa: ====================================================================================================                                                                                                                                                                      
+dpa: Using EAL args: dpa-dpdk -l 17-23 --main-lcore 17 --file-prefix dpa-dpdk -a 0000:41:00.1                                                                                                                                                                                  
+EAL: Detected CPU lcores: 24                                                                                                                                                                                                                                                   
+EAL: Detected NUMA nodes: 1                                                                                                                                                                                                                                                    
+EAL: Detected shared linkage of DPDK                                                                                                                                                                                                                                           
+EAL: Multi-process socket /var/run/dpdk/dpa-dpdk/mp_socket                                                                                                                                                                                                                     
+EAL: Selected IOVA mode 'VA'                                                                                                                                                                                                                                                   
+EAL: Probe PCI driver: mlx5_pci (15b3:101d) device: 0000:41:00.1 (socket -1)                                                                                                                                                                                                   
+dpa: DPDK link status: UP, speed: 100000                                                                                                                                                                                                                                       
+dpa: DPDK runtime ring size: RX=1024 TX=1024                                                                                                                                                                                                                                   
+dpa: Promiscuous mode disabled: success                                                                                                                                                                                                                                        
+dpa: Flow created: UDP dst=4242 -> queue 0                                                                                                                                                                                                                                     
+dpa: Flow created: UDP dst=4243 -> queue 1                                                                                                                                                                                                                                     
+dpa: Flow created: UDP dst=4244 -> queue 2                                                                                                                                                                                                                                     
+dpa: Flow created: UDP dst=4245 -> queue 3                                                                                                                                                                                                                                     
+dpa: Flow created: UDP dst=4246 -> queue 4                                                                                                                                                                                                                                     
+dpa: Flow created: UDP dst=4247 -> queue 5                                                                                                                                                                                                                                     
+Port configured with 6 RX queues and 6 TX queues                                                                                                                                                                                                                               
+dpa: DPDK device configured succefully. Port: 0, address 10:70:FD:DF:A4:27                                                                                                                                                                                                     
+dpa: DPDK eth link up. Speed 100000 Mbps Full-duplex                                                                                                                                                                                                                           
+dpa.torch: pinned mempool enabled with 20 tensors of 200000000 bytes                                                                                                                                                                                                           
+[2026-03-28 16:48:54] re-pinned to cores 0-17                                                                                                                                                                                                                                  
+[2026-03-28 16:48:54] DDP setup with backend=dpa_dpdk world_size=6 master=42.0.1.1:29500 iface=ens4f1 local_rank=0                                                                                                                                                             
+{                                                                                                                                                                                                                                                                              
+  "rank": 1,                                                                                                                                                                                                                                                                   
+  "world_size": 6,                                                                                                                                                                                                                                                             
+  "iface": "ens4f1",                                                                                                                                                                                                                                                           
+  "master_addr": "42.0.1.1",                                                                                                                                                                                                                                                   
+  "master_port": 29500,                                                                                                                                                                                                                                                        
+  "backend": "dpa_dpdk",                                                                                                                                                                                                                                                       
+  "device": "cuda",                                                                                                                                                                                                                                                            
+  "deterministic": true,                                                                                                                                                                                                                                                       
+  "workers": 8,                                                                                                                                                                                                                                                                
+  "seed": 42,                                                                                                                                                                                                                                                                  
+  "json": "experiments/train-2/resnet_su_moderate.json",                                                                                                                                                                                                                       
+  "dpa_conf": "/home/gks/straggle-ml-experiments/configs/edgecore.json",                                                                                                                                                                                                       
+  "dpa_repin": true,                                                                                                                                                                                                                                                           
+  "dpa_k": 6,                                                                                                                                                                                                                                                                  
+  "dpa_preemptive": false,                                                                                                                                                                                                                                                     
+  "dpa_prescale": false,                                                                                                                                                                                                                                                       
+  "model": "resnet50",                                                                                                                                                                                                                                                         
+  "data": "/home/gks/datasets/imagenet",                                                                                                                                                                                                                                       
+  "epochs": 92,                                                                                                                                                                                                                                                                
+  "batch_size": 128,                                                                                                                                                                                                                                                           
+  "learning_rate": 0.1,                                                                                                                                                                                                                                                        
+  "momentum": 0.9,                                                                                                                                                                                                                                                             
+  "weight_decay": 0.0001,                                                                                                                                                                                                                                                      
+  "num_classes": 1000,                                                                                                                                                                                                                                                         
+  "amp": false,                                                                                                                                                                                                                                                                
+  "drop_last_train": false,                                                                                                                                                                                                                                                    
+  "drop_last_val": true,                                                                                                                                                                                                                                                       
+  "static_graph": false,                                                                                                                                                                                                                                                       
+  "prefetch_factor": 4,                                                                                                                                                                                                                                                        
+  "prescale": false,                                                                                                                                                                                                                                                           
+  "bucket_cap_mb": null,                                                                                                                                                                                                                                                       
+  "straggle_points": 1,                                                                                                                                                                                                                                                        
+  "straggle_prob": 15.0,                                                                                                                                                                                                                                                       
+  "straggle_last": 0,                                                                                                                                                                                                                                                          
+  "straggle_skip": 0,                                                                                                                                                                                                                                                          
+  "straggle_skip_every": 0,                                                                                                                                                                                                                                                    
+  "straggle_ranks": [                                                                                                                                                                                                                                                          
+    1                                                                                                                                                                                                                                                                          
+  ],                                                                                                                                                                                                                                                                           
+  "straggle_amount": 0.6,                                                                                                                                                                                                                                                      
+  "straggle_multiply": [                                                                                                                                                                                                                                                       
+    0.5,                                                                                                                                                                                                                                                                       
+    2.0                                                                                                                                                                                                                                                                        
+  ],                                                                                                                                                                                                                                                                           
+  "straggle_verbose": false,                                                                                                                                                                                                                                                   
+  "local_rank": 0,                                                                                                                                                                                                                                                             
+  "dpa_dpdk": {                                                                                                                                                                                                                                                                
+    "iface": "ens4f1",                                                                                                                                                                                                                                                         
+    "port": 4242,                                                  
+    "async": true,                                                 
+    "drain_queues": true,                                          
+    "timeout_us": 1000,                                            
+    "timeout_init_scaling": 25.5,                                  
+    "threads": 6,                                                  
+    "window": 64,                                                  
+    "tx_burst": 64,                                                
+    "rx_burst": 64,                                                
+    "rx_pool_size": 65536,                                         
+    "rx_pool_cache": 512,                                          
+    "tx_pool_size": 65536,                                         
+    "tx_pool_cache": 512,                                          
+    "rx_ring_size": 1024,                                          
+    "tx_ring_size": 1024,                                          
+    "tx_interval_us": 10,                                          
+    "rx_interval_us": 0,                                           
+    "eal_port": "0000:41:00.1",                                    
+    "debug_trace_packet": true,                                    
+    "debug_trace_packet_rtx": true                                 
+  }                                                                
+}  
+[straggle_sim] pattern: 
+  Maybe-straggle at every step (no skipping).
+  At each maybe-straggle step, sleep at 1 hook point(s) with probability 15.0%.
+  Each delay: 0.50–2.00 × 0.60s.
+[straggle_sim] on rank 1
+[straggle_sim] attached 1 straggle hooks to rank 1
+[2026-03-28 16:48:57] DDPStraggleSim(points=1, prob=15.0%, amount=0.60 sec, multiplier_range=[0.50,2.00], ranks=[1], active=True) created and active for rank 1
+dpa.torch.DDPWrapper: _DPAHookState Object:  {'pipes': 0, 'sa_world': 6, 'sa_preemptive': False, 'averaging': True, 'prescaled': False}
+Model 'resnet50' initialized.
+[2026-03-28 16:48:57][Epoch 000] ...
+[2026-03-28 17:08:45][Epoch 000] global_step=1669 train_loss=5.7190 val_loss=4.6369 top1=12.83% top5=31.49% lr=0.100000 epoch_time=1188.40s step_time=0.70 (min=0.16s, max=3.18) tp=~183.3 img/s straggle_events=251
+[2026-03-28 17:08:45][Epoch 001] ...
+[2026-03-28 17:28:41][Epoch 001] global_step=3338 train_loss=4.0023 val_loss=4.5395 top1=21.19% top5=43.56% lr=0.100000 epoch_time=1196.40s step_time=0.70 (min=0.15s, max=1.78) tp=~182.0 img/s straggle_events=265
+[2026-03-28 17:28:41][Epoch 002] ...
+[2026-03-28 17:48:50][Epoch 002] global_step=5007 train_loss=3.2598 val_loss=3.1530 top1=33.63% top5=59.51% lr=0.100000 epoch_time=1208.81s step_time=0.71 (min=0.15s, max=1.77) tp=~180.1 img/s straggle_events=277
+[2026-03-28 17:48:50][Epoch 003] ...
+[2026-03-28 18:08:45][Epoch 003] global_step=6676 train_loss=2.8714 val_loss=2.6303 top1=41.58% top5=68.34% lr=0.100000 epoch_time=1194.69s step_time=0.70 (min=0.15s, max=1.78) tp=~182.0 img/s straggle_events=260
+[2026-03-28 18:08:45][Epoch 004] ...
+[2026-03-28 18:28:51][Epoch 004] global_step=8345 train_loss=2.6305 val_loss=2.3470 top1=47.29% top5=72.62% lr=0.100000 epoch_time=1205.83s step_time=0.71 (min=0.15s, max=1.78) tp=~180.3 img/s straggle_events=267
+[2026-03-28 18:28:51][Epoch 005] ...
+[2026-03-28 18:48:36][Epoch 005] global_step=10014 train_loss=2.4617 val_loss=2.2729 top1=48.67% top5=73.83% lr=0.100000 epoch_time=1185.39s step_time=0.70 (min=0.53s, max=1.78) tp=~183.6 img/s straggle_events=247
+[2026-03-28 18:48:36][Epoch 006] ...
+[2026-03-28 19:08:22][Epoch 006] global_step=11683 train_loss=2.3478 val_loss=2.1064 top1=50.99% top5=76.68% lr=0.100000 epoch_time=1186.29s step_time=0.70 (min=0.15s, max=1.78) tp=~183.0 img/s straggle_events=246
+[2026-03-28 19:08:22][Epoch 007] ...
+[2026-03-28 19:28:29][Epoch 007] global_step=13352 train_loss=2.2712 val_loss=2.1176 top1=51.29% top5=76.99% lr=0.100000 epoch_time=1206.34s step_time=0.71 (min=0.15s, max=1.78) tp=~180.8 img/s straggle_events=267
+[2026-03-28 19:28:29][Epoch 008] ...
+[2026-03-28 19:48:23][Epoch 008] global_step=15021 train_loss=2.2042 val_loss=2.0496 top1=52.20% top5=77.56% lr=0.100000 epoch_time=1194.24s step_time=0.70 (min=0.15s, max=1.78) tp=~181.5 img/s straggle_events=260
+[2026-03-28 19:48:23][Epoch 009] ...
+[2026-03-28 20:08:20][Epoch 009] global_step=16690 train_loss=2.1448 val_loss=2.0248 top1=53.19% top5=77.92% lr=0.100000 epoch_time=1197.04s step_time=0.70 (min=0.15s, max=1.78) tp=~181.5 img/s straggle_events=259
+[2026-03-28 20:08:20][Epoch 010] ...
+[2026-03-28 20:28:01][Epoch 010] global_step=18359 train_loss=2.0977 val_loss=1.9992 top1=53.34% top5=78.43% lr=0.100000 epoch_time=1180.51s step_time=0.70 (min=0.15s, max=1.78) tp=~183.8 img/s straggle_events=244
+[2026-03-28 20:28:01][Epoch 011] ...
+[2026-03-28 20:47:57][Epoch 011] global_step=20028 train_loss=2.0643 val_loss=1.9939 top1=53.73% top5=78.76% lr=0.100000 epoch_time=1196.52s step_time=0.71 (min=0.15s, max=1.78) tp=~181.4 img/s straggle_events=265
+[2026-03-28 20:47:57][Epoch 012] ...
+[2026-03-28 21:07:41][Epoch 012] global_step=21697 train_loss=2.0316 val_loss=1.9062 top1=55.27% top5=79.87% lr=0.100000 epoch_time=1183.90s step_time=0.69 (min=0.59s, max=1.78) tp=~184.3 img/s straggle_events=252
+[2026-03-28 21:07:41][Epoch 013] ...
+[2026-03-28 21:27:57][Epoch 013] global_step=23366 train_loss=1.9948 val_loss=1.9208 top1=54.76% top5=79.71% lr=0.100000 epoch_time=1216.46s step_time=0.72 (min=0.15s, max=1.77) tp=~178.5 img/s straggle_events=283
+[2026-03-28 21:27:57][Epoch 014] ...
+[2026-03-28 21:47:56][Epoch 014] global_step=25035 train_loss=1.9674 val_loss=1.9445 top1=54.35% top5=79.35% lr=0.100000 epoch_time=1198.91s step_time=0.70 (min=0.59s, max=2.04) tp=~181.5 img/s straggle_events=260
+[2026-03-28 21:47:56][Epoch 015] ...
+[2026-03-28 22:08:22][Epoch 015] global_step=26704 train_loss=1.9439 val_loss=1.8843 top1=55.33% top5=80.19% lr=0.100000 epoch_time=1225.92s step_time=0.72 (min=0.15s, max=1.78) tp=~177.3 img/s straggle_events=298
+[2026-03-28 22:08:22][Epoch 016] ...
+[2026-03-28 22:28:29][Epoch 016] global_step=28373 train_loss=1.9286 val_loss=1.8535 top1=56.23% top5=80.56% lr=0.100000 epoch_time=1207.08s step_time=0.71 (min=0.15s, max=1.78) tp=~180.2 img/s straggle_events=278
+[2026-03-28 22:28:29][Epoch 017] ...
+[2026-03-28 22:48:18][Epoch 017] global_step=30042 train_loss=1.9000 val_loss=1.9073 top1=54.73% top5=79.51% lr=0.100000 epoch_time=1188.48s step_time=0.70 (min=0.15s, max=1.78) tp=~182.9 img/s straggle_events=254
+[2026-03-28 22:48:18][Epoch 018] ...
+[2026-03-28 23:07:59][Epoch 018] global_step=31711 train_loss=1.8977 val_loss=1.7998 top1=58.10% top5=81.56% lr=0.100000 epoch_time=1181.04s step_time=0.70 (min=0.15s, max=1.78) tp=~183.4 img/s straggle_events=251
+[2026-03-28 23:07:59][Epoch 019] ...
+[2026-03-28 23:28:06][Epoch 019] global_step=33380 train_loss=1.8676 val_loss=1.9902 top1=53.92% top5=78.76% lr=0.100000 epoch_time=1206.88s step_time=0.71 (min=0.15s, max=1.78) tp=~179.5 img/s straggle_events=274
+[2026-03-28 23:28:06][Epoch 020] ...
+[2026-03-28 23:48:18][Epoch 020] global_step=35049 train_loss=1.8479 val_loss=1.7849 top1=57.52% top5=81.27% lr=0.100000 epoch_time=1212.67s step_time=0.71 (min=0.59s, max=1.77) tp=~179.3 img/s straggle_events=278
+[2026-03-28 23:48:18][Epoch 021] ...
+[2026-03-29 00:08:13][Epoch 021] global_step=36718 train_loss=1.8438 val_loss=1.7303 top1=58.69% top5=82.21% lr=0.100000 epoch_time=1194.62s step_time=0.70 (min=0.15s, max=1.78) tp=~181.8 img/s straggle_events=265
+[2026-03-29 00:08:13][Epoch 022] ...
+[2026-03-29 00:27:54][Epoch 022] global_step=38387 train_loss=1.8429 val_loss=1.8248 top1=57.06% top5=80.97% lr=0.100000 epoch_time=1181.30s step_time=0.70 (min=0.15s, max=1.78) tp=~184.0 img/s straggle_events=239
+[2026-03-29 00:27:54][Epoch 023] ...
+[2026-03-29 00:48:11][Epoch 023] global_step=40056 train_loss=1.8329 val_loss=1.7514 top1=59.11% top5=82.46% lr=0.100000 epoch_time=1216.36s step_time=0.72 (min=0.15s, max=1.78) tp=~178.8 img/s straggle_events=283
+[2026-03-29 00:48:11][Epoch 024] ...
+[2026-03-29 01:08:05][Epoch 024] global_step=41725 train_loss=1.8157 val_loss=2.0774 top1=52.20% top5=76.87% lr=0.100000 epoch_time=1194.16s step_time=0.70 (min=0.15s, max=2.37) tp=~182.1 img/s straggle_events=264
+[2026-03-29 01:08:05][Epoch 025] ...
+[2026-03-29 01:27:47][Epoch 025] global_step=43394 train_loss=1.8064 val_loss=1.7245 top1=59.15% top5=83.02% lr=0.100000 epoch_time=1182.60s step_time=0.70 (min=0.15s, max=2.38) tp=~183.5 img/s straggle_events=244
+[2026-03-29 01:27:47][Epoch 026] ...
+[2026-03-29 01:47:43][Epoch 026] global_step=45063 train_loss=1.8046 val_loss=1.7299 top1=58.19% top5=82.81% lr=0.100000 epoch_time=1195.52s step_time=0.70 (min=0.15s, max=1.78) tp=~182.0 img/s straggle_events=269
+[2026-03-29 01:47:43][Epoch 027] ...
+[2026-03-29 03:07:39][Epoch 027] global_step=46732 train_loss=1.7882 val_loss=1.9161 top1=54.60% top5=79.62% lr=0.100000 epoch_time=1195.61s step_time=0.70 (min=0.15s, max=1.77) tp=~182.3 img/s straggle_events=267
+[2026-03-29 03:07:39][Epoch 028] ...
+[2026-03-29 03:27:42][Epoch 028] global_step=48401 train_loss=1.7845 val_loss=1.6806 top1=60.10% top5=83.59% lr=0.100000 epoch_time=1202.92s step_time=0.71 (min=0.59s, max=2.07) tp=~180.5 img/s straggle_events=270
+[2026-03-29 03:27:42][Epoch 029] ...
+[2026-03-29 03:47:28][Epoch 029] global_step=50070 train_loss=1.7733 val_loss=1.6768 top1=59.50% top5=83.10% lr=0.100000 epoch_time=1186.64s step_time=0.70 (min=0.15s, max=1.78) tp=~183.4 img/s straggle_events=249
+[2026-03-29 03:47:28][Epoch 030] ...
+[2026-03-29 04:07:23][Epoch 030] global_step=51739 train_loss=1.4143 val_loss=1.1923 top1=70.31% top5=89.48% lr=0.010000 epoch_time=1194.74s step_time=0.70 (min=0.15s, max=1.78) tp=~182.5 img/s straggle_events=256
+[2026-03-29 04:07:23][Epoch 031] ...
+[2026-03-29 04:27:09][Epoch 031] global_step=53408 train_loss=1.3241 val_loss=1.1740 top1=70.39% top5=90.07% lr=0.010000 epoch_time=1185.65s step_time=0.70 (min=0.15s, max=1.78) tp=~183.3 img/s straggle_events=251
+[2026-03-29 04:27:09][Epoch 032] ...
+[2026-03-29 04:46:59][Epoch 032] global_step=55077 train_loss=1.2917 val_loss=1.1546 top1=70.99% top5=90.14% lr=0.010000 epoch_time=1190.80s step_time=0.70 (min=0.59s, max=1.78) tp=~182.1 img/s straggle_events=266
+[2026-03-29 04:46:59][Epoch 033] ...
+[2026-03-29 05:06:59][Epoch 033] global_step=56746 train_loss=1.2622 val_loss=1.1486 top1=70.70% top5=90.17% lr=0.010000 epoch_time=1199.46s step_time=0.70 (min=0.15s, max=1.77) tp=~182.4 img/s straggle_events=253
+[2026-03-29 05:06:59][Epoch 034] ...
+[2026-03-29 05:26:53][Epoch 034] global_step=58415 train_loss=1.2499 val_loss=1.1513 top1=70.98% top5=90.15% lr=0.010000 epoch_time=1194.61s step_time=0.70 (min=0.15s, max=1.78) tp=~182.4 img/s straggle_events=267
+[2026-03-29 05:26:53][Epoch 035] ...
+[2026-03-29 05:46:42][Epoch 035] global_step=60084 train_loss=1.2333 val_loss=1.1400 top1=71.31% top5=90.40% lr=0.010000 epoch_time=1188.29s step_time=0.70 (min=0.15s, max=1.78) tp=~183.0 img/s straggle_events=248
+[2026-03-29 05:46:42][Epoch 036] ...
+[2026-03-29 06:07:01][Epoch 036] global_step=61753 train_loss=1.2216 val_loss=1.1395 top1=71.19% top5=90.46% lr=0.010000 epoch_time=1219.65s step_time=0.72 (min=0.58s, max=1.78) tp=~178.4 img/s straggle_events=289
+[2026-03-29 06:07:01][Epoch 037] ...
+[2026-03-29 06:26:57][Epoch 037] global_step=63422 train_loss=1.2067 val_loss=1.1270 top1=71.55% top5=90.45% lr=0.010000 epoch_time=1195.56s step_time=0.70 (min=0.15s, max=1.77) tp=~182.1 img/s straggle_events=256
+[2026-03-29 06:26:57][Epoch 038] ...
+[2026-03-29 06:46:47][Epoch 038] global_step=65091 train_loss=1.2002 val_loss=1.1239 top1=71.57% top5=90.47% lr=0.010000 epoch_time=1189.98s step_time=0.70 (min=0.15s, max=1.78) tp=~183.0 img/s straggle_events=249
+[2026-03-29 06:46:47][Epoch 039] ...
+[2026-03-29 07:06:36][Epoch 039] global_step=66760 train_loss=1.1855 val_loss=1.1244 top1=72.01% top5=90.69% lr=0.010000 epoch_time=1189.04s step_time=0.70 (min=0.59s, max=1.78) tp=~182.5 img/s straggle_events=252
+[2026-03-29 07:06:36][Epoch 040] ...
+[2026-03-29 07:26:21][Epoch 040] global_step=68429 train_loss=1.1774 val_loss=1.1353 top1=71.12% top5=90.69% lr=0.010000 epoch_time=1185.28s step_time=0.70 (min=0.15s, max=1.77) tp=~183.4 img/s straggle_events=256
+[2026-03-29 07:26:21][Epoch 041] ...
+[2026-03-29 07:46:29][Epoch 041] global_step=70098 train_loss=1.1685 val_loss=1.1127 top1=71.75% top5=90.74% lr=0.010000 epoch_time=1208.22s step_time=0.71 (min=0.15s, max=1.78) tp=~179.9 img/s straggle_events=285
+[2026-03-29 07:46:29][Epoch 042] ...
+[2026-03-29 08:06:33][Epoch 042] global_step=71767 train_loss=1.1619 val_loss=1.1274 top1=71.40% top5=90.65% lr=0.010000 epoch_time=1203.06s step_time=0.71 (min=0.59s, max=1.78) tp=~180.4 img/s straggle_events=274
+[2026-03-29 08:06:33][Epoch 043] ...
+[2026-03-29 08:26:28][Epoch 043] global_step=73436 train_loss=1.1566 val_loss=1.1222 top1=71.54% top5=90.91% lr=0.010000 epoch_time=1195.48s step_time=0.70 (min=0.15s, max=1.77) tp=~181.6 img/s straggle_events=267
+[2026-03-29 08:26:28][Epoch 044] ...
+[2026-03-29 08:46:28][Epoch 044] global_step=75105 train_loss=1.1529 val_loss=1.1227 top1=72.05% top5=90.81% lr=0.010000 epoch_time=1199.59s step_time=0.71 (min=0.15s, max=1.78) tp=~181.1 img/s straggle_events=259
+[2026-03-29 08:46:28][Epoch 045] ...
+[2026-03-29 09:06:20][Epoch 045] global_step=76774 train_loss=1.1445 val_loss=1.1134 top1=71.53% top5=90.91% lr=0.010000 epoch_time=1192.31s step_time=0.70 (min=0.59s, max=1.78) tp=~181.9 img/s straggle_events=259
+[2026-03-29 09:06:20][Epoch 046] ...
+[2026-03-29 09:26:25][Epoch 046] global_step=78443 train_loss=1.1358 val_loss=1.1213 top1=72.20% top5=90.37% lr=0.010000 epoch_time=1204.79s step_time=0.71 (min=0.15s, max=1.78) tp=~180.6 img/s straggle_events=269
+[2026-03-29 09:26:25][Epoch 047] ...
+[2026-03-29 09:46:24][Epoch 047] global_step=80112 train_loss=1.1343 val_loss=1.1126 top1=72.20% top5=90.69% lr=0.010000 epoch_time=1199.59s step_time=0.71 (min=0.15s, max=1.78) tp=~181.2 img/s straggle_events=258
+[2026-03-29 09:46:24][Epoch 048] ...
+[2026-03-29 10:05:58][Epoch 048] global_step=81781 train_loss=1.1300 val_loss=1.1138 top1=71.41% top5=90.71% lr=0.010000 epoch_time=1173.66s step_time=0.69 (min=0.15s, max=2.28) tp=~185.4 img/s straggle_events=239
+[2026-03-29 10:05:58][Epoch 049] ...
+[2026-03-29 10:25:52][Epoch 049] global_step=83450 train_loss=1.1333 val_loss=1.1212 top1=72.25% top5=90.89% lr=0.010000 epoch_time=1194.12s step_time=0.70 (min=0.15s, max=1.78) tp=~181.9 img/s straggle_events=265
+[2026-03-29 10:25:52][Epoch 050] ...
+[2026-03-29 10:45:31][Epoch 050] global_step=85119 train_loss=1.1265 val_loss=1.1152 top1=71.85% top5=90.71% lr=0.010000 epoch_time=1178.99s step_time=0.69 (min=0.15s, max=1.78) tp=~184.6 img/s straggle_events=243
+[2026-03-29 10:45:31][Epoch 051] ...
+[2026-03-29 11:05:42][Epoch 051] global_step=86788 train_loss=1.1189 val_loss=1.2015 top1=70.14% top5=89.51% lr=0.010000 epoch_time=1210.81s step_time=0.72 (min=0.15s, max=1.78) tp=~178.9 img/s straggle_events=278
+[2026-03-29 11:05:42][Epoch 052] ...

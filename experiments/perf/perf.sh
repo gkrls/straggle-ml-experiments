@@ -118,7 +118,8 @@ W_TP_6=64
 W_LA_6=128
 W_LA_8=64
 
-export DPA_DPDK_MONITOR=1
+export DPA_PREEMPTIVE=0
+export DPA_DPDK_MONITOR=0
 export DPA_DPDK_MONITOR_INTERVAL_US=500
 
 XXXXXXXS=25000  # 0.10MB
@@ -139,11 +140,11 @@ XXXXL=125000000 # 500MB
 echo "[STRAGGLE AWARE BENCHMARK]"
 sudo -E DPA_LOG=Info DPA_SCHEDULER=OFF $(which python) $PROG \
   --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  -d cuda -t float32 -s $S -w 0 -i 20 --pattern 3 --batch --verify \
+  -d cuda -t float32 -s $S -w 0 -i 20 --pattern 3 --batch --avg \
   -b dpa_dpdk \
-  --dpa_conf $CONF --dpa_pipes 4 --dpa_window 96 --dpa_threads 8 \
-  --dpa_k 6 --dpa_timeout_us 1000 --dpa_timeout_init_scaling 25 \
-   --straggle_rank 1 --straggle_ms 1 --straggle_num 5 --straggle_start 2 --straggle_mode op
+  --dpa_conf $CONF --dpa_pipes 2 --dpa_window 96 --dpa_threads 8 \
+  --dpa_k 6 --dpa_timeout_us 500 --dpa_timeout_init_scaling 3 \
+   --straggle_rank 1 --straggle_ms 8 --straggle_num 5 --straggle_start 5 --straggle_mode op
   # --gloo_socket_ifname $IFACE
   # --dpa_k 5 --dpa_preemptive --dpa_window 64 --dpa_threads 6 --dpa_timeout_us 100 --dpa_profile_skip 4 --dpa_timeout_init_scaling 5 --batch
  
