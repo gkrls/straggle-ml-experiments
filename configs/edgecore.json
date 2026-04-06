@@ -48,7 +48,7 @@
         "ports": ["1/0", "2/0", "3/0", "4/0", "5/0", "6/0"],
         "pool_base": 0,
         "pool_size": 16384,
-        "straggle_timeout_ms": 25.0,
+        "straggle_timeout_ms": 15.0,
         "mgid": 2,
         "dropsim": {
           "ingress": 0.0,
@@ -64,7 +64,7 @@
     "async": true,
     "drain_queues": true,
     "timeout_us": 1000,
-    "timeout_init_scaling": 25.5,
+    "timeout_init_scaling": 20,
     "threads": 6,
     "window":  96,
     "tx_burst": 64,
