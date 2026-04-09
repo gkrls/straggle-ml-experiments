@@ -56,7 +56,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
         -DDPA_TORCH_PINNEDPOOL_PRETOUCH=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PIPELINE=ON \
+        -DDPA_TORCH_WORKSTEAL=OFF ..
   make -j4 install
 
   # Install the plugin
@@ -131,8 +132,8 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=ON $(which python) experiments/train-2/resnet
   --drop_last_val \
   --json experiments/train-2/resnet_nat_50steps.json \
   --log_every_steps 50 \
-  --torch_profile \
   --dpa_k 6
+  # --torch_profile \
   # --straggle_points 3 \
   # --straggle_prob 20 \
   # --straggle_ranks 1 \

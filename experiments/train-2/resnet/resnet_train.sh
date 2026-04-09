@@ -54,7 +54,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PIPELINE=OFF \
+        -DDPA_TORCH_WORKSTEAL=ON ..
   make -j4 install
 
   # Install the plugin
@@ -109,6 +110,8 @@ set -x
 
 GDB='gdb -ex run --args'
 
+export DPA_PREEMPTIVE=0
+
 sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resnet/resnet.py \
   --rank "$RANK" \
   --world_size "$WORLD_SIZE" \
@@ -126,13 +129,13 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/resne
   --deterministic \
   --prefetch_factor 4 \
   --drop_last_val \
-  --json experiments/train-2/resnet_su_aggressive.json \
-  --dpa_k 6 \
-  --straggle_points 3 \
-  --straggle_prob 15 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.6 \
-  --straggle_multiply 0.5 2.0
+  --json experiments/train-2/resnet_reactive.json \
+  --dpa_k 5
+  # --straggle_points 3 \
+  # --straggle_prob 15 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 0.6 \
+  # --straggle_multiply 0.5 2.0
   
 # sudo -E $(which python) experiments/train/resnet.py \
 #   --rank "$RANK" \

@@ -54,7 +54,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PIPELINE=OFF \
+        -DDPA_TORCH_WORKSTEAL=ON ..
   make -j4 install
 
   # Install the plugin
@@ -124,6 +125,7 @@ set -x
 #   --json experiments/train/roberta_finetune.json \
 #   "$@"
 
+export DPA_PREEMPTIVE=0
 
 # squad v2
 sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/roberta/roberta.py \
@@ -147,10 +149,10 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/rober
   --prefetch_factor 4 \
   --log_every_opt_steps 100 \
   --mini_val_every_opt_steps 150 \
-  --json experiments/train-2/roberta_sa_moderate.json \
-  --dpa_k 5 \
-  --straggle_points 1 \
-  --straggle_prob 15 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.3 \
-  --straggle_multiply 0.5 2.0
+  --json experiments/train-2/roberta_reactive.json \
+  --dpa_k 5
+  # --straggle_points 1 \
+  # --straggle_prob 15 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 1.3 \
+  # --straggle_multiply 0.5 2.0

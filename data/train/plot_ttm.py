@@ -252,7 +252,7 @@ if __name__ == "__main__":
     p.add_argument("--input-b",           )
     p.add_argument("--metric",            default="val_ppl")
     p.add_argument("--minival",           default=None)
-    p.add_argument("--labels",            nargs=2, default=["SU", "SA"])
+    p.add_argument("--labels",            nargs=2, default=["A", "B"])
     p.add_argument("--target",            type=float, default=None)
     p.add_argument("--tolerance",         type=float, default=0.0)
     p.add_argument("--rank",              default="rank0", help="rank0..N | avg | best | fastest")
@@ -275,12 +275,14 @@ if __name__ == "__main__":
     # a.input_b = DIR / "resnet/aggressive-25b/sa"
     # a.input_a = DIR / "resnet/moderate-25b/su/"
     # a.input_b = DIR / "resnet/aggressive-25b/sa"
+    # a.input_a = DIR / "resnet/natural/proactive"
+    # a.input_b = DIR / "resnet/natural/reactive"
     # a.metric = "val_top5"
     # a.target = 90
     # a.tolerance = 0.01
     # a.rank = "avg"
     # a.exclude_ranks_a = None
-    # a.exclude_ranks_b = [1]
+    # a.exclude_ranks_b = None # [1]
     # a.smooth = True
     # a.epochs=45
 
@@ -289,44 +291,52 @@ if __name__ == "__main__":
     # a.input_b = DIR / "gpt2/aggressive/sa"
     # a.input_a = DIR / "gpt2/moderate/su"
     # a.input_b = DIR / "gpt2/moderate/sa"
-    # a.metric = "val_ppl"
-    # a.target = 28.00
+    a.input_a = DIR / "gpt2/natural/proactive"
+    a.input_b = DIR / "gpt2/natural/reactive"
+    a.metric = "val_ppl"
+    a.target = 28.00
     # a.tolerance = 0.01
-    # a.rank = "avg"
-    # a.minival = "mini_val_ppl"
-    # a.exclude_ranks_a = None
-    # a.exclude_ranks_b = [1]
-    # a.smooth = True
-    # a.epochs = 6
+    a.rank = "avg"
+    a.minival = "mini_val_ppl"
+    a.exclude_ranks_a = None
+    a.exclude_ranks_b = [1]
+    a.smooth = True
+    a.epochs = 6
 
     # roberta
     # a.input_a   = DIR/"roberta/aggressive/su"
     # a.input_b   = DIR/"roberta/aggressive/sa"
+    # a.input_a   = DIR/"roberta/natural/proactive"
+    # a.input_b   = DIR/"roberta/natural/reactive"    
     # a.metric    = "val_f1"
     # a.target    = 80
     # a.rank      = "avg"
     # a.tolerance = 0.01
     # a.smooth    = True
     # a.minival   = "mini_val_f1"
-    # a.epochs    = 4 # 8
-    # a.exclude_ranks_a = None,
-    # a.exclude_ranks_b = [1]
+    # a.epochs    = 6
+    # a.exclude_ranks_a = None
+    # a.exclude_ranks_b = None
 
     #qwen
     # a.input_a = DIR / "qwen25-metamath40k/moderate-75/su"
     # a.input_b = DIR / "qwen25-metamath40k/moderate-50/sa"
-    # a.input_a = DIR / "qwen25-metamath40k/aggressive-75/su"
-    # a.input_b = DIR / "qwen25-metamath40k/aggressive-50/sa"
-    # a.exclude_pre_train = 0
+    # # a.input_a = DIR / "qwen25-metamath40k/aggressive-75/su"
+    # # a.input_b = DIR / "qwen25-metamath40k/aggressive-50/sa"
+    # a.input_a = DIR / "qwen25-metamath40k/natural/proactive"
+    # a.input_b = DIR / "qwen25-metamath40k/natural/reactive"
+    # # a.exclude_pre_train = 0
     # a.metric = "val_ppl"
     # a.target = 1.3
-    # a.rank = "avg"
+    # a.rank = "0"
     # a.minival = "mini_val_ppl"
     # a.exclude_ranks_a = None
-    # a.exclude_ranks_b = [1]
+    # a.exclude_ranks_b = None
     # a.smooth = False
     # a.tolerance = 0.01
-    # a.epochs = 3
+    # a.epochs = 4
+
+
 
     plot_tta(a.input_a, a.input_b, a.metric, a.labels, a.minival, a.target,
              a.output, a.smooth, a.title, a.epochs, a.tolerance, a.rank,

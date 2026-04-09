@@ -71,7 +71,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PIPELINE=OFF \
+        -DDPA_TORCH_WORKSTEAL=ON ..
   make -j4 install
 
   # Install the plugin
@@ -139,7 +140,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --backend $BACKEND \
+  --backend dpa_dpdk \
   --dpa_conf $DPA_CONF \
   --dpa_repin \
   --workers 0 \
@@ -154,12 +155,12 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --json experiments/train-2/gpt2_sa_moderate.json \
   --data ~/datasets/openwebtext/tokenized  \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_k 5 \
-  --straggle_points 3 \
-  --straggle_prob 20 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.66 \
-  --straggle_multiply 0.5 2.0
+  --dpa_k 6
+  # --straggle_points 3 \
+  # --straggle_prob 20 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 1.66 \
+  # --straggle_multiply 0.5 2.0
 
   # --straggle_points 1 \
   # --straggle_prob 15 \

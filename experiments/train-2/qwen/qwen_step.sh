@@ -54,7 +54,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PIPELINE=OFF \
+        -DDPA_TORCH_WORKSTEAL=ON ..
   make -j4 install
 
   source $HOME/straggle-ml-experiments/venv/bin/activate
@@ -122,7 +123,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --epochs 3 \
   --batch_size 2 \
   --learning_rate 0.000005 \
-  --gradient_accumulation_steps 20 \
+  --gradient_accumulation_steps 10 \
   --no_mask_prompt \
   --seq_len 512 \
   --sched cosine \

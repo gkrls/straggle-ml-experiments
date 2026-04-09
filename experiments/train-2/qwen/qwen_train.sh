@@ -54,7 +54,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PIPELINE=OFF \
+        -DDPA_TORCH_WORKSTEAL=ON ..
   make -j4 install
 
   source $HOME/straggle-ml-experiments/venv/bin/activate
@@ -100,6 +101,9 @@ set -x
 QWEN_15=Qwen/Qwen1.5-0.5B #--learning_rate 0.00002
 QWEN_25=Qwen/Qwen2.5-0.5B #--learning_rate 0.000002
 
+export DPA_PREEMPTIVE=0
+export DPA_SYN_DISABLE=0
+
 # https://debuggercafe.com/fine-tuning-qwen-1-5-for-coding/
 
 sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/qwen2.py \
@@ -132,14 +136,16 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/qwen/
   --mini_val_early_until 20 \
   --mini_val_max_batches 0 \
   --mini_val_0 \
-  --json experiments/train-2/qwen_metamath40k_sa_aggressive_50.json \
-  --dpa_k 5 \
-  --save_model ~/straggle-ml-experiments/saved_models/qwen25-sa-metamath40k \
-  --straggle_points 3 \
-  --straggle_prob 15 \
-  --straggle_ranks 1 \
-  --straggle_amount 0.9 \
-  --straggle_multiply 0.5 2.0
+  --json experiments/train-2/qwen_reactive.json \
+  --dpa_k 5
+  # --save_model ~/straggle-ml-experiments/saved_models/qwen25-natural-preemptive
+
+  # --save_model ~/straggle-ml-experiments/saved_models/qwen25-sa-metamath40k \
+  # --straggle_points 3 \
+  # --straggle_prob 15 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 0.9 \
+  # --straggle_multiply 0.5 2.0
 
 # METAMATH-40k
   # --model_name $QWEN_25 \

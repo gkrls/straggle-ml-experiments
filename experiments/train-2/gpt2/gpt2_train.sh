@@ -71,7 +71,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PIPELINE=OFF \
+        -DDPA_TORCH_WORKSTEAL=ON ..
   make -j4 install
 
   # Install the plugin
@@ -132,6 +133,8 @@ PY="gpt2-3.py"
 # sudo swapoff -a
 # sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
 
+export DPA_PREEMPTIVE=0
+
 # Consumes around ~15.3GB of memory with AMP
 sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/"$PY" \
   --rank "$RANK" \
@@ -151,15 +154,15 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/gpt2/
   --amp \
   --deterministic \
   --prefetch_factor 4 \
-  --json experiments/train-2/gpt2_sa_moderate.json \
+  --json experiments/train-2/gpt2_reactive.json \
   --data ~/datasets/openwebtext/tokenized  \
   --cache_dir ~/datasets/openwebtext/cache \
-  --dpa_k 6 \
-  --straggle_points 1 \
-  --straggle_prob 15 \
-  --straggle_ranks 1 \
-  --straggle_amount 1.66 \
-  --straggle_multiply 0.5 2.0
+  --dpa_k 5
+  # --straggle_points 1 \
+  # --straggle_prob 15 \
+  # --straggle_ranks 1 \
+  # --straggle_amount 1.66 \
+  # --straggle_multiply 0.5 2.0
 
   # --straggle_points 1 \
   # --straggle_prob 15 \

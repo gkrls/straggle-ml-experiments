@@ -3,7 +3,6 @@ import numpy as np
 import json
 from pathlib import Path
 
-# Replace this with your actual populated JSON/Dictionary data
 data = {
   "sa" : {
     "gpt": {"0": {"avg": [105]}, "5": {"avg": [100]}, "10": {"avg": [95]}, "15": {"avg": [85]}, "20": {"avg": [75]}},

@@ -17,12 +17,11 @@ def avg_gbit(runs):
 
 # Primary bars (full width) — order matters
 PRIMARY = [
-    "dpa-256", "dpa-128", "dpa-64",
-    "gloo",
-    "nccl-tcp-tree", "nccl-tcp-ring",
-    "nccl-rdma-tree", "nccl-rdma-tree-gdr/1",
+    "dpa-256/8", "dpa-128/8", "dpa-256/6", "dpa-128/6", "dpa-64/6",
     "nccl-rdma-ring", "nccl-rdma-ring-gdr/1",
-    
+    "nccl-rdma-tree", "nccl-rdma-tree-gdr/1",
+    "nccl-tcp-tree", "nccl-tcp-ring",
+    "gloo",
 ]
 # Ceiling markers: base_key -> [(overlay_key, linestyle, label), ...]
 OVERLAYS = {

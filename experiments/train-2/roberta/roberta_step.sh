@@ -55,7 +55,8 @@ if [[ $# -ge 1 && "$1" == "sync" ]]; then
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
         -DDPA_TORCH_PINNEDPOOL_PRETOUCH=ON \
-        -DDPA_TORCH_WORKSTEALING=ON ..
+        -DDPA_TORCH_PIPELINE=OFF \
+        -DDPA_TORCH_WORKSTEAL=ON ..
   make -j4 install
 
   # Install the plugin
@@ -133,7 +134,7 @@ sudo -E DPA_LOG=INFO DPA_SCHEDULER=OFF $(which python) experiments/train-2/rober
   --iface "$IFACE" \
   --master_addr "$MASTER_ADDR" \
   --master_port "$MASTER_PORT" \
-  --backend dpa_dpdk \
+  --backend nccl \
   --dpa_conf $DPA_CONF \
   --dpa_repin \
   --data ~/datasets/squad_v2 \

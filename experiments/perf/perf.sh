@@ -42,14 +42,14 @@ if [[ $# -eq 1 && "$1" == "sync" ]]; then
         -DDPA_FASTESTK_EXIT=OFF \
         -DDPA_FASTESTK_BULK=OFF \
         -DDPA_SYNCHRON_BULK=OFF \
-        -DDPA_DPDK_RE_DISABLE=ON \
+        -DDPA_DPDK_RE_DISABLE=OFF \
         -DDPA_DPDK_RX_REUSE=ON \
         -DDPA_DPDK_WIN_HUGE=ON \
         -DDPA_DPDK_RE_FIRST=ΟFF \
         -DDPA_TORCH_PINNEDPOOL=ON \
         -DDPA_TORCH_PINNEDPOOL_PRETOUCH=OFF \
-        -DDPA_TORCH_PIPELINE=OFF \
-        -DDPA_TORCH_WORKSTEAL=ON ..
+        -DDPA_TORCH_PIPELINE=ON \
+        -DDPA_TORCH_WORKSTEAL=OFF ..
   make -j4 install
 
   # Install the plugin
@@ -89,7 +89,6 @@ GDB="gdb --args"
 LOGFILE="allreduce_bench_$(date +%Y%m%d_%H%M%S).log"
 
 
-
 # NCCL STUFF
 export NCCL_SOCKET_IFNAME=$IFACE
 export NCCL_IB_HCA=mlx5_1
@@ -97,15 +96,15 @@ export NCCL_DEBUG=INFO
 export NCCL_DEBUG_SUBSYS=NET
 
 # GDR  # export NCCL_IB_PCI_RELAXED_ORDERING=1
-# export NCCL_NET_GDR_LEVEL=SYS  # Tell NCCL that crossing the internal CPU fabric (SYS level) is okay
-# export NCCL_P2P_LEVEL=SYS
-# export NCCL_P2P_DISABLE=0      # Ensure Peer-to-Peer is not restricted
-# export NCCL_IB_GDR_FLUSH=1     # Recommended for Mellanox + GDR performance
+export NCCL_NET_GDR_LEVEL=SYS  # Tell NCCL that crossing the internal CPU fabric (SYS level) is okay
+export NCCL_P2P_LEVEL=SYS
+export NCCL_P2P_DISABLE=0      # Ensure Peer-to-Peer is not restricted
+export NCCL_IB_GDR_FLUSH=1     # Recommended for Mellanox + GDR performance
 
 
 # export NCCL_PROTO=LL           # LL, LL128, Simple
 export NCCL_ALGO=Ring
-# export NCCL_MIN_NCHANNELS=8
+export NCCL_MIN_NCHANNELS=8
 
 
 sudo modprobe nvidia_peermem 2>/dev/null || true
@@ -118,9 +117,7 @@ W_TP_6=64
 W_LA_6=128
 W_LA_8=64
 
-export DPA_PREEMPTIVE=0
-export DPA_DPDK_MONITOR=0
-export DPA_DPDK_MONITOR_INTERVAL_US=500
+
 
 XXXXXXXS=25000  # 0.10MB
 XXXXXXS=62500   # 0.25MB
@@ -137,15 +134,21 @@ XXL=75000000    # 300ΜΒ
 XXXL=100000000  # 400MB
 XXXXL=125000000 # 500MB
 
-echo "[STRAGGLE AWARE BENCHMARK]"
+export DPA_PREEMPTIVE=0
+export DPA_SYN_DISABLE=0
+export DPA_DPDK_MONITOR=0
+export DPA_DPDK_MONITOR_INTERVAL_US=500
+
+echo "[ALLREDUCE BENCHMARK]"
 sudo -E DPA_LOG=Info DPA_SCHEDULER=OFF $(which python) $PROG \
   --rank $RANK --world_size $WORLD --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
-  -d cuda -t float32 -s $S -w 0 -i 20 --pattern 3 --batch --avg \
+  -d cuda -t float32 -s $L -w 5 -i 20 --pattern 3 \
   -b dpa_dpdk \
-  --dpa_conf $CONF --dpa_pipes 2 --dpa_window 96 --dpa_threads 8 \
-  --dpa_k 6 --dpa_timeout_us 500 --dpa_timeout_init_scaling 3 \
-   --straggle_rank 1 --straggle_ms 8 --straggle_num 5 --straggle_start 5 --straggle_mode op
+  --dpa_conf $CONF --dpa_pipes 4 --dpa_window 96 --dpa_threads 6 \
+  --dpa_k 6 #--dpa_timeout_us 60 --dpa_timeout_init_scaling 20 \
   # --gloo_socket_ifname $IFACE
+  #  --straggle_rank 1 --straggle_ms 200 --straggle_num 10 --straggle_start 0 --straggle_mode op
+  
   # --dpa_k 5 --dpa_preemptive --dpa_window 64 --dpa_threads 6 --dpa_timeout_us 100 --dpa_profile_skip 4 --dpa_timeout_init_scaling 5 --batch
  
 #   # --gloo_socket_ifname $IFACE --gloo_num_threads 2
